@@ -53,7 +53,9 @@
 }
 
 /* The output history: the only scrolling region; monospaced so columns in
-   engine output survive. */
+   engine output survive. Output wraps to this element's actual laid-out
+   width (the context follows every window/resolution change), including
+   long unbroken tokens. */
 #console-history {
 	position: absolute;
 	left: 0dp;
@@ -61,20 +63,22 @@
 	right: 12dp;
 	width: auto;
 	height: 276dp;
-	overflow: auto;
+	overflow-x: hidden;
+	overflow-y: auto;
 	padding-left: 6dp;
 	padding-right: 6dp;
+	drag: drag;
 }
 
-/* No wrapping: engine lines are fixed-height rows (a wrapped long line
-   would overlap the fixed 12dp row height - live-caught). Long lines are
-   clipped by the container's horizontal scroll; the container scrolls on
-   both axes (explicit dp width, so the percentage-collapse trap does not
-   apply). */
+/* One source line is one row, but a row may occupy several rendered lines:
+   the height is content-driven and every wrapped segment keeps the same
+   12dp line rhythm. `word-break: break-word` lets paths, URLs and command
+   dumps break when a token alone is wider than the window. */
 .console-line {
 	display: block;
-	height: 12dp;
-	white-space: nowrap;
+	min-height: 12dp;
+	white-space: pre-wrap;
+	word-break: break-word;
 	font-family: Consolas;
 	font-size: 9dp;
 	line-height: 12dp;
@@ -83,6 +87,25 @@
 
 .console-line.console-dev {
 	color: #9aa2ab;
+}
+
+/* Selection highlight: a sibling over the scrolling history. Rectangles are
+   positioned from the same generated line boxes the text uses and are
+   clipped by this viewport box; they never intercept pointer input. */
+#console-selection {
+	position: absolute;
+	left: 0dp;
+	top: 21dp;
+	right: 12dp;
+	width: auto;
+	height: 276dp;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+.console-selection-rect {
+	position: absolute;
+	background-color: #ff9a3c59;
 }
 
 /* Completion dropdown: sits directly above the command row (the modern
@@ -196,4 +219,30 @@
 	border: 1dp var(--abc-line);
 	color: var(--abc-text);
 	padding-left: 4dp;
+}
+
+/* Right-click menu: one fixed Copy intent, placed at the pointer. */
+#console-context-menu {
+	position: absolute;
+	display: none;
+	min-width: 86dp;
+	padding: 2dp;
+	background-color: #181d22f8;
+	border: 1dp var(--abc-line);
+	border-top: 2dp var(--abc-accent);
+}
+
+.console-context-item {
+	display: block;
+	height: 20dp;
+	line-height: 20dp;
+	padding-left: 8dp;
+	padding-right: 8dp;
+	font-size: 9dp;
+	color: var(--abc-text);
+}
+
+.console-context-item:hover {
+	background-color: var(--abc-accent);
+	color: var(--abc-accent-ink);
 }

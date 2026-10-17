@@ -5,8 +5,7 @@
 
 #include "SpriteResource.h"
 #include "../framework/ResourceLimits.h"
-#include <filesystem>
-#include <memory>
+#include "../framework/ResourceFile.h"
 #include <unordered_set>
 
 #include <wrect.h>
@@ -72,28 +71,29 @@ std::unordered_map<std::string, int> FrameTextures;
 bool ChannelWarned = false;
 int HudResolution = 0;
 
-// GoldSrc keeps sprites in several search paths; the engine SPR_Load walks
-// the same list (mod dir first, then the server-downloaded and addon trees).
-// "<mod>_downloads"/"<mod>_addon" are SIBLINGS of the mod dir, so ".." climbs
-// out of it in the relative path (works for both the relative mod dir the SC
-// engine reports and an absolute one).
-std::vector<std::string> spriteSearchPaths(const std::string& relative) {
-	const std::filesystem::path game = abc::GameDir();
-	return {(game / relative).string(), (game.parent_path() / (game.filename().string()+"_downloads") / relative).string(),
-		(game.parent_path() / (game.filename().string()+"_addon") / relative).string()};
-}
-
-bool readWholeFile(const std::string& path, std::vector<unsigned char>& out) {
-	FILE* file = nullptr;
-	if (fopen_s(&file, path.c_str(), "rb") != 0 || !file)
+// SPR_GetList paths are relative to the sprite root, except when the list
+// escaped it ("../abc/..."): the engine then returns the normalized path
+// ("./abc/..."). Try the standard "sprites/" form first, with the already
+// normalized path as the fallback for those engine-supplied entries.
+bool readSpriteFile(const std::string& atlasFile, std::vector<unsigned char>& bytes) {
+	std::string normalized;
+	if (!framework::ResourceFile::normalize(atlasFile, normalized))
 		return false;
-	std::unique_ptr<FILE, decltype(&fclose)> owned(file, fclose);
-	if (fseek(file, 0, SEEK_END) != 0) return false;
-	const long size = ftell(file);
-	if (size <= 0 || static_cast<size_t>(size) > framework::ResourceLimits::MaxFileBytes || fseek(file,0,SEEK_SET) != 0) return false;
-	std::vector<unsigned char> bytes(static_cast<size_t>(size));
-	if (fread(bytes.data(),1,bytes.size(),file) != bytes.size()) return false;
-	out = std::move(bytes); return true;
+
+	if (normalized.starts_with("sprites/"))
+		return framework::ResourceFile::read(normalized, bytes, framework::ResourceLimits::MaxFileBytes);
+
+	const bool escapedSpriteRoot = atlasFile.starts_with("./") ||
+		atlasFile.starts_with(".\\") || atlasFile.starts_with("../") ||
+		atlasFile.starts_with("..\\") || atlasFile.find("/../") != std::string::npos ||
+		atlasFile.find("\\..\\") != std::string::npos;
+	if (escapedSpriteRoot &&
+		framework::ResourceFile::read(normalized, bytes, framework::ResourceLimits::MaxFileBytes))
+		return true;
+
+	if (framework::ResourceFile::read("sprites/" + normalized, bytes, framework::ResourceLimits::MaxFileBytes))
+		return true;
+	return framework::ResourceFile::read(normalized, bytes, framework::ResourceLimits::MaxFileBytes);
 }
 
 // Forward decl: standalone frame uploads share the atlas upload helper
@@ -137,11 +137,7 @@ void decodeFramePixels(const unsigned char* indexed, int pixelCount, const unsig
 
 bool loadSpr(const std::string& atlasFile, DecodedAtlas& out) {
 	std::vector<unsigned char> file;
-	for (const auto& path : spriteSearchPaths("sprites/" + atlasFile)) {
-		if (readWholeFile(path, file))
-			break;
-	}
-	if (file.empty()) {
+	if (!readSpriteFile(atlasFile, file)) {
 		abc::ConsoleWarn("[AbcUi] sprite atlas not found: sprites/%s\n", atlasFile.c_str());
 		return false;
 	}
@@ -236,11 +232,7 @@ StandaloneSpr* ensureStandalone(const std::string& relativePath) {
 	};
 
 	StandaloneSpr spr;
-	for (const auto& path : spriteSearchPaths(relativePath)) {
-		if (readWholeFile(path, spr.file))
-			break;
-	}
-	if (spr.file.empty()) {
+	if (!framework::ResourceFile::read(relativePath, spr.file, framework::ResourceLimits::MaxFileBytes)) {
 		abc::ConsoleWarn("[AbcUi] sprite not found: %s\n", relativePath.c_str());
 		return fail();
 	}

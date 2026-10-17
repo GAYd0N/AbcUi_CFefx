@@ -2,7 +2,8 @@
 
 // data::sprites - hud.txt sprite registry + GoldSrc .spr decoder feeding
 // Rml textures. Ported from ABCEnchance src/core/resource/spriteresource.*
-// (the hud.txt half runs through the engine SPR_GetList, same as before);
+// (hud.txt runs through SPR_GetList; atlas bytes resolve through the engine
+// IFileSystem, so all mounted *_downloads/*_addon paths participate);
 // the pixel half is new - the old VGUI controls drew engine HSPRITE handles,
 // which Rml cannot consume. Decode rules ported from SPRView.Net (Core/
 // FrameDecoder.cs, same author/maintainer as this migration):

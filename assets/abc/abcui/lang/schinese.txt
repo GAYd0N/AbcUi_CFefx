@@ -405,6 +405,7 @@ Loading_AddressInvalid = 请输入有效地址，例如 127.0.0.1:27015
 
 # Replacement console (T16)
 Console_Title = 控制台
+Console_Copy = 复制
 Console_Close = 关闭
 Console_Count = 行数
 Console_ConfirmLead = 粘贴内容包含多条命令，将执行命令数：

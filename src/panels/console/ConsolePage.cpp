@@ -4,6 +4,8 @@
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
+#include <RmlUi/Core/ElementText.h>
+#include <RmlUi/Core/ElementUtilities.h>
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <RmlUi/Core/Elements/ElementFormControlInput.h>
 #include <RmlUi/Core/Event.h>
@@ -16,6 +18,7 @@
 #include "../../services/console/ConsoleBuffer.h"
 
 #include <algorithm>
+#include <cstdio>
 
 namespace panels::console {
 
@@ -65,6 +68,61 @@ std::string controlValue(Rml::ElementDocument* doc, const char* id) {
 
 bool containsNewline(const std::string& text) {
 	return text.find('\n') != std::string::npos || text.find('\r') != std::string::npos;
+}
+
+bool insideNode(const Rml::Element* node, const Rml::Element* ancestor) {
+	for (const Rml::Element* it = node; it; it = it->GetParentNode()) {
+		if (it == ancestor)
+			return true;
+	}
+	return false;
+}
+
+// A point belongs to the output only when it is inside a row's text; the
+// history's own blank area also starts a selection, but its scrollbar (a
+// child with drag=block) must keep owning the pointer.
+bool insideConsoleRow(const Rml::Element* target, const Rml::Element* history) {
+	for (const Rml::Element* it = target; it; it = it->GetParentNode()) {
+		if (it->IsClassSet("console-line"))
+			return true;
+		if (it == history)
+			return false;
+	}
+	return false;
+}
+
+// Width of a UTF-8 prefix in the laid-out text element. This is the same
+// measurement path RmlUi used to format the line, so the caret can be placed
+// between glyphs instead of estimating from character counts.
+int prefixWidth(Rml::ElementText* text, const Rml::String& line, std::size_t bytes) {
+	bytes = std::min(bytes, line.size());
+	return Rml::ElementUtilities::GetStringWidth(text,
+		Rml::StringView(line.data(), line.data() + bytes));
+}
+
+// Maps a horizontal offset inside one generated line to the nearest UTF-8
+// character boundary. A click in the left/right half of a glyph snaps to the
+// matching side, matching the feel of a native text selection.
+std::size_t offsetForX(Rml::ElementText* text, const Rml::String& line, float x) {
+	if (x <= 0.0f || line.empty())
+		return 0;
+	std::size_t previous = 0;
+	int previousWidth = 0;
+	for (Rml::StringIteratorU8 it(line); it; ++it) {
+		const std::ptrdiff_t offset = it.offset();
+		if (offset <= 0 || offset > static_cast<std::ptrdiff_t>(line.size()))
+			continue;
+		const std::size_t current = static_cast<std::size_t>(offset);
+		const int currentWidth = prefixWidth(text, line, current);
+		if (static_cast<float>(currentWidth) >= x) {
+			if (x - static_cast<float>(previousWidth) <= static_cast<float>(currentWidth) - x)
+				return previous;
+			return current;
+		}
+		previous = current;
+		previousWidth = currentWidth;
+	}
+	return line.size();
 }
 
 // Parks the editor's caret at the end of its text. The widget's selection
@@ -129,6 +187,10 @@ void ConsolePage::onDocumentReady() {
 	Rml::ElementDocument* doc = documentOrNull();
 	if (doc) {
 		addListener(doc, "click", &Listener);
+		// Output selection: mousedown anchors, drag extends. Capture phase so
+		// the console's own widget/listener defaults cannot swallow the feed.
+		addListener(doc, "mousedown", &Listener, true);
+		addListener(doc, "drag", &Listener, true);
 		// Capture phase: the interaction keys are consumed before the editor
 		// widget (and the document's own TAB navigation default) sees them.
 		addListener(doc, "keydown", &Keys, true);
@@ -146,6 +208,9 @@ void ConsolePage::onDocumentReady() {
 	SuggestionIndex = -1;
 	HistoryCursor = -1;
 	HistoryDraft.clear();
+	Selection.clear();
+	RowTexts.clear();
+	SelectionDirty = true;
 	prepare();
 }
 
@@ -158,7 +223,10 @@ void ConsolePage::prepare() {
 	HistoryCursor = -1;
 	HistoryDraft.clear();
 	setVisible(doc, "console-confirm", false);
+	closeContextMenu();
 	hideCompletion();
+	Selection.clear();
+	SelectionDirty = true;
 	// A fresh open reseeds the projection: the tail window of whatever the
 	// buffer holds now (the reader sees current state, not an arbitrary
 	// incremental slice from a previous session).
@@ -190,6 +258,9 @@ void ConsolePage::render() {
 		ProjectedGeneration = generation;
 		ProjectedSequence = 0;
 		history->SetInnerRML("");
+		RowTexts.clear();
+		Selection.clear();
+		SelectionDirty = true;
 	}
 
 	if (ProjectedSequence == 0) {
@@ -209,6 +280,7 @@ void ConsolePage::render() {
 		if (atBottom)
 			history->SetScrollTop(history->GetScrollHeight());
 		updateCountLine();
+		refreshSelectionOverlay();
 		return;
 	}
 
@@ -217,12 +289,13 @@ void ConsolePage::render() {
 		// The pending tail follow (see the append branch): the metrics are
 		// current now, so the one-pass-behind scroll can land exactly at the
 		// bottom - unless the reader scrolled up since it was armed.
-		if (FollowPending) {
+		if (FollowPending && !Selection.hasAnchor()) {
 			FollowPending = false;
 			if (history->GetScrollTop() + 1.0f >= FollowFromScrollTop)
 				history->SetScrollTop(history->GetScrollHeight());
 		}
 		updateCountLine();
+		refreshSelectionOverlay();
 		return;  // no new lines
 	}
 
@@ -230,7 +303,10 @@ void ConsolePage::render() {
 	const float scrollTopBefore = history->GetScrollTop();
 	const float scrollHeightBefore = history->GetScrollHeight();
 	const float clientHeight = history->GetClientHeight();
-	const bool atBottom = scrollTopBefore + clientHeight >= scrollHeightBefore - 1.0f;
+	// A selection pins the view: appends during a drag (or while selected
+	// text waits to be copied) must never yank the range off screen.
+	const bool atBottom = !Selection.hasAnchor()
+		&& scrollTopBefore + clientHeight >= scrollHeightBefore - 1.0f;
 
 	std::vector<services::console::ConsoleLine> lines;
 	// The consumer window is bounded too: a long gap (the page was hidden
@@ -264,6 +340,7 @@ void ConsolePage::render() {
 		history->SetScrollTop(target);
 	}
 	updateCountLine();
+	refreshSelectionOverlay();
 }
 
 void ConsolePage::appendLine(const std::string& text, bool developer, bool truncated) {
@@ -280,6 +357,8 @@ void ConsolePage::appendLine(const std::string& text, bool developer, bool trunc
 	// Output is always text: escaped, never parsed as markup.
 	row->SetInnerRML(framework::TextUtil::escapeRml(text + (truncated ? " …" : "")));
 	history->AppendChild(std::move(row));
+	RowTexts.push_back(text + (truncated ? " …" : ""));
+	SelectionDirty = true;
 }
 
 int ConsolePage::trimDom() {
@@ -294,6 +373,14 @@ int ConsolePage::trimDom() {
 			break;
 		history->RemoveChild(oldest);
 		++removed;
+	}
+	if (removed > 0) {
+		const std::size_t count = std::min(RowTexts.size(), static_cast<std::size_t>(removed));
+		RowTexts.erase(RowTexts.begin(), RowTexts.begin() + static_cast<std::ptrdiff_t>(count));
+		Selection.trimFront(removed);
+		if (RowTexts.empty())
+			Selection.clear();
+		SelectionDirty = true;
 	}
 	return removed;
 }
@@ -324,6 +411,13 @@ void ConsolePage::handleClick(Rml::Event& event) {
 			Callback(kActionClose);
 		return;
 	}
+	if (action == "console-context-copy") {
+		// Right-click menu: the selection when there is one, otherwise the
+		// whole visible scrollback. Ctrl+C remains the quick path.
+		copyOutput();
+		closeContextMenu();
+		return;
+	}
 	if (action == "console-confirm-yes") {
 		executeConfirmed();
 		return;
@@ -344,6 +438,259 @@ void ConsolePage::handleClick(Rml::Event& event) {
 		const int index = entry->GetAttribute<int>("data-index", -1);
 		applyCompletion(index);
 		return;
+	}
+}
+
+void ConsolePage::handlePointerDown(Rml::Event& event) {
+	Rml::ElementDocument* doc = documentOrNull();
+	if (!doc)
+		return;
+	const int button = event.GetParameter<int>("button", -1);
+	Rml::Element* history = doc->GetElementById("console-history");
+	Rml::Element* target = event.GetTargetElement();
+	const Rml::Vector2f point(event.GetParameter<float>("mouse_x", 0.0f),
+		event.GetParameter<float>("mouse_y", 0.0f));
+	if (button == 1) {
+		// Right click on output opens the copy menu and preserves the current
+		// selection (the menu may be about to copy exactly that range).
+		if (history && insideNode(target, history)
+			&& (target == history || insideConsoleRow(target, history)))
+			openContextMenu(point);
+		else
+			closeContextMenu();
+		return;
+	}
+	if (button != 0)
+		return;
+	Rml::Element* menu = doc->GetElementById("console-context-menu");
+	if (menu && insideNode(target, menu))
+		return;  // the item's click handler owns copy + close
+	if (!history || !insideNode(target, history)) {
+		closeContextMenu();
+		clearSelection();
+		return;
+	}
+	closeContextMenu();
+	// The scrollbar owns its drag; only the output body and rows select.
+	if (target != history && !insideConsoleRow(target, history))
+		return;
+	const Caret caret = caretFromPoint(point);
+	if (caret.Row < 0)
+		return;
+	const bool shift = event.GetParameter<int>("shift_key", 0) != 0;
+	if (shift && !Selection.empty())
+		Selection.extend(caret.Row, caret.Offset);
+	else
+		Selection.begin(caret.Row, caret.Offset);
+	SelectionDirty = true;
+	refreshSelectionOverlay(true);
+}
+
+void ConsolePage::handleDrag(Rml::Event& event) {
+	if (!Selection.hasAnchor())
+		return;
+	Rml::ElementDocument* doc = documentOrNull();
+	if (!doc)
+		return;
+	Rml::Element* history = doc->GetElementById("console-history");
+	const Rml::Element* dragElement = static_cast<const Rml::Element*>(
+		event.GetParameter<void*>("drag_element", static_cast<void*>(nullptr)));
+	if (!history || dragElement != history)
+		return;
+	const Rml::Vector2f point(event.GetParameter<float>("mouse_x", 0.0f),
+		event.GetParameter<float>("mouse_y", 0.0f));
+	const Caret caret = caretFromPoint(point);
+	if (caret.Row < 0)
+		return;
+	Selection.extend(caret.Row, caret.Offset);
+	SelectionDirty = true;
+	refreshSelectionOverlay(true);
+}
+
+ConsolePage::Caret ConsolePage::caretFromPoint(Rml::Vector2f point) const {
+	Rml::ElementDocument* doc = documentOrNull();
+	Rml::Element* history = doc ? doc->GetElementById("console-history") : nullptr;
+	if (!history || RowTexts.empty())
+		return {};
+	const int rowCount = std::min(history->GetNumChildren(), static_cast<int>(RowTexts.size()));
+	if (rowCount <= 0)
+		return {};
+
+	int row = rowCount - 1;
+	for (int i = 0; i < rowCount; ++i) {
+		Rml::Element* candidate = history->GetChild(i);
+		if (!candidate)
+			continue;
+		const float top = candidate->GetAbsoluteOffset().y;
+		if (point.y < top + candidate->GetOffsetHeight()) {
+			row = i;
+			break;
+		}
+	}
+
+	Rml::Element* rowElement = history->GetChild(row);
+	Rml::ElementText* text = rowElement
+		? rmlui_dynamic_cast<Rml::ElementText*>(rowElement->GetFirstChild())
+		: nullptr;
+	if (!text)
+		return Caret{row, 0};
+	const auto& lines = text->GetLines();
+	if (lines.empty())
+		return Caret{row, 0};
+	const Rml::Vector2f textOrigin = text->GetAbsoluteOffset();
+	const float relativeY = point.y - textOrigin.y;
+	int lineIndex = 0;
+	for (int i = 1; i < static_cast<int>(lines.size()); ++i) {
+		if (relativeY < lines[static_cast<std::size_t>(i)].position.y)
+			break;
+		lineIndex = i;
+	}
+	const Rml::ElementText::Line& line = lines[static_cast<std::size_t>(lineIndex)];
+	std::size_t lineStart = 0;
+	for (int i = 0; i < lineIndex; ++i)
+		lineStart += lines[static_cast<std::size_t>(i)].text.size();
+	const float relativeX = point.x - textOrigin.x - line.position.x;
+	const std::size_t local = offsetForX(text, line.text, relativeX);
+	const std::size_t offset = std::min(lineStart + local, RowTexts[static_cast<std::size_t>(row)].size());
+	return Caret{row, offset};
+}
+
+void ConsolePage::clearSelection() {
+	if (!Selection.hasAnchor())
+		return;
+	Selection.clear();
+	SelectionDirty = true;
+	refreshSelectionOverlay(true);
+}
+
+void ConsolePage::copySelection() {
+	if (Selection.empty())
+		return;
+	Rml::SystemInterface* systemInterface = Rml::GetSystemInterface();
+	if (!systemInterface)
+		return;
+	const std::string text = Selection.text(RowTexts);
+	if (!text.empty())
+		systemInterface->SetClipboardText(text);
+}
+
+void ConsolePage::copyOutput() {
+	Rml::SystemInterface* systemInterface = Rml::GetSystemInterface();
+	if (!systemInterface)
+		return;
+	std::string text;
+	if (!Selection.empty()) {
+		text = Selection.text(RowTexts);
+	} else {
+		for (const std::string& row : RowTexts) {
+			if (!text.empty())
+				text.push_back('\n');
+			text += row;
+		}
+	}
+	if (!text.empty())
+		systemInterface->SetClipboardText(text);
+}
+
+void ConsolePage::openContextMenu(Rml::Vector2f point) {
+	Rml::ElementDocument* doc = documentOrNull();
+	Rml::Element* menu = doc ? doc->GetElementById("console-context-menu") : nullptr;
+	if (!doc || !menu)
+		return;
+	// The menu uses viewport pixel coordinates (the same space as the mouse
+	// event); clamp it so a right click near an edge still shows the whole
+	// entry. Its size is known from console.rcss (86dp min width, one 20dp row).
+	const float scale = Rml::ElementUtilities::GetDensityIndependentPixelRatio(doc);
+	const float menuWidth = 94.0f * scale;
+	const float menuHeight = 31.0f * scale;
+	const float x = std::clamp(point.x, 0.0f, std::max(0.0f, doc->GetClientWidth() - menuWidth));
+	const float y = std::clamp(point.y, 0.0f, std::max(0.0f, doc->GetClientHeight() - menuHeight));
+	menu->SetProperty(Rml::PropertyId::Left, Rml::Property(x, Rml::Unit::PX));
+	menu->SetProperty(Rml::PropertyId::Top, Rml::Property(y, Rml::Unit::PX));
+	setVisible(doc, "console-context-menu", true);
+	ContextMenuOpen = true;
+}
+
+void ConsolePage::closeContextMenu() {
+	ContextMenuOpen = false;
+	setVisible(documentOrNull(), "console-context-menu", false);
+}
+
+void ConsolePage::refreshSelectionOverlay(bool force) {
+	Rml::ElementDocument* doc = documentOrNull();
+	Rml::Element* history = doc ? doc->GetElementById("console-history") : nullptr;
+	Rml::Element* layer = doc ? doc->GetElementById("console-selection") : nullptr;
+	if (!history || !layer)
+		return;
+	if (Selection.empty()) {
+		if (layer->GetNumChildren() != 0)
+			layer->SetInnerRML("");
+		SelectionDirty = false;
+		return;
+	}
+	const float scrollTop = history->GetScrollTop();
+	const float scrollHeight = history->GetScrollHeight();
+	const float width = history->GetOffsetWidth();
+	if (!force && !SelectionDirty
+		&& scrollTop == SelectionScrollTop
+		&& scrollHeight == SelectionScrollHeight
+		&& width == SelectionWidth)
+		return;
+	SelectionDirty = false;
+	SelectionScrollTop = scrollTop;
+	SelectionScrollHeight = scrollHeight;
+	SelectionWidth = width;
+	layer->SetInnerRML("");
+
+	const ConsoleSelection::Point first = Selection.start();
+	const ConsoleSelection::Point last = Selection.end();
+	const int rowCount = std::min(history->GetNumChildren(), static_cast<int>(RowTexts.size()));
+	const Rml::Vector2f layerOrigin = layer->GetAbsoluteOffset();
+	const float layerHeight = layer->GetOffsetHeight();
+	for (int row = first.Row; row <= last.Row && row < rowCount; ++row) {
+		if (row < 0)
+			continue;
+		std::size_t begin = 0;
+		std::size_t end = 0;
+		if (!Selection.rowRange(row, RowTexts[static_cast<std::size_t>(row)].size(), begin, end))
+			continue;
+		Rml::Element* rowElement = history->GetChild(row);
+		Rml::ElementText* text = rowElement
+			? rmlui_dynamic_cast<Rml::ElementText*>(rowElement->GetFirstChild())
+			: nullptr;
+		if (!text)
+			continue;
+		const auto& lines = text->GetLines();
+		const Rml::Vector2f textOrigin = text->GetAbsoluteOffset();
+		const float lineHeight = text->GetLineHeight();
+		std::size_t lineStart = 0;
+		for (const Rml::ElementText::Line& line : lines) {
+			const std::size_t currentStart = lineStart;
+			const std::size_t currentEnd = currentStart + line.text.size();
+			const std::size_t selectedBegin = std::max(begin, currentStart);
+			const std::size_t selectedEnd = std::min(end, currentEnd);
+			lineStart = currentEnd;
+			if (selectedBegin >= selectedEnd)
+				continue;
+			const float x = textOrigin.x + line.position.x
+				+ static_cast<float>(prefixWidth(text, line.text, selectedBegin - currentStart))
+				- layerOrigin.x;
+			const float right = textOrigin.x + line.position.x
+				+ static_cast<float>(prefixWidth(text, line.text, selectedEnd - currentStart))
+				- layerOrigin.x;
+			const float y = textOrigin.y + line.position.y - layerOrigin.y;
+			if (right <= x || y + lineHeight <= 0.0f || y >= layerHeight)
+				continue;
+			Rml::ElementPtr rectangle = doc->CreateElement("div");
+			if (!rectangle)
+				continue;
+			rectangle->SetClass("console-selection-rect", true);
+			char style[192];
+			std::snprintf(style, sizeof(style), "left:%.2fpx; top:%.2fpx; width:%.2fpx; height:%.2fpx;",
+				x, y, right - x, lineHeight);
+			rectangle->SetAttribute("style", style);
+			layer->AppendChild(std::move(rectangle));
+		}
 	}
 }
 
@@ -368,6 +715,15 @@ void ConsolePage::handleKey(Rml::Event& event) {
 	const bool confirmOpen = !PendingText.empty();
 
 	if (key == Rml::Input::KI_ESCAPE) {
+		if (ContextMenuOpen) {
+			// One key closes one layer: the context menu first. The module's
+			// owner action runs after this feed, so the claim keeps the same
+			// press from also closing the console.
+			event.StopPropagation();
+			EscapeClaimed = true;
+			closeContextMenu();
+			return;
+		}
 		if (confirmOpen) {
 			// One key closes one layer: the pane first (the paste is
 			// dropped, nothing runs). The module's owner action runs after
@@ -380,6 +736,13 @@ void ConsolePage::handleKey(Rml::Event& event) {
 			return;
 		}
 		return;  // the overlay close is the owner's routed ESC, not ours
+	}
+	if (key == Rml::Input::KI_C && ctrl && !Selection.empty()) {
+		// Output selection copy. With no selection the widget keeps its own
+		// Ctrl+C (editor text), so neither layer steals the other's shortcut.
+		event.StopPropagation();
+		copySelection();
+		return;
 	}
 	if (confirmOpen)
 		return;  // the modal pane drives; the editor stays inert
@@ -667,7 +1030,12 @@ void ConsolePage::walkHistory(int delta) {
 }
 
 void ConsolePage::WindowListener::ProcessEvent(Rml::Event& event) {
-	Owner->handleClick(event);
+	if (event.GetId() == Rml::EventId::Mousedown)
+		Owner->handlePointerDown(event);
+	else if (event.GetId() == Rml::EventId::Drag)
+		Owner->handleDrag(event);
+	else
+		Owner->handleClick(event);
 }
 
 void ConsolePage::KeyListener::ProcessEvent(Rml::Event& event) {

@@ -22,11 +22,11 @@
 #include <abc/CvarCmd.h>
 #include <abc/Console.h>
 #include <abc/Math.h>
-#include <abc/Paths.h>
 
 #include "../../data/HudState.h"
 #include "../../framework/Localization.h"
 #include "../../framework/Projection.h"
+#include "../../framework/ResourceFile.h"
 #include "../../framework/TextUtil.h"
 #include "../../framework/Theme.h"
 
@@ -88,17 +88,12 @@ void loadItemList() {
 	if (!Items.empty() || ListWarned)
 		return;
 	ListWarned = true;
-	FILE* file = nullptr;
-	if (fopen_s(&file, abc::ModPath(kItemListPath).c_str(), "rb") != 0 || !file) {
+	std::vector<unsigned char> bytes;
+	if (!framework::ResourceFile::read(kItemListPath, bytes, 4 * 1024 * 1024)) {
 		abc::ConsoleWarn("[AbcUi] itemhighlight: no item list file %s\n", kItemListPath);
 		return;
 	}
-	std::string content;
-	char buffer[1024];
-	size_t read = 0;
-	while ((read = fread(buffer, 1, sizeof(buffer), file)) > 0)
-		content.append(buffer, read);
-	fclose(file);
+	const std::string content(reinterpret_cast<const char*>(bytes.data()), bytes.size());
 
 	// Tokenize on whitespace (the old COM_ParseFile contract).
 	std::vector<std::string> tokens;

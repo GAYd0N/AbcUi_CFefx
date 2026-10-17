@@ -17,6 +17,11 @@
 //     lines, and the DOM holds at most kMaxDomLines rows (oldest trimmed).
 //   - Scroll is honest: a reader parked above the bottom is never yanked
 //     down by appends; a viewer at the bottom follows the tail.
+//   - Output wraps to the console's actual laid-out width (no fixed columns,
+//     no horizontal scrolling), and the same layout is the source for
+//     mouse selection: drag over rows, Ctrl+C copies the selected text, and
+//     a right-click opens the Copy menu (visible output when nothing is
+//     selected).
 //   - The editor is single-line: text enters only through the T07 text
 //     pipeline, so an uncommitted composition can never execute. Enter
 //     submits through the sink, Up/Down walk the backend history, Tab
@@ -29,8 +34,10 @@
 //     console-confirm-execute, console-confirm-cancel, console-close.
 
 #include "../../framework/InteractiveDocument.h"
+#include "ConsoleSelection.h"
 
 #include <RmlUi/Core/EventListener.h>
+#include <RmlUi/Core/Types.h>
 
 #include <cstdint>
 #include <functional>
@@ -134,6 +141,8 @@ private:
 	};
 
 	void handleClick(Rml::Event& event);
+	void handlePointerDown(Rml::Event& event);
+	void handleDrag(Rml::Event& event);
 	void handleKey(Rml::Event& event);
 	Rml::ElementDocument* documentOrNull() const;
 
@@ -141,6 +150,21 @@ private:
 	void appendLine(const std::string& text, bool developer, bool truncated);
 	int trimDom();
 	void updateCountLine();
+
+	// Selection. `caretFromPoint` maps a context-space point onto the
+	// laid-out output (row + UTF-8 byte offset); the highlight layer is
+	// rebuilt from the same line boxes the text renderer used.
+	struct Caret {
+		int Row = -1;
+		std::size_t Offset = 0;
+	};
+	Caret caretFromPoint(Rml::Vector2f point) const;
+	void clearSelection();
+	void copySelection();
+	void copyOutput();
+	void openContextMenu(Rml::Vector2f point);
+	void closeContextMenu();
+	void refreshSelectionOverlay(bool force = false);
 
 	// Interaction.
 	void submitFromEditor();
@@ -187,6 +211,17 @@ private:
 	std::string HistoryDraft;
 	// Set when the confirm pane consumed an ESC press (see consumeEscapeClaim).
 	bool EscapeClaimed = false;
+	// The visible rows' source text, index-aligned with the history's
+	// children (the DOM can be trimmed; this mirror trims with it).
+	std::vector<std::string> RowTexts;
+	ConsoleSelection Selection;
+	bool SelectionDirty = false;
+	bool ContextMenuOpen = false;
+	// Layout inputs of the last highlight build: a scroll, resize, append or
+	// trim invalidates the cached rectangles.
+	float SelectionScrollTop = -1.0f;
+	float SelectionScrollHeight = -1.0f;
+	float SelectionWidth = -1.0f;
 };
 
 }

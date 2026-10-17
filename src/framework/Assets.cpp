@@ -1,10 +1,8 @@
 // framework::Assets implementation - see Assets.h.
 #include "Assets.h"
+#include "ResourceFile.h"
 
 #include <abc/Console.h>
-#include <abc/Paths.h>
-
-#include <cstdio>
 
 namespace framework {
 
@@ -12,11 +10,7 @@ namespace Assets {
 
 namespace {
 bool fileExists(const char* relativePath) {
-	FILE* file = nullptr;
-	if (fopen_s(&file, abc::ModPath(relativePath).c_str(), "rb") != 0)
-		return false;
-	fclose(file);
-	return true;
+	return ResourceFile::exists(relativePath);
 }
 } // namespace
 

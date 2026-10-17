@@ -132,7 +132,7 @@ private:
 	// result to the VGUI2 surface texture channel.
 	Rml::TextureHandle loadFileTexture(Rml::Vector2i& dimensions, const Rml::String& source);
 	// Uploads pixels through the VGUI2 surface texture channel, ending any
-	// active 2D pass first (the surface upload is not re-entrant with the
+	// active 2D pass first (surface uploads are not re-entrant with the
 	// renderer's batched pass - see the .cpp note). 0 = upload unavailable.
 	int uploadSurfaceTexture(const unsigned char* rgba, int width, int height);
 

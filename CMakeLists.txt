@@ -113,6 +113,7 @@ add_library(AbcUi MODULE
     src/rmlui/SteamApiNative.cpp
     src/rmlui/VGUI2ExtensionImport.cpp
     src/framework/Assets.cpp
+    src/framework/ResourceFile.cpp
     src/framework/Commands.cpp
     src/framework/FatalExit.cpp
     src/framework/TextEncoding.cpp
@@ -213,6 +214,7 @@ add_library(AbcUi MODULE
     src/panels/menushared/MenuShellWindows.cpp
     src/panels/loading/LoadingWindows.cpp
     src/panels/console/ConsolePage.cpp
+    src/panels/console/ConsoleSelection.cpp
     src/panels/serverbrowser/ServerBrowserPage.cpp
     src/panels/serverbrowser/ServerBrowserControls.cpp
     src/panels/creategame/CreateGamePage.cpp

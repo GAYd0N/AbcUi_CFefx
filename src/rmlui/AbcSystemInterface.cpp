@@ -5,16 +5,21 @@
 #include "AbcSystemInterface.h"
 
 #include <abc/Console.h>
-#include <abc/Paths.h>
+#include <abc/Plugin.h>
 
 #include "TextInput.h"
+#include "framework/ResourceFile.h"
 #include "framework/DocumentLoadGuard.h"
 #include "framework/Localization.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <limits>
+#include <new>
 #include <string>
 
+#include <IFileSystem.h>
 #include <Windows.h>
 
 namespace rmlui {
@@ -115,29 +120,114 @@ void AbcSystemInterface::ActivateKeyboard(Rml::Vector2f caretPosition, float lin
 // OnDeactivate; there is no platform state worth resetting here.
 void AbcSystemInterface::DeactivateKeyboard() {}
 
-Rml::FileHandle AbcFileInterface::Open(const Rml::String& path) {	// RML/RCSS/image sources are mod-relative ("abc/abcui/..."); the process CWD
-	// is the game root, so resolve through abc::Paths (plan 08 §4.11).
-	const std::string resolved = abc::ModPath(path.c_str());
-	FILE* file = nullptr;
-	if (fopen_s(&file, resolved.c_str(), "rb") != 0)
-		file = nullptr;
-	return reinterpret_cast<Rml::FileHandle>(file);
+namespace {
+
+struct ResourceHandle {
+	FileHandle_t EngineFile = nullptr;
+	FILE* LocalFile = nullptr;
+};
+
+ResourceHandle* handleFor(Rml::FileHandle handle) {
+	return reinterpret_cast<ResourceHandle*>(handle);
+}
+
+} // namespace
+
+Rml::FileHandle AbcFileInterface::Open(const Rml::String& path) {
+	// Rml documents and their resources follow the engine mount order, which
+	// is the same IFileSystem VGUI2Extension uses. This also keeps paths such
+	// as "abc/abcui/..." independent of the process CWD.
+	const bool absolute = (path.size() >= 2 && path[1] == ':') ||
+		(!path.empty() && (path.front() == '/' || path.front() == '\\'));
+	if (absolute) {
+		FILE* local = nullptr;
+		if (fopen_s(&local, path.c_str(), "rb") != 0 || !local)
+			return 0;
+		auto* resource = new (std::nothrow) ResourceHandle{nullptr, local};
+		if (!resource) {
+			fclose(local);
+			return 0;
+		}
+		return reinterpret_cast<Rml::FileHandle>(resource);
+	}
+
+	std::string normalized;
+	if (!abc::g_pFileSystem || !framework::ResourceFile::normalize(path, normalized))
+		return 0;
+	FileHandle_t file = abc::g_pFileSystem->Open(normalized.c_str(), "rb");
+	if (!file)
+		return 0;
+	auto* resource = new (std::nothrow) ResourceHandle{file, nullptr};
+	if (!resource) {
+		abc::g_pFileSystem->Close(file);
+		return 0;
+	}
+	return reinterpret_cast<Rml::FileHandle>(resource);
 }
 
 void AbcFileInterface::Close(Rml::FileHandle file) {
-	fclose(reinterpret_cast<FILE*>(file));
+	ResourceHandle* resource = handleFor(file);
+	if (!resource)
+		return;
+	if (resource->LocalFile)
+		fclose(resource->LocalFile);
+	else if (abc::g_pFileSystem && resource->EngineFile)
+		abc::g_pFileSystem->Close(resource->EngineFile);
+	delete resource;
 }
 
 size_t AbcFileInterface::Read(void* buffer, size_t size, Rml::FileHandle file) {
-	return fread(buffer, 1, size, reinterpret_cast<FILE*>(file));
+	ResourceHandle* resource = handleFor(file);
+	if (!resource || !buffer)
+		return 0;
+	if (resource->LocalFile)
+		return fread(buffer, 1, size, resource->LocalFile);
+	if (!abc::g_pFileSystem || !resource->EngineFile)
+		return 0;
+	size_t total = 0;
+	while (total < size) {
+		const size_t remaining = size - total;
+		const int chunk = static_cast<int>((std::min)(
+			remaining, static_cast<size_t>((std::numeric_limits<int>::max)())));
+		const int got = abc::g_pFileSystem->Read(static_cast<unsigned char*>(buffer) + total, chunk,
+			resource->EngineFile);
+		if (got <= 0)
+			break;
+		total += static_cast<size_t>(got);
+	}
+	return total;
 }
 
 bool AbcFileInterface::Seek(Rml::FileHandle file, long offset, int origin) {
-	return _fseeki64(reinterpret_cast<FILE*>(file), offset, origin) == 0;
+	ResourceHandle* resource = handleFor(file);
+	if (!resource)
+		return false;
+	if (resource->LocalFile)
+		return _fseeki64(resource->LocalFile, offset, origin) == 0;
+	if (!abc::g_pFileSystem || !resource->EngineFile)
+		return false;
+	if (offset < (std::numeric_limits<int>::min)() || offset > (std::numeric_limits<int>::max)())
+		return false;
+	FileSystemSeek_t seek;
+	switch (origin) {
+	case SEEK_SET: seek = FILESYSTEM_SEEK_HEAD; break;
+	case SEEK_CUR: seek = FILESYSTEM_SEEK_CURRENT; break;
+	case SEEK_END: seek = FILESYSTEM_SEEK_TAIL; break;
+	default: return false;
+	}
+	abc::g_pFileSystem->Seek(resource->EngineFile, static_cast<int>(offset), seek);
+	return true;
 }
 
 size_t AbcFileInterface::Tell(Rml::FileHandle file) {
-	return static_cast<size_t>(_ftelli64(reinterpret_cast<FILE*>(file)));
+	ResourceHandle* resource = handleFor(file);
+	if (!resource)
+		return 0;
+	if (resource->LocalFile)
+		return static_cast<size_t>(_ftelli64(resource->LocalFile));
+	if (!abc::g_pFileSystem || !resource->EngineFile)
+		return 0;
+	return abc::g_pFileSystem->Tell(resource->EngineFile);
 }
 
 }

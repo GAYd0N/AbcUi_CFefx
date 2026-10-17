@@ -9,13 +9,14 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <vector>
 
 #include <abc/CvarCmd.h>
 #include <abc/Console.h>
-#include <abc/Paths.h>
 
 #include "../../data/NetworkMessages.h"
 #include "../../framework/Commands.h"
+#include "../../framework/ResourceFile.h"
 #include "../../framework/TextUtil.h"
 
 namespace panels {
@@ -194,17 +195,11 @@ void MotdPanel::loadMissionBrief() {
 	if (!levelName || !levelName[0])
 		return;
 
-	char chunk[1024];
-	size_t read = 0;
 	const auto tryRead = [&](const std::string& path) {
-		FILE* f = nullptr;
-		if (fopen_s(&f, abc::ModPath(path.c_str()).c_str(), "rb") != 0 || !f)
+		std::vector<unsigned char> bytes;
+		if (!framework::ResourceFile::read(path, bytes, 65536))
 			return false;
-		while ((read = fread(chunk, 1, sizeof(chunk), f)) > 0) {
-			if (Buffer.size() + read > 65536) { Buffer.clear(); fclose(f); return false; }
-			Buffer.append(chunk, read);
-		}
-		fclose(f);
+		Buffer.assign(reinterpret_cast<const char*>(bytes.data()), bytes.size());
 		return true;
 	};
 	if (tryRead(std::string(levelName) + ".txt"))

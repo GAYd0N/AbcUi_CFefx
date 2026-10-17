@@ -403,6 +403,7 @@ Loading_AddressInvalid = Enter a valid address, e.g. 127.0.0.1:27015
 
 # Replacement console (T16)
 Console_Title = Console
+Console_Copy = Copy
 Console_Close = Close
 Console_Count = Lines
 Console_ConfirmLead = This paste contains multiple commands. Execute

@@ -54,8 +54,9 @@ struct IndexedImage {
 	}
 };
 
-// Detects the format from the file content (file signature, with the name
-// only as fallback for headerless formats) and decodes it. Returns false
+// Reads an engine-relative resource through the mounted IFileSystem search
+// paths, detects the format from the file content (file signature, with the
+// name only as fallback for headerless formats) and decodes it. Returns false
 // silently on any failure (unknown format, unreadable, bad header) - the
 // asset verification layer owns missing-file warnings, LoadTexture retries
 // are Rml's business.

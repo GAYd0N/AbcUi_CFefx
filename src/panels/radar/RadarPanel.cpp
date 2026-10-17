@@ -16,7 +16,6 @@
 
 #include <abc/CvarCmd.h>
 #include <abc/Math.h>
-#include <abc/Paths.h>
 
 #include "../../render/Render.h"
 #include "../../render/RenderCommon.h"
@@ -85,7 +84,7 @@ void loadMaskTextures() {
 		return;
 	const auto upload = [](const char* path) -> int {
 		framework::ImageLoader::DecodedImage image;
-		if (!framework::ImageLoader::loadFromFile(abc::ModPath(path).c_str(), image))
+		if (!framework::ImageLoader::loadFromFile(path, image))
 			return 0;
 		const int id = vgui2ext::createTexture();
 		if (!id)

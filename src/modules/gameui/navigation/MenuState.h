@@ -308,6 +308,15 @@ struct MenuState {
 	// Closing the menu is a game-only privilege: no-map Main must stay,
 	// Connecting/Loading hold the input, Fatal shows the emergency page.
 	bool canCloseMenu() const { return phase == BackendPhase::kInGame; }
+	// The console hotkey's in-game close intent: the plain pause page with
+	// the console as its only overlay returns all the way to gameplay in one
+	// press. The no-map home stays (it cannot vanish), and a deeper page or
+	// another modal keeps its context - only the console layer closes there.
+	bool consoleHotkeyClosesMenu() const {
+		return phase == BackendPhase::kInGame
+			&& pages.size() == 1 && pages.topIs(MenuPage::kPause)
+			&& overlays.size() == 1 && overlays.topIs(MenuOverlay::kConsole);
+	}
 	// Text input goes to the top text-capable overlay; page editors
 	// (connect address field etc.) arrive with T06/T07.
 	TextInputTarget textInputTarget() const {

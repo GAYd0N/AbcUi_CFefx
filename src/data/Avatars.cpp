@@ -5,8 +5,6 @@
 
 #include <unordered_map>
 
-#include <abc/Paths.h>
-
 #include "../framework/ImageLoader.h"
 #include "../framework/ResourceLimits.h"
 #include "../hooks.h"
@@ -43,7 +41,7 @@ bool loadDefaultAvatar() {
 	if (!vgui2ext::available())
 		return false;
 	framework::ImageLoader::DecodedImage image;
-	if (!framework::ImageLoader::loadFromFile(abc::ModPath("abc/abcui/img/default_avatar.png").c_str(), image))
+	if (!framework::ImageLoader::loadFromFile("abc/abcui/img/default_avatar.png", image))
 		return false;
 	DefaultAvatarTexture = vgui2ext::createTexture();
 	if (!DefaultAvatarTexture)

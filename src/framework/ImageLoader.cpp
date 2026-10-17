@@ -1,9 +1,9 @@
 // framework::ImageLoader implementation - see ImageLoader.h.
 #include "ImageLoader.h"
+#include "ResourceFile.h"
 #include "ResourceLimits.h"
 #include <algorithm>
 #include <memory>
-#include <filesystem>
 
 #include <FreeImage.h>
 
@@ -123,8 +123,11 @@ bool decodeToRgba(FIBITMAP* bitmap, DecodedImage& out, const PaletteTransform& T
 	return true;
 }
 
-bool loadStream(FreeImageIO& io, fi_handle handle, DecodedImage& out, const PaletteTransform& Transform) {
-	const FREE_IMAGE_FORMAT format = FreeImage_GetFileTypeFromHandle(&io, handle, 0);
+bool loadStream(FreeImageIO& io, fi_handle handle, DecodedImage& out, const PaletteTransform& Transform,
+	FREE_IMAGE_FORMAT fallbackFormat = FIF_UNKNOWN) {
+	FREE_IMAGE_FORMAT format = FreeImage_GetFileTypeFromHandle(&io, handle, 0);
+	if (format == FIF_UNKNOWN)
+		format = fallbackFormat;
 	if (format == FIF_UNKNOWN || !FreeImage_FIFSupportsReading(format))
 		return false;
 	// The format sniff left the cursor mid-stream; plugin loaders read from
@@ -193,22 +196,21 @@ bool loadFromFile(const char* path, DecodedImage& out) {
 	out = DecodedImage();
 	if (!path || !*path)
 		return false;
-	std::error_code error;
-	const auto fileSize = std::filesystem::file_size(path,error);
-	if (error || fileSize > ResourceLimits::MaxFileBytes) return false;
-	// Signature first, extension only as the fallback for headerless
-	// formats (TGA has no magic bytes).
-	FREE_IMAGE_FORMAT format = FreeImage_GetFileType(path, 0);
-	if (format == FIF_UNKNOWN)
-		format = FreeImage_GetFIFFromFilename(path);
-	if (format == FIF_UNKNOWN || !FreeImage_FIFSupportsReading(format))
+	std::vector<unsigned char> bytes;
+	if (!ResourceFile::read(path, bytes, ResourceLimits::MaxFileBytes))
 		return false;
-	if (FreeImage_FIFSupportsNoPixels(format)) {
-		BitmapHandle Header(FreeImage_Load(format, path, FIF_LOAD_NOPIXELS), FreeImage_Unload);
-		if (!validDimensions(Header.get()))
-			return false;
-	}
-	return decodeToRgba(FreeImage_Load(format, path, 0), out);
+
+	// Engine filesystem first: the resource may live in a mounted
+	// *_downloads/*_addon tree or inside a pack. Decode from the resident
+	// bytes; the extension is only a hint for headerless formats (TGA).
+	FreeImageIO io = {};
+	io.read_proc = streamRead;
+	io.seek_proc = streamSeek;
+	io.tell_proc = streamTell;
+	MemoryStream stream;
+	stream.Data = bytes.data();
+	stream.Size = bytes.size();
+	return loadStream(io, &stream, out, {}, FreeImage_GetFIFFromFilename(path));
 }
 
 bool loadFromMemory(const unsigned char* Data, std::size_t Size, DecodedImage& Output,

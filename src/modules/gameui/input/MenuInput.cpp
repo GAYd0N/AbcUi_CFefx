@@ -72,7 +72,15 @@ void GameUiModule::onClaimedKeyDown(int keynum) {
 		if (!MenuPresented)
 			return;
 		rmlui::swallowToggleKeyText();
+		// In-game hotkey close: when the console sits alone over the pause
+		// page, one press closes the console AND returns to gameplay. On the
+		// no-map home the menu must stay; deeper pages/modals keep theirs.
+		const bool closeMenu = Controller.state().consoleHotkeyClosesMenu();
 		onMenuAction("console");
+		if (closeMenu) {
+			Controller.dispatch(MenuEvent{EventKind::kResume});
+			finishDispatch();
+		}
 		return;
 	}
 	if (keynum != K_ESCAPE || !MenuPresented)

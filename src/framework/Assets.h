@@ -5,8 +5,8 @@
 // and their page-specific art/config live under gameui/, HUD documents and
 // their page-specific art/sprites live under hud/, and the cross-surface
 // stylesheets, language tables and shared art stay at the abcui root.
-// File reads themselves go through AbcFileInterface (mod-dir resolution), so
-// this module only owns existence checks and the canonical prefix constants.
+// File reads go through the engine IFileSystem, so this module only owns
+// existence checks and the canonical prefix constants.
 
 namespace framework {
 

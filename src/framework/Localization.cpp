@@ -1,15 +1,15 @@
 // framework::Localization implementation - see Localization.h.
 #include "Localization.h"
+#include "ResourceFile.h"
 #include "TextUtil.h"
 
 #include <abc/Console.h>
-#include <abc/Paths.h>
 
 #include "../rmlui/VGUI2ExtensionImport.h"
 
-#include <cstdio>
 #include <cstring>
 #include <unordered_map>
+#include <vector>
 
 namespace framework {
 
@@ -18,19 +18,19 @@ std::unordered_map<std::string, std::string> Table;
 
 // "key = value" lines; '#' starts a comment. Values keep interior spaces.
 void parseTableFile(const std::string& path) {
-	FILE* file = nullptr;
-	if (fopen_s(&file, path.c_str(), "rb") != 0 || !file)
+	std::vector<unsigned char> bytes;
+	if (!ResourceFile::read(path, bytes, 1024 * 1024))
 		return;
 
 	std::string line;
 	auto parseLine = [&]() { std::string key, value; if (TextUtil::parseTranslationLine(line,key,value)) Table[key]=value; line.clear(); };
-	int ch;
-	while ((ch = fgetc(file)) != EOF) {
-		if (ch == '\n') parseLine();
-		else if (line.size() < 65536) line.push_back(static_cast<char>(ch));
+	for (const unsigned char ch : bytes) {
+		if (ch == '\n')
+			parseLine();
+		else if (line.size() < 65536)
+			line.push_back(static_cast<char>(ch));
 	}
 	parseLine();
-	fclose(file);
 }
 } // namespace
 
@@ -43,14 +43,14 @@ void Localization::load() {
 
 	// Sven Co-op reports "schinese"; keep a translation-free alias chain so a
 	// missing language file degrades to english instead of an empty UI.
-	std::string path = abc::ModPath("abc/abcui/lang/");
+	std::string path = "abc/abcui/lang/";
 	path += language;
 	path += ".txt";
-	parseTableFile(abc::ModPath("abc/abcui/lang/english.txt"));
+	parseTableFile("abc/abcui/lang/english.txt");
 	if (strcmp(language, "english") != 0) parseTableFile(path);
 	if (Table.empty() && strcmp(language, "english") != 0) {
 		abc::ConsoleWarn("[AbcUi] no localization for \"%s\", falling back to english\n", language);
-		parseTableFile(abc::ModPath("abc/abcui/lang/english.txt"));
+		parseTableFile("abc/abcui/lang/english.txt");
 	}
 }
 

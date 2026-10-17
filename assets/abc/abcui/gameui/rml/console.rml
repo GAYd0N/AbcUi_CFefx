@@ -18,6 +18,9 @@
 			<button id="console-close" data-action="console-close" data-label="#Console_Close">#Console_Close</button>
 		</div>
 		<div id="console-history"></div>
+		<!-- Selection is painted over the rows by the page: translucent
+		     rectangles, no hit testing, clipped to the history viewport. -->
+		<div id="console-selection"></div>
 		<div id="console-suggestions"></div>
 		<div id="console-confirm">
 			<p id="console-confirm-lead"></p>
@@ -30,6 +33,10 @@
 		<div id="console-input-row">
 			<span id="console-prompt">]</span>
 			<input id="console-input" type="text" autofocus="autofocus"/>
+		</div>
+		<!-- Output context menu: shown at the pointer by the page. -->
+		<div id="console-context-menu">
+			<div id="console-context-copy" class="console-context-item" data-action="console-context-copy">#Console_Copy</div>
 		</div>
 	</div>
 </body>
