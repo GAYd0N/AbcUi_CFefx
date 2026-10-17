@@ -189,8 +189,7 @@ void WeaponChoosePanel::rebuild() {
 	// Owned weapons grouped by slot (old InsertWeapon slot lists; the
 	// registry also carries the full WeaponList - ownership filters it).
 	std::vector<const weaponres::Weapon*> bySlot[weaponres::kMaxWeaponSlot];
-	for (int id = 1; id < weaponres::kMaxWeaponIds; id++) {
-		const weaponres::Weapon* weapon = weaponres::getWeapon(id);
+	for (const weaponres::Weapon* weapon : weaponres::allWeapons()) {
 		if (!weapon || weapon->slot < 0 || weapon->slot >= static_cast<int>(weaponres::kMaxWeaponSlot))
 			continue;
 		if (!weaponres::isOwned(weapon))

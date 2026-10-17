@@ -18,17 +18,15 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include <abc/Events.h>
 #include <wrect.h>
-#include <entity_state.h>
-#include <type_traits>
 
 struct weapon_data_s;
 
 namespace weaponres {
 
-inline constexpr int kMaxWeaponIds = std::extent_v<decltype(local_state_t::weapondata)>;
 constexpr size_t kMaxWeaponSlot = 10;
 constexpr size_t kInvalidWeaponSlot = kMaxWeaponSlot + 1;
 
@@ -88,6 +86,9 @@ void onTxferPredictionData(const weapon_data_s* weaponDataArray);
 const Weapon* getWeapon(int id);
 const Weapon* getWeapon(const char* name);
 const Weapon* getWeapon(int slot, int pos);
+// Every registered weapon (server WeaponList entries); the UI enumerates this
+// instead of assuming the weapon id is a dense array index.
+std::vector<const Weapon*> allWeapons();
 bool hasWeapon(int slot, int pos);
 // Ownership check for a registry weapon (old m_pOwnedWeaponData membership).
 bool isOwned(const Weapon* weapon);

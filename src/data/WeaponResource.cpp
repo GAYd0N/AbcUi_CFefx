@@ -34,6 +34,10 @@ namespace {
 
 constexpr int kMaxWeaponName = 128;
 constexpr int kMaxAmmoTypes = 256; // AmmoX byte domain; -1 is the no-ammo sentinel.
+// Dense prediction-array capacity, not the weapon-id domain. Sven plugin
+// weapons use ids beyond this; their ownership arrives through CurWeapon /
+// WeapPickup instead of being read out of the fixed array.
+constexpr int kPredictionWeaponSlots = 64;
 
 struct SlotData {
 	std::map<int, int> positions; // slotPos -> weapon id
@@ -200,12 +204,11 @@ void loadWeaponSprites(Weapon& weapon, const char* customSpr) {
 // slot position persistently (same as the old in-place mutation).
 void addWeapon(Weapon&& incoming) {
 	const int id = incoming.id;
-	// Single choke point: every registry id must stay a valid prediction-
-	// array index (onTxferPredictionData indexes weaponDataArray[id]).
-	if (id <= 0 || id >= kMaxWeaponIds || incoming.slot < 0 || incoming.slot >= static_cast<int>(kMaxWeaponSlot))
+	if (id <= 0 || incoming.slot < 0 || incoming.slot >= static_cast<int>(kMaxWeaponSlot))
 		return;
 	if (RegistryState.byId.count(id))
 		return;
+	const bool wasOwned = RegistryState.owned.count(id) > 0;
 
 	Weapon& weapon = RegistryState.byId[id] = std::move(incoming);
 	RegistryState.byName[weapon.name] = id;
@@ -216,6 +219,8 @@ void addWeapon(Weapon&& incoming) {
 	slot.positions[weapon.slotPos] = id;
 	slot.updateMinMax();
 	loadWeaponSprites(weapon, nullptr);
+	if (wasOwned)
+		PickupWeapon(&weapon);
 }
 
 void dropAllWeapons() {
@@ -228,6 +233,18 @@ void dropAllWeapons() {
 	DropAllWeapons();
 }
 
+// Ownership signals for ids outside the dense prediction array. WeapPickup
+// and CurWeapon arrive for plugin weapons even when weaponDataArray cannot
+// represent their id; keep the id in owned so a later WeaponList registration
+// and the weapon menu see it.
+void markOwned(int id) {
+	if (id <= 0 || !RegistryState.owned.insert(id).second)
+		return;
+	const auto itor = RegistryState.byId.find(id);
+	if (itor != RegistryState.byId.end())
+		PickupWeapon(&itor->second);
+}
+
 #pragma region netmsg handlers
 void onAmmoX(int index, int count) {
 	if (index < 0 || index >= kMaxAmmoTypes || count < 0) return;
@@ -235,7 +252,7 @@ void onAmmoX(int index, int count) {
 }
 
 void onWeaponList(const netmsg::WeaponListData& data) {
-	if (data.id <= 0 || data.id >= kMaxWeaponIds || data.slot < 0 || data.slot >= static_cast<int>(kMaxWeaponSlot) || data.slotPos < 0 || !framework::ResourceLimits::resourceName(data.name)) return;
+	if (data.id <= 0 || data.slot < 0 || data.slot >= static_cast<int>(kMaxWeaponSlot) || data.slotPos < 0 || !framework::ResourceLimits::resourceName(data.name)) return;
 	if (const auto itor = RegistryState.byId.find(data.id); itor != RegistryState.byId.end()) {
 		// Old UpdateWeapon: full replace + sprite reload, ownership kept.
 		Weapon updated;
@@ -295,6 +312,7 @@ void onCurWeapon(int state, int id, int clip, int clip2) {
 			dropAllWeapons();
 			return;
 		}
+		markOwned(id);
 		RegistryState.curWeaponId = id;
 		RegistryState.curWeapon = getWeapon(id);
 		if (const auto itor = RegistryState.byId.find(id); itor != RegistryState.byId.end()) {
@@ -306,6 +324,10 @@ void onCurWeapon(int state, int id, int clip, int clip2) {
 	}
 	if (id == -1 || id == 0)
 		dropAllWeapons();
+}
+
+void onWeapPickup(int id) {
+	markOwned(id);
 }
 
 void onWeaponSpr(int id, const char* sprName) {
@@ -331,6 +353,7 @@ void init() {
 	netmsg::CustWeapon.append(onCustWeapon);
 	netmsg::CurWeapon.append(onCurWeapon);
 	netmsg::WeaponSpr.append(onWeaponSpr);
+	netmsg::WeapPickup.append(onWeapPickup);
 }
 
 void reset() {
@@ -346,6 +369,11 @@ void onTxferPredictionData(const weapon_data_s* weaponDataArray) {
 	std::vector<const Weapon*> pickedUp;
 	std::vector<const Weapon*> dropped;
 	for (const auto& [id, weapon] : RegistryState.byId) {
+		// The prediction array is dense and has no id table. Plugin weapon ids
+		// above its capacity are owned through CurWeapon/WeapPickup below; do
+		// not index past the array for them.
+		if (id >= kPredictionWeaponSlots)
+			continue;
 		const weapon_data_s& data = weaponDataArray[id];
 		if (data.m_iId <= 0) {
 			if (RegistryState.owned.erase(id))
@@ -390,6 +418,14 @@ const Weapon* getWeapon(int slot, int pos) {
 	const auto& positions = RegistryState.slots[slot].positions;
 	const auto itor = positions.find(pos);
 	return itor != positions.end() ? getWeapon(itor->second) : nullptr;
+}
+
+std::vector<const Weapon*> allWeapons() {
+	std::vector<const Weapon*> result;
+	result.reserve(RegistryState.byId.size());
+	for (const auto& entry : RegistryState.byId)
+		result.push_back(&entry.second);
+	return result;
 }
 
 bool hasWeapon(int slot, int pos) {
