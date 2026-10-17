@@ -29,6 +29,7 @@ cmake --build --preset win32-release --target deploy
 ```
 
 - UI assets go to `<game>/svencoop/abc/abcui/`, split by surface: GameUI documents, page styles, config and menu media live under `gameui/`; HUD documents, sprites and page art live under `hud/`; the cross-surface stylesheets (`rcss/base.rcss`, `rcss/theme.rcss`), language tables and shared art stay at the `abcui/` root.
+- The Cfefx score sound is engine-played and therefore lives under the engine's sound root: `<game>/svencoop/sound/abc/cfefx/UI_SPECIALKILL2.wav`.
 - `AbcUi.dll` goes to `<game>/svencoop/metahook/plugins/`.
 - `FreeImage.dll` and `Mile.FFmpeg.dll` are published by MetaHookSV/Renderer and are intentionally not installed or packaged by AbcUi.
 
@@ -79,10 +80,10 @@ Limits: 1 MiB per file, 100 items per menu and 40 nested levels.
 
 ## Feature overview
 
-- HUD panels: Health / Flashlight / AmmoBar / AmmoStack / ItemStack / WeaponStack / Notice / DeadMsg / SideText / TextMenu / DamageTiles / PopNum / Indicator / player board / scoreboard / vote / MOTD / weapon choose / item highlight / Radar and more; data layer with NetworkMessages / WeaponResource / SpriteResource (GoldSrc .spr decode + hud.txt) / HudState / TextFeed; the original HUD is suppressed by sig-scan on the HUD_Redraw chain.
+- HUD panels: Health / Flashlight / AmmoBar / AmmoStack / ItemStack / WeaponStack / Notice / DeadMsg / SideText / TextMenu / DamageTiles / PopNum / Cfefx / Indicator / player board / scoreboard / vote / MOTD / weapon choose / item highlight / Radar and more; data layer with NetworkMessages / WeaponResource / SpriteResource (GoldSrc .spr decode + hud.txt) / HudState / TextFeed; the original HUD is suppressed by sig-scan on the HUD_Redraw chain.
 - Menu: main menu, settings (general/input/mouse/video/audio/voice/captions/multiplayer/advanced), server browser, create game, player list, vote creation (ban/kick/kill/map with the server's map list), connect/loading/error pages, console, direct-connect/password dialogs, quit confirmation, and the nested in-game command menu; text input goes through the IME-aware input bridge. The pause menu's **Vote Menu** row and the original `votemenu` command both open the RmlUi page, replacing the legacy GameUI vote dialog. The original `+commandmenu` VGUI window is replaced by a translucent, left-anchored RmlUi menu that leaves the game view visible.
 - Menu backdrop: `abc_ui_menu_video` picks the looping movie behind the no-map menu (blurred by `abc_ui_menu_backdrop_blur` gaussian rounds, 0..4, default 2; 0 shows the unblurred capture); in a level the pause menu blurs the live frame instead.
-- Retained cvars: `hud_danger_health`, `hud_danger_armor`, `hud_deathnotice(+_time/_count)`, `hud_sideinfo`; in-game diagnostics: `abc_ui_debugger` (RmlUi debugger) and `abc_ui_probe` (font/panel/element state dump).
+- Retained cvars: `hud_danger_health`, `hud_danger_armor`, `hud_deathnotice(+_time/_count)`, `hud_sideinfo`, `hud_cfefx(+_max/+_volume/+_time)`; in-game diagnostics: `abc_ui_debugger` (RmlUi debugger) and `abc_ui_probe` (font/panel/element state dump).
 - Avatars and real names come from the dynamically bound game steam_api.dll (Bridge/Native backend abstraction, no steam_api.lib import dependency); fonts are loaded from the system font directory through `Rml::LoadFontFace`.
 
 ## Runtime requirements

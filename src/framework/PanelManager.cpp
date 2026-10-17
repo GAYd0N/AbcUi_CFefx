@@ -26,6 +26,7 @@
 #include "../panels/vote/VotePanel.h"
 #include "../panels/weaponchoose/WeaponChoosePanel.h"
 #include "../panels/popnum/PopNumPanel.h"
+#include "../panels/cfefx/CfefxPanel.h"
 #include "../panels/radar/RadarPanel.h"
 #include "../panels/sidetext/SideTextPanel.h"
 #include "../panels/textmenu/TextMenuPanel.h"
@@ -66,6 +67,9 @@ static std::vector<std::unique_ptr<HudPanel>> createPanels() {
 		// Batch D (render depth, plan 05 §6).
 		list.push_back(std::make_unique<panels::ItemHighlightPanel>());
 		list.push_back(std::make_unique<panels::RadarPanel>());
+		// Cfefx is last so its damage/score feedback stacks above the HUD
+		// panels (old CfefxPanel zpos 998/999).
+		list.push_back(std::make_unique<panels::CfefxPanel>());
 		return list;
 	}();
 }
@@ -88,6 +92,7 @@ void PanelManager::registerPanelCvars() {
 	panels::gindicator::registerCvars();
 	panels::effect::registerCvars();
 	panels::popnum::registerCvars();
+	panels::cfefx::registerCvars();
 	// Batch C.
 	panels::playerboard::registerCvars();
 	panels::vote::registerCvars();

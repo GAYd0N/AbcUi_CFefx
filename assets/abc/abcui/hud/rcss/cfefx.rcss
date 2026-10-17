@@ -1,0 +1,64 @@
+/* cfefx.rcss - CfefxPanel layout, from the old abcenchance/res/CfefxPanel.res
+   (854x480 design space). Design units map 1:1 to dp through Theme::scale, so
+   142dp is always 142/480 of the screen height on any resolution.
+
+   The old animation script hardcoded 854x480 absolute positions (a VGUI
+   limitation of its era). Here the right-side marks are anchored to the right
+   edge and the score/star flight targets are computed from the live viewport
+   size by CfefxPanel, keeping the same visual story on 4:3, 16:9 and
+   ultrawide screens.
+
+   Only static geometry and default size/opacity live here; stars and the two
+   score elements are positioned per frame in px by the panel. */
+
+#cfefx {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	width: 100%;
+	height: 100%;
+}
+
+#cfefx .star, #cfefx .mark, #cfefx .score {
+	position: absolute;
+	display: block;
+	opacity: 0;
+}
+
+#cfefx .star {
+	left: 0px;
+	top: 0px;
+	width: 20dp;
+	height: 20dp;
+}
+
+/* Old DmgMark right edge r44, 34x30. */
+#cfefx .mark {
+	right: 44dp;
+	width: 34dp;
+	height: 30dp;
+}
+
+/* Old ypos c-98 / c-74 / c-50 / c-26 (= 142..214 in the 480-line design
+   space) and DmgMarkFive at c-122 (= 118). Percentages keep the same
+   proportional placement while the panel scales with screen height. */
+#dmg-mark-one, #dmg-mark-six { top: 29.5833%; }
+#dmg-mark-two, #dmg-mark-seven { top: 34.5833%; }
+#dmg-mark-three, #dmg-mark-eight { top: 39.5833%; }
+#dmg-mark-four, #dmg-mark-nine { top: 44.5833%; }
+#dmg-mark-five { top: 24.5833%; }
+
+#cfefx .score {
+	left: 0px;
+	top: 0px;
+}
+
+#score-mark {
+	width: 96dp;
+	height: 80dp;
+}
+
+#score-effect {
+	width: 40dp;
+	height: 35dp;
+}

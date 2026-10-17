@@ -235,6 +235,7 @@ add_library(AbcUi MODULE
     src/panels/scoreboard/ScoreboardPanel.cpp
     src/panels/weaponchoose/WeaponChoosePanel.cpp
     src/panels/popnum/PopNumPanel.cpp
+    src/panels/cfefx/CfefxPanel.cpp
     src/panels/radar/RadarPanel.cpp
     src/panels/sidetext/SideTextPanel.cpp
     src/panels/textmenu/TextMenuPanel.cpp
@@ -287,6 +288,11 @@ if(ABC_GAME_DIR)
         install(DIRECTORY assets/abc/abcui DESTINATION "${ABC_GAME_DIR}/svencoop/abc"
             PATTERN ".gitkeep" EXCLUDE)
     endif()
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/sound")
+        # Engine-played effects resolve under <mod>/sound/ (pfnPlaySoundByName
+        # prefixes sound/), so cfefx's score WAV lives outside abc/abcui.
+        install(DIRECTORY assets/sound DESTINATION "${ABC_GAME_DIR}/svencoop")
+    endif()
     # The menu score ships inside abc/abcui/gameui/scence/audio (installed with
     # the tree above). MenuMusic drives the engine's mp3 player with the
     # mod-relative path selected by abc_ui_menu_music.
@@ -302,6 +308,7 @@ endif()
 # extracted directly into the Sven Co-op directory:
 #   svencoop/metahook/plugins/AbcUi.dll
 #   svencoop/abc/abcui/** (gameui/, hud/, shared rcss/lang/img)
+#   svencoop/sound/abc/cfefx/** (engine-played UI sound effects)
 #   README.md
 # The target is named `dist` because `package` is reserved by the CPack
 # configuration that thirdparty/FreeImage pulls in.
@@ -320,11 +327,15 @@ add_custom_target(dist
     COMMAND "${CMAKE_COMMAND}" -E make_directory
         "${ABC_UI_STAGE_DIR}/svencoop/metahook/plugins"
         "${ABC_UI_STAGE_DIR}/svencoop/abc"
+        "${ABC_UI_STAGE_DIR}/svencoop/sound"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:AbcUi>"
         "${ABC_UI_STAGE_DIR}/svencoop/metahook/plugins/"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/abc/abcui"
         "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/sound"
+        "${ABC_UI_STAGE_DIR}/svencoop/sound"
     COMMAND "${CMAKE_COMMAND}" -E rm -f "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/.gitkeep"
     COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/README.md" "${ABC_UI_STAGE_DIR}/"
     COMMAND "${CMAKE_COMMAND}" -E chdir "${ABC_UI_STAGE_DIR}"
