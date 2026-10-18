@@ -15,6 +15,8 @@
 // marks. A score within hud_cfefx_time of the previous one advances the combo;
 // otherwise it starts again at 1. The old plugin called this UpdateAnimations
 // from its AddDmg path - the panel now owns the whole loop and its reset.
+// Stars are queued (0.05 s apart) rather than started together, and each side
+// mark pops in opaque the moment its own star lands, matching the CF original.
 
 #include "../../framework/HudPanel.h"
 
@@ -65,16 +67,20 @@ private:
 	struct Pip {
 		Rml::Element* mark = nullptr;
 		Rml::Element* star = nullptr;
-		double markStart = -1.0;
 		double starStart = -1.0;
+		// Set when a later tier replaces this side mark (500 mark); the star
+		// keeps flying, but the landing must not reveal the old side.
+		bool sideSuppressed = false;
 	};
 
 	void onDamage(int value);
 	void evaluate();
 
 	void updateDmgMark(std::size_t index);
+	void resetSideMark(std::size_t index, bool suppress);
 	void resetDmgMark(std::size_t index);
 	void resetAllMarks();
+	void rebaseStarQueue();
 	void updateScoreEffect();
 	void resetScoreEffect();
 
@@ -88,6 +94,9 @@ private:
 	static void setOpacity(Rml::Element* element, float opacity);
 
 	double ClientTimeNow = 0.0;
+	// Earliest time the next queued star may launch; keeps the 0.05 s cadence
+	// across separate damage events and reset/rebase cycles.
+	double NextStarStart = 0.0;
 	std::uint64_t Damage = 0;
 	std::size_t LastTier = 0;
 	std::size_t Score = 0;

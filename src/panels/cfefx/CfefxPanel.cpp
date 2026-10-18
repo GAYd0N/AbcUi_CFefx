@@ -97,9 +97,11 @@ constexpr float kScoreEffectTop = 80.0f;
 // Old ScoreEffect drawColor was white with alpha 200.
 constexpr float kScoreEffectBaseAlpha = 200.0f / 255.0f;
 
-// Old hudanimations timings.
-constexpr double kMarkDelay = 0.2;
-constexpr double kMarkFade = 0.3;
+// Old hudanimations timings. The stars are queued: each new action starts
+// kStarStagger after the previous one, so a single 400-damage hit launches its
+// four stars as a continuous trail instead of four synchronized animations.
+// The side mark appears the moment its own star lands (no fade).
+constexpr double kStarStagger = 0.05;
 constexpr double kStarDuration = 0.3;
 constexpr double kScoreMarkEnd = 2.0;
 constexpr double kScoreEffectEnd = 1.2;
@@ -202,6 +204,7 @@ void CfefxPanel::evaluate() {
 	const std::size_t tier = static_cast<std::size_t>(Damage / step);
 	if (tier == 0 || tier == LastTier)
 		return;
+	const std::size_t previous = LastTier;
 	LastTier = tier;
 
 	if (tier >= 10) {
@@ -224,19 +227,21 @@ void CfefxPanel::evaluate() {
 		return;
 	}
 
+	// Queue every tenth unlocked by this hit, in order - a single 400-damage
+	// hit therefore plays four stars 0.05 s apart instead of one synchronized
+	// burst. Re-walking already-lit pips would restart their animations.
 	if (tier < 5) {
 		// First tier: marks 1-4. Clear the second-row marks.
 		for (std::size_t i = 4; i < 9; i++)
 			resetDmgMark(i);
-		for (std::size_t i = 0; i < tier; i++)
-			updateDmgMark(i);
 	}
-	else {
-		// Second tier: the 500 mark plus marks 6-9, replacing marks 1-4.
+	for (std::size_t i = previous; i < tier; i++)
+		updateDmgMark(i);
+	if (tier >= 5) {
+		// The 500 mark replaces marks 1-4. Their stars keep flying (the queue
+		// stays continuous), but their side marks are interrupted here.
 		for (std::size_t i = 0; i < 4; i++)
-			resetDmgMark(i);
-		for (std::size_t i = 4; i < tier; i++)
-			updateDmgMark(i);
+			resetSideMark(i, true);
 	}
 }
 
@@ -247,23 +252,29 @@ void CfefxPanel::updateDmgMark(std::size_t index) {
 	if (!pip.mark || !pip.star)
 		return;
 
-	// Old UpdateDmgMark returned while the mark alpha was already non-zero;
-	// alpha stays zero for the first kMarkDelay seconds, so a repeat call in
-	// that window restarted the sequence. Keep that edge case.
-	if (pip.markStart >= 0.0 && ClientTimeNow - pip.markStart >= kMarkDelay)
-		return;
+	// A new action re-arms its own side mark even if it is already visible
+	// (the old side is overwritten immediately) and joins the tail of the
+	// star queue.
+	resetSideMark(index, false);
+	const double start = std::max(ClientTimeNow, NextStarStart);
+	pip.starStart = start;
+	NextStarStart = start + kStarStagger;
+}
 
-	resetDmgMark(index);
-	pip.markStart = ClientTimeNow;
-	pip.starStart = ClientTimeNow;
+void CfefxPanel::resetSideMark(std::size_t index, bool suppress) {
+	if (index >= 9)
+		return;
+	Pip& pip = Pips[index];
+	pip.sideSuppressed = suppress;
+	setOpacity(pip.mark, 0.0f);
 }
 
 void CfefxPanel::resetDmgMark(std::size_t index) {
 	if (index >= 9)
 		return;
 	Pip& pip = Pips[index];
-	pip.markStart = -1.0;
 	pip.starStart = -1.0;
+	pip.sideSuppressed = false;
 	setOpacity(pip.mark, 0.0f);
 	setOpacity(pip.star, 0.0f);
 
@@ -273,6 +284,19 @@ void CfefxPanel::resetDmgMark(std::size_t index) {
 		setBox(pip.star, width * 0.5f - half, height * 0.5f - half,
 			kStarSize * scale, kStarSize * scale);
 	}
+	rebaseStarQueue();
+}
+
+// Keep the queue cursor behind the last scheduled star after a reset removed
+// one of its entries, so the remaining actions keep their 0.05 s cadence.
+void CfefxPanel::rebaseStarQueue() {
+	double latest = -1.0;
+	for (const Pip& pip : Pips) {
+		if (pip.starStart >= 0.0)
+			latest = std::max(latest, pip.starStart);
+	}
+	NextStarStart = latest < 0.0 ? ClientTimeNow
+		: std::max(ClientTimeNow, latest + kStarStagger);
 }
 
 void CfefxPanel::resetAllMarks() {
@@ -344,21 +368,31 @@ void CfefxPanel::animatePip(Pip& pip, std::size_t index, double now) {
 	if (!screenMetrics(width, height, scale))
 		return;
 
-	if (pip.markStart >= 0.0) {
-		// Old DmgMarkXN Fade: alpha 0 -> 255 from 0.2s over 0.3s.
-		const float alpha = segment(now, pip.markStart + kMarkDelay, kMarkFade);
-		setOpacity(pip.mark, alpha);
+	if (pip.starStart < 0.0) {
+		setOpacity(pip.star, 0.0f);
+		setOpacity(pip.mark, 0.0f);
+		return;
 	}
 
-	if (pip.starStart < 0.0)
+	// Queued but not launched yet.
+	if (now < pip.starStart) {
+		setOpacity(pip.star, 0.0f);
+		setOpacity(pip.mark, 0.0f);
 		return;
+	}
 
 	const double elapsed = now - pip.starStart;
 	if (elapsed >= kStarDuration) {
+		// The star has landed: the side mark appears in the same frame and is
+		// fully opaque - the original has no fade on this transition. A side
+		// replaced by the 500 mark stays suppressed while its star finishes.
 		setOpacity(pip.star, 0.0f);
-		pip.starStart = -1.0;
+		setOpacity(pip.mark, pip.sideSuppressed ? 0.0f : 1.0f);
 		return;
 	}
+
+	// A side mark is only shown once its own star has landed.
+	setOpacity(pip.mark, 0.0f);
 
 	// Old StarXAnim: centre -> right 204dp (20 -> 40) -> right 44dp (-> 20),
 	// fading in over 0.02s and out over the last 0.1s.
