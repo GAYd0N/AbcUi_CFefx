@@ -10,6 +10,7 @@
 
 #include <abc/Console.h>
 #include <abc/CvarCmd.h>
+#include <abc/Format.h>
 
 #include <keydefs.h>
 #include <abc/Math.h>
@@ -18,6 +19,8 @@
 #include "../data/Avatars.h"
 #include "../data/NetworkMessages.h"
 #include "../data/PlayerResource.h"
+#include "../framework/PanelManager.h"
+#include "../panels/cfefx/CfefxPanel.h"
 #include "../panels/itemhighlight/ItemHighlightPanel.h"
 #include "../panels/radar/RadarPanel.h"
 #include "../panels/scoreboard/ScoreboardPanel.h"
@@ -36,6 +39,9 @@
 #include "../services/console/ConsoleBackend.h"
 #include "../services/console/ConsoleBuffer.h"
 
+#include <algorithm>
+#include <cstring>
+#include <string>
 #include <vector>
 namespace panels::scoreboard { extern panels::ScoreboardPanel* PanelInstance; }
 
@@ -216,7 +222,8 @@ void probeCommand() {
 	}
 	for (const char* name : {"health", "flashlight", "ammobar", "ammostack", "itemstack",
 			 "weaponstack", "deadmsg", "notice", "notice-center", "sidetext", "textmenu",
-			 "crosshair", "indicator", "gindicator", "dmgtiles", "effect", "popnum"}) {
+			 "crosshair", "indicator", "gindicator", "dmgtiles", "effect", "popnum",
+			 "cfefx"}) {
 		if (Rml::ElementDocument* doc = context->GetDocument(name))
 			abc::ConsolePrint("[AbcUi] probe: doc %-14s visible=%d display='%s'\n", name,
 				doc->IsVisible() ? 1 : 0, doc->GetProperty("display")->ToString().c_str());
@@ -500,6 +507,163 @@ void probeCommand() {
 		abc::ConsolePrint("[AbcUi] feedback: injected Damage(25/40 poison+burn+shock) + Health(20) + PopNum(12345)\n");
 	}
 
+	// cfefx manual trigger: fires the wire event the panel subscribes to
+	// (netmsg::PopNum) instead of poking its private accumulator, so the whole
+	// chain - subscription, tier split, mark fade, star flight, score pop, the
+	// engine sound - runs exactly like a live server hit. The ids below are the
+	// document ids CfefxPanel queries; they are listed only here, in a Debug
+	// translation unit, so the production surface stays uncoupled (same rule as
+	// the probe fields).
+	constexpr const char* kCfefxMarkIds[9] = {
+		"dmg-mark-one", "dmg-mark-two", "dmg-mark-three", "dmg-mark-four", "dmg-mark-five",
+		"dmg-mark-six", "dmg-mark-seven", "dmg-mark-eight", "dmg-mark-nine",
+	};
+	constexpr const char* kCfefxStarIds[9] = {
+		"star-one", "star-two", "star-three", "star-four", "star-five",
+		"star-six", "star-seven", "star-eight", "star-nine",
+	};
+
+	panels::CfefxPanel* cfefxPanel() {
+		for (const auto& panel : framework::PanelManager::panels()) {
+			if (panel->getName() != "cfefx")
+				continue;
+			return dynamic_cast<panels::CfefxPanel*>(panel.get());
+		}
+		return nullptr;
+	}
+
+	// One POPNUMBER package 80u ahead of the view: the same point shape the
+	// server addon sends, so PopNum also reacts to it and the hud_popnumber
+	// decoupling can be watched side by side (`hud_popnumber 0` must leave the
+	// cfefx marks running).
+	bool cfefxInject(int value) {
+		const cl_entity_t* local = gEngfuncs.GetLocalPlayer();
+		if (!local) {
+			abc::ConsoleWarn("[AbcUi] cfefx: no local player - nothing to inject\n");
+			return false;
+		}
+		vec3_t angles{}, forward{};
+		gEngfuncs.GetViewAngles(angles);
+		abc::CMathlib::AngleVectors(angles, forward, nullptr, nullptr);
+
+		netmsg::PopNumData popnum;
+		for (int i = 0; i < 3; i++)
+			popnum.origin[i] = local->curstate.origin[i] + forward[i] * 80.0f;
+		popnum.origin[2] += 16.0f;
+		popnum.value = value;
+		popnum.color[0] = 255;
+		popnum.color[1] = 210;
+		popnum.color[2] = 80;
+		popnum.color[3] = 255;
+		netmsg::PopNum(popnum);
+		return true;
+	}
+
+	void cfefxDump(const char* label) {
+		panels::CfefxPanel* panel = cfefxPanel();
+		if (!panel) {
+			abc::ConsoleWarn("[AbcUi] cfefx: panel not registered\n");
+			return;
+		}
+		const panels::CfefxPanel::DebugState state = panel->debugState();
+		abc::ConsolePrint(
+			"[AbcUi] cfefx: %s enabled=%d active=%d visible=%d damage=%llu step=%d tier=%d score=%d "
+			"lastScore=%.2fs scoreAge=%.2fs volume=%.2f popNum=%.0f\n",
+			label, state.enabled ? 1 : 0, state.active ? 1 : 0, state.visible ? 1 : 0,
+			static_cast<unsigned long long>(state.damage), state.step,
+			static_cast<int>(state.tier), static_cast<int>(state.score), state.lastScoreAge,
+			state.scoreAge, state.volume, gEngfuncs.pfnGetCvarFloat("hud_popnumber"));
+		if (!state.active)
+			abc::ConsoleWarn(
+				"[AbcUi] cfefx: inactive (no live player, health 0 or HUD hidden) - the "
+				"injection ran but nothing draws\n");
+
+		Rml::ElementDocument* doc = panel->getDocument();
+		if (!doc) {
+			abc::ConsoleWarn("[AbcUi] cfefx: document not loaded\n");
+			return;
+		}
+		std::string marks;
+		std::string stars;
+		for (int i = 0; i < 9; i++) {
+			if (Rml::Element* mark = doc->GetElementById(kCfefxMarkIds[i]))
+				marks += abc::Format("%d:%s ", i, mark->GetProperty("opacity")->ToString().c_str());
+			if (Rml::Element* star = doc->GetElementById(kCfefxStarIds[i]))
+				stars += abc::Format("%d:%s ", i, star->GetProperty("opacity")->ToString().c_str());
+		}
+		abc::ConsolePrint("[AbcUi] cfefx: mark-alpha %s| star-alpha %s\n", marks.c_str(),
+			stars.c_str());
+		if (Rml::Element* score = doc->GetElementById("score-mark"))
+			abc::ConsolePrint("[AbcUi] cfefx: score src='%s' opacity='%s' | document display='%s'\n",
+				score->GetAttribute<Rml::String>("src", "<none>").c_str(),
+				score->GetProperty("opacity")->ToString().c_str(),
+				doc->GetProperty("display")->ToString().c_str());
+	}
+
+	void cfefxUsage() {
+		abc::ConsolePrint(
+			"[AbcUi] cfefx: abc_ui_cfefx hit [value] | tier <1..9> | score [count] | sound | "
+			"reset | status\n"
+			"[AbcUi] cfefx: hit defaults to one mark of hud_cfefx_max; ten marks = one score pop\n");
+	}
+
+	void cfefxCommand() {
+		panels::CfefxPanel* panel = cfefxPanel();
+		if (!panel) {
+			abc::ConsoleWarn("[AbcUi] cfefx: panel not registered\n");
+			return;
+		}
+		if (!panel->getDocument()) {
+			abc::ConsoleWarn("[AbcUi] cfefx: document not loaded (in a map yet?)\n");
+			return;
+		}
+		const panels::CfefxPanel::DebugState state = panel->debugState();
+		if (state.step <= 0) {
+			abc::ConsoleWarn("[AbcUi] cfefx: hud_cfefx_max not registered yet\n");
+			return;
+		}
+		const char* sub = gEngfuncs.Cmd_Argc() > 1 ? gEngfuncs.Cmd_Argv(1) : "status";
+
+		if (!strcmp(sub, "hit")) {
+			const int requested = gEngfuncs.Cmd_Argc() > 2 ? atoi(gEngfuncs.Cmd_Argv(2)) : state.step;
+			if (!cfefxInject(requested))
+				return;
+			cfefxDump("hit");
+		}
+		else if (!strcmp(sub, "tier")) {
+			const int target = std::clamp(gEngfuncs.Cmd_Argc() > 2 ? atoi(gEngfuncs.Cmd_Argv(2)) : 1, 1, 9);
+			panel->reset();
+			if (!cfefxInject(target * state.step))
+				return;
+			cfefxDump("tier");
+		}
+		else if (!strcmp(sub, "score")) {
+			const int count = std::clamp(gEngfuncs.Cmd_Argc() > 2 ? atoi(gEngfuncs.Cmd_Argv(2)) : 1, 1, 10);
+			for (int i = 0; i < count; i++) {
+				// A full accumulator: the tenth mark triggers the score pop and
+				// clears the marks, the same edge a live 1000-damage run hits.
+				if (!cfefxInject(state.step * 10))
+					return;
+			}
+			cfefxDump("score");
+		}
+		else if (!strcmp(sub, "sound")) {
+			panel->debugPlayScoreSound();
+			abc::ConsolePrint("[AbcUi] cfefx: sound requested at volume %.2f (abc/cfefx/UI_SPECIALKILL2.wav)\n",
+				state.volume);
+		}
+		else if (!strcmp(sub, "reset")) {
+			panel->reset();
+			cfefxDump("reset");
+		}
+		else if (!strcmp(sub, "status")) {
+			cfefxDump("status");
+		}
+		else {
+			cfefxUsage();
+		}
+	}
+
 	// Batch C full-occupancy board instrument: pins 31 fake playerres slots
 	// (mixed teams/health/donor/admin) so a local session can drive the
 	// scoreboard table/scroll/context-menu at 32 occupancy. The wire-parse
@@ -752,6 +916,7 @@ void registerProbeCommand() {
 	abc::ADD_COMMAND("abc_ui_probe", probeCommand);
 	abc::ADD_COMMAND("abc_ui_menu", menuCommand);
 	abc::ADD_COMMAND("abc_ui_feedback", feedbackCommand);
+	abc::ADD_COMMAND("abc_ui_cfefx", cfefxCommand);
 	abc::ADD_COMMAND("abc_ui_board", boardCommand);
 	abc::ADD_COMMAND("abc_ui_perf", perfCommand);
 	abc::ADD_COMMAND("abc_ui_pointer_on", pointerOnCommand);

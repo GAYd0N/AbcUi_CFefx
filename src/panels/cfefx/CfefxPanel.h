@@ -34,6 +34,29 @@ public:
 
 	void reset() override;
 
+#ifndef NDEBUG
+	// abc_ui_cfefx aid (Debug builds): the accumulator state the panel computed
+	// from the last POPNUMBER, plus the effective per-mark damage step, so the
+	// manual trigger path can inject exactly one tier and report what happened
+	// without scraping the rendered document.
+	struct DebugState {
+		double clock = 0.0;
+		std::uint64_t damage = 0;
+		int step = 0; // hud_cfefx_max / 10, floored at 10
+		std::size_t tier = 0;
+		std::size_t score = 0;
+		double lastScoreAge = 0.0; // seconds since the last score pop
+		double scoreAge = -1.0; // < 0 while no score animation runs
+		float volume = 0.0f;
+		bool enabled = false;
+		bool active = false;
+		bool visible = false;
+	};
+	DebugState debugState() const;
+	// Runs the real score-sound path (hud_cfefx_volume gate included).
+	void debugPlayScoreSound() const { playScoreSound(); }
+#endif
+
 protected:
 	void onDocumentReady() override;
 	void onData(double frameTime) override;

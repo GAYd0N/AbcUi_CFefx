@@ -151,6 +151,27 @@ void CfefxPanel::reset() {
 	hide();
 }
 
+#ifndef NDEBUG
+CfefxPanel::DebugState CfefxPanel::debugState() const {
+	DebugState state;
+	state.clock = ClientTimeNow;
+	state.damage = Damage;
+	state.tier = LastTier;
+	state.score = Score;
+	state.lastScoreAge = ClientTimeNow - LastScoreTime;
+	state.scoreAge = ScoreStart < 0.0 ? -1.0 : ClientTimeNow - ScoreStart;
+	state.enabled = cfefx::Enabled && cfefx::Enabled->value > 0.0f;
+	// Same expression evaluate() uses for the tier step, so the driver can
+	// inject exactly one mark's worth of damage.
+	if (cfefx::MaxDamage)
+		state.step = static_cast<int>(std::max<float>(10.0f, cfefx::MaxDamage->value)) / 10;
+	state.volume = cfefx::Volume ? cfefx::Volume->value : 0.0f;
+	state.active = hudActive();
+	state.visible = isVisible();
+	return state;
+}
+#endif
+
 void CfefxPanel::onDamage(int value) {
 	if (!cfefx::Enabled || cfefx::Enabled->value <= 0.0f)
 		return;
