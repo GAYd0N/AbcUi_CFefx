@@ -395,7 +395,9 @@ void CfefxPanel::animatePip(Pip& pip, std::size_t index, double now) {
 	setOpacity(pip.mark, 0.0f);
 
 	// Old StarXAnim: centre -> right 204dp (20 -> 40) -> right 44dp (-> 20),
-	// fading in over 0.02s and out over the last 0.1s.
+	// fading in over 0.02s and out over the last 0.1s. The old script held the
+	// peak for 0.1s before the exit leg; the two legs now split the full
+	// duration so the star never stops moving.
 	const float startX = width * 0.5f - kStarSize * 0.5f * scale;
 	const float startY = height * 0.5f - kStarSize * 0.5f * scale;
 	const float midX = width - kStarMidFromRight * scale;
@@ -407,19 +409,14 @@ void CfefxPanel::animatePip(Pip& pip, std::size_t index, double now) {
 	float x = startX;
 	float y = startY;
 	float size = smallSize;
-	if (elapsed < 0.1) {
-		const float t = segment(elapsed, 0.0, 0.1);
+	if (elapsed < 0.15) {
+		const float t = segment(elapsed, 0.0, 0.15);
 		x = lerp(startX, midX, t);
 		y = lerp(startY, top, t);
 		size = lerp(smallSize, bigSize, t);
 	}
-	else if (elapsed < 0.2) {
-		x = midX;
-		y = top;
-		size = bigSize;
-	}
 	else {
-		const float t = segment(elapsed, 0.2, 0.1);
+		const float t = segment(elapsed, 0.15, 0.15);
 		x = lerp(midX, endX, t);
 		y = top;
 		size = lerp(bigSize, smallSize, t);
