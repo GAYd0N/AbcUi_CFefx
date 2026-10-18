@@ -101,7 +101,7 @@ constexpr float kScoreEffectBaseAlpha = 200.0f / 255.0f;
 // kStarStagger after the previous one, so a single 400-damage hit launches its
 // four stars as a continuous trail instead of four synchronized animations.
 // The side mark appears the moment its own star lands (no fade).
-constexpr double kStarStagger = 0.05;
+constexpr double kStarStagger = 0.025;
 constexpr double kStarDuration = 0.3;
 constexpr double kScoreMarkEnd = 2.0;
 constexpr double kScoreEffectEnd = 1.2;
@@ -396,8 +396,8 @@ void CfefxPanel::animatePip(Pip& pip, std::size_t index, double now) {
 
 	// Old StarXAnim: centre -> right 204dp (20 -> 40) -> right 44dp (-> 20),
 	// fading in over 0.02s and out over the last 0.1s. The old script held the
-	// peak for 0.1s before the exit leg; the two legs now split the full
-	// duration so the star never stops moving.
+	// peak for 0.1s; keep a short 0.05s beat there and split the remaining
+	// 0.25s evenly between the two legs.
 	const float startX = width * 0.5f - kStarSize * 0.5f * scale;
 	const float startY = height * 0.5f - kStarSize * 0.5f * scale;
 	const float midX = width - kStarMidFromRight * scale;
@@ -409,14 +409,19 @@ void CfefxPanel::animatePip(Pip& pip, std::size_t index, double now) {
 	float x = startX;
 	float y = startY;
 	float size = smallSize;
-	if (elapsed < 0.15) {
-		const float t = segment(elapsed, 0.0, 0.15);
+	if (elapsed < 0.125) {
+		const float t = segment(elapsed, 0.0, 0.125);
 		x = lerp(startX, midX, t);
 		y = lerp(startY, top, t);
 		size = lerp(smallSize, bigSize, t);
 	}
+	else if (elapsed < 0.175) {
+		x = midX;
+		y = top;
+		size = bigSize;
+	}
 	else {
-		const float t = segment(elapsed, 0.15, 0.15);
+		const float t = segment(elapsed, 0.175, 0.125);
 		x = lerp(midX, endX, t);
 		y = top;
 		size = lerp(bigSize, smallSize, t);
