@@ -22,6 +22,14 @@
 
 #include <abc/Math.h>
 
+// Renderer-side aliases that used to live in abc/Math.h. Keep them in this
+// shim so AbcCore stays renderer-free.
+typedef float mat3x4[3][4];
+typedef float mat4[4][4];
+typedef float vec4[4];
+typedef int ivec4[4];
+typedef unsigned int uvec4[4];
+
 // Minimal GL types (Renderer-side constants reference a couple of these).
 typedef unsigned int GLuint;
 typedef unsigned int GLenum;

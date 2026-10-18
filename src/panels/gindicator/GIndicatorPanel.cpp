@@ -163,7 +163,7 @@ void GIndicatorPanel::onRedraw(double frameTime) {
   // View forward (old PaintBackground angles math).
   vec3_t view{}, forward{};
   gEngfuncs.GetViewAngles(view);
-  abc::CMathlib::AngleVectors(view, forward, nullptr, nullptr);
+  abc::math::AngleVectors(view, forward, nullptr, nullptr);
 
   for (gindicator::TrackedGrenade &tracked : gindicator::Tracked) {
     if (!tracked.marker) {

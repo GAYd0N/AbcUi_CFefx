@@ -218,7 +218,7 @@ void PlayerBoardPanel::onRedraw(double frameTime) {
 
     vec3_t view{};
     gEngfuncs.GetViewAngles(view);
-    abc::CMathlib::AngleVectors(view, view, nullptr, nullptr);
+    abc::math::AngleVectors(view, view, nullptr, nullptr);
     const float distance = std::sqrt(distanceSquared);
     float dot = 0.0f;
     for (int i = 0; i < 3; i++)

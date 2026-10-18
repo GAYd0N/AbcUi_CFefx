@@ -407,7 +407,7 @@ void ItemHighlightPanel::onRedraw(double frameTime) {
 
   vec3_t view{};
   gEngfuncs.GetViewAngles(view);
-  abc::CMathlib::AngleVectors(view, view, nullptr, nullptr);
+  abc::math::AngleVectors(view, view, nullptr, nullptr);
   vec3_t viewOfs{};
   gEngfuncs.pEventAPI->EV_LocalPlayerViewheight(viewOfs);
 

@@ -15,13 +15,13 @@ namespace framework {
 namespace ColorUtil {
 
 inline void rgbToHsv(const float rgb[3], float hsv[3]) {
-  abc::CMathlib::RGBToHSV(static_cast<int>(rgb[0]), static_cast<int>(rgb[1]),
-                          static_cast<int>(rgb[2]), hsv[0], hsv[1], hsv[2]);
+  abc::math::RGBToHSV(static_cast<int>(rgb[0]), static_cast<int>(rgb[1]),
+                      static_cast<int>(rgb[2]), hsv[0], hsv[1], hsv[2]);
 }
 
 inline void hsvToRgb(const float hsv[3], float rgb[3]) {
   int r, g, b;
-  abc::CMathlib::HSVToRGB(hsv[0], hsv[1], hsv[2], r, g, b);
+  abc::math::HSVToRGB(hsv[0], hsv[1], hsv[2], r, g, b);
   rgb[0] = static_cast<float>(r);
   rgb[1] = static_cast<float>(g);
   rgb[2] = static_cast<float>(b);

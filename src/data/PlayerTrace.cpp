@@ -43,7 +43,7 @@ void update(bool levelActive) {
   vec3_t angles{};
   gEngfuncs.GetViewAngles(angles);
   vec3_t forward{};
-  abc::CMathlib::AngleVectors(angles, forward, nullptr, nullptr);
+  abc::math::AngleVectors(angles, forward, nullptr, nullptr);
   vec3_t viewOfs{};
   gEngfuncs.pEventAPI->EV_LocalPlayerViewheight(viewOfs);
   vec3_t start{};

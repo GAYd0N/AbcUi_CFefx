@@ -60,7 +60,7 @@ bool viewForward(vec3_t forward) {
     return false;
   vec3_t view{};
   gEngfuncs.GetViewAngles(view);
-  abc::CMathlib::AngleVectors(view, forward, nullptr, nullptr);
+  abc::math::AngleVectors(view, forward, nullptr, nullptr);
   return true;
 }
 
