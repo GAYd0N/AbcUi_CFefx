@@ -71,4 +71,12 @@ int textureForUri(const std::string& uri, int& width, int& height);
 // Effect panel drives its animation loop with it.
 int standaloneFrameCount(const std::string& relativePath);
 
+#ifndef NDEBUG
+// Debug probes (abc_ui_sprprobe): trace each resolution stage of one atlas /
+// URI through the engine filesystem so a silent texture failure localizes to
+// read / decode / crop / upload in one run.
+void debugDumpAtlas(const std::string& atlasFile);
+int debugResolveUri(const std::string& uri);
+#endif
+
 }

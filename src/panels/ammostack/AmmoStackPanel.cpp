@@ -33,7 +33,11 @@ void AmmoStackPanel::onDocumentReady() {
 		wrect_t rect{};
 		if (!weaponres::ammoIcon(index, atlas, rect))
 			return;
-		char item[160];
+		// Server-provided atlases live under subdirectories
+		// ("bdsc_custom/..."), so the markup needs room for the full sprite
+		// path plus the rect and count; 160 overflowed sprintf_s (fatal
+		// invalid-parameter handler) on a long path.
+		char item[256];
 		sprintf_s(item,
 			"<img class=\"icon\" src=\"spricon://%s/%d,%d,%d,%d\"/>"
 			"<div class=\"count font-default\">%d</div>",

@@ -130,6 +130,7 @@ add_library(AbcUi MODULE
     src/data/PlayerResource.cpp
     src/data/PlayerTrace.cpp
     src/data/SpriteResource.cpp
+    src/data/SpriteUri.cpp
     src/data/TextFeed.cpp
     src/data/TeamResource.cpp
     src/data/WeaponResource.cpp

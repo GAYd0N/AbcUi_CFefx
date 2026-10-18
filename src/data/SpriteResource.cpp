@@ -4,6 +4,7 @@
 #include <metahook.h>
 
 #include "SpriteResource.h"
+#include "SpriteUri.h"
 #include "../framework/ResourceLimits.h"
 #include "../framework/ResourceFile.h"
 #include <unordered_set>
@@ -71,28 +72,27 @@ std::unordered_map<std::string, int> FrameTextures;
 bool ChannelWarned = false;
 int HudResolution = 0;
 
-// SPR_GetList paths are relative to the sprite root, except when the list
-// escaped it ("../abc/..."): the engine then returns the normalized path
-// ("./abc/..."). Try the standard "sprites/" form first, with the already
-// normalized path as the fallback for those engine-supplied entries.
+// SPR_GetList paths are relative to the sprite root. The engine itself opens
+// "sprites/<szSprite>.spr", so an entry may legitimately climb out with ".."
+// (the ABC fallback list ships "../abc/abcui/hud/spr/weapon_error"); prefix
+// first and let the engine filesystem normalize, exactly like SPR_Load does.
+// Paths already carrying the "sprites/" prefix are used as-is.
 bool readSpriteFile(const std::string& atlasFile, std::vector<unsigned char>& bytes) {
 	std::string normalized;
+	if (atlasFile.starts_with("sprites/") || atlasFile.starts_with("sprites\\")) {
+		if (!framework::ResourceFile::normalize(atlasFile, normalized))
+			return false;
+		return framework::ResourceFile::read(normalized, bytes, framework::ResourceLimits::MaxFileBytes);
+	}
+
+	std::string spritePath;
+	if (framework::ResourceFile::normalize("sprites/" + atlasFile, spritePath) &&
+		framework::ResourceFile::read(spritePath, bytes, framework::ResourceLimits::MaxFileBytes))
+		return true;
+
+	// Fallback for paths already rooted at the mod directory.
 	if (!framework::ResourceFile::normalize(atlasFile, normalized))
 		return false;
-
-	if (normalized.starts_with("sprites/"))
-		return framework::ResourceFile::read(normalized, bytes, framework::ResourceLimits::MaxFileBytes);
-
-	const bool escapedSpriteRoot = atlasFile.starts_with("./") ||
-		atlasFile.starts_with(".\\") || atlasFile.starts_with("../") ||
-		atlasFile.starts_with("..\\") || atlasFile.find("/../") != std::string::npos ||
-		atlasFile.find("\\..\\") != std::string::npos;
-	if (escapedSpriteRoot &&
-		framework::ResourceFile::read(normalized, bytes, framework::ResourceLimits::MaxFileBytes))
-		return true;
-
-	if (framework::ResourceFile::read("sprites/" + normalized, bytes, framework::ResourceLimits::MaxFileBytes))
-		return true;
 	return framework::ResourceFile::read(normalized, bytes, framework::ResourceLimits::MaxFileBytes);
 }
 
@@ -468,13 +468,15 @@ int textureForUri(const std::string& uri, int& width, int& height) {
 	}
 	if (uri.rfind("spricon://", 0) == 0) {
 		// spricon://<atlas>/<l>,<t>,<r>,<b>
-		const size_t slash = uri.find('/', 10);
-		if (slash == std::string::npos)
+		std::string atlasFile;
+		int values[4] = {0, 0, 0, 0};
+		if (!splitCropUri(uri, 10, atlasFile, values))
 			return 0;
-		const std::string atlasFile = uri.substr(10, slash - 10);
 		wrect_t rect{};
-		if (sscanf_s(uri.c_str() + slash + 1, "%d,%d,%d,%d", &rect.left, &rect.top, &rect.right, &rect.bottom) != 4)
-			return 0;
+		rect.left = values[0];
+		rect.top = values[1];
+		rect.right = values[2];
+		rect.bottom = values[3];
 		const auto* atlas = ensureAtlas(atlasFile);
 		int x, y;
 		if (!atlas || !framework::ResourceLimits::crop(rect.left,rect.top,rect.right,rect.bottom,atlas->width,atlas->height,x,y,width,height)) return 0;
@@ -483,13 +485,15 @@ int textureForUri(const std::string& uri, int& width, int& height) {
 	if (uri.rfind("spralpha://", 0) == 0) {
 		// spralpha://<atlas>/<l>,<t>,<r>,<b> - straight-alpha crop (old
 		// kRenderTransTexture sprites: the weapon crosshairs).
-		const size_t slash = uri.find('/', 11);
-		if (slash == std::string::npos)
+		std::string atlasFile;
+		int values[4] = {0, 0, 0, 0};
+		if (!splitCropUri(uri, 11, atlasFile, values))
 			return 0;
-		const std::string atlasFile = uri.substr(11, slash - 11);
 		wrect_t rect{};
-		if (sscanf_s(uri.c_str() + slash + 1, "%d,%d,%d,%d", &rect.left, &rect.top, &rect.right, &rect.bottom) != 4)
-			return 0;
+		rect.left = values[0];
+		rect.top = values[1];
+		rect.right = values[2];
+		rect.bottom = values[3];
 		const auto* atlas = ensureAtlas(atlasFile);
 		int x, y;
 		if (!atlas || !framework::ResourceLimits::crop(rect.left,rect.top,rect.right,rect.bottom,atlas->width,atlas->height,x,y,width,height)) return 0;
@@ -511,5 +515,56 @@ int standaloneFrameCount(const std::string& relativePath) {
 	const StandaloneSpr* spr = ensureStandalone(relativePath);
 	return spr ? static_cast<int>(spr->frameOffsets.size()) : 0;
 }
+
+#ifndef NDEBUG
+namespace {
+int readProbeInt(const std::vector<unsigned char>& file, size_t offset, bool& ok) {
+	if (offset + 4 > file.size()) {
+		ok = false;
+		return 0;
+	}
+	return static_cast<int>(file[offset]) | (static_cast<int>(file[offset + 1]) << 8) |
+		(static_cast<int>(file[offset + 2]) << 16) | (static_cast<int>(file[offset + 3]) << 24);
+}
+} // namespace
+
+void debugDumpAtlas(const std::string& atlasFile) {
+	std::string normalized;
+	const bool normalizedOk = framework::ResourceFile::normalize(atlasFile, normalized);
+	std::vector<unsigned char> bytes;
+	const bool readOk = readSpriteFile(atlasFile, bytes);
+	abc::ConsolePrint(
+		"[AbcUi] sprdbg atlas='%s' norm='%s' normOk=%d read=%d bytes=%u cached=%d\n",
+		atlasFile.c_str(), normalized.c_str(), normalizedOk ? 1 : 0, readOk ? 1 : 0,
+		static_cast<unsigned>(bytes.size()), Atlases.count(atlasFile) ? 1 : 0);
+	abc::ConsolePrint("[AbcUi] sprdbg exists raw=%d sprites=%d fs=%p\n",
+		normalizedOk && framework::ResourceFile::exists(normalized) ? 1 : 0,
+		framework::ResourceFile::exists("sprites/" + normalized) ? 1 : 0,
+		static_cast<void*>(abc::g_pFileSystem));
+	if (!readOk || bytes.size() < 40)
+		return;
+	bool ok = true;
+	const int signature = readProbeInt(bytes, 0, ok);
+	const int version = readProbeInt(bytes, 4, ok);
+	const int format = readProbeInt(bytes, 12, ok);
+	const int width = readProbeInt(bytes, 20, ok);
+	const int height = readProbeInt(bytes, 24, ok);
+	const int frames = readProbeInt(bytes, 28, ok);
+	abc::ConsolePrint(
+		"[AbcUi] sprdbg header ok=%d sig=%x ver=%d fmt=%d declared=%dx%d frames=%d\n",
+		ok ? 1 : 0, static_cast<unsigned>(signature), version, format, width, height, frames);
+	const auto cached = Atlases.find(atlasFile);
+	if (cached != Atlases.end())
+		abc::ConsolePrint("[AbcUi] sprdbg decoded=%dx%d rgba=%u\n", cached->second.width,
+			cached->second.height, static_cast<unsigned>(cached->second.rgba.size()));
+}
+
+int debugResolveUri(const std::string& uri) {
+	int width = 0, height = 0;
+	const int id = textureForUri(uri, width, height);
+	abc::ConsolePrint("[AbcUi] sprdbg uri='%s' id=%d dims=%dx%d\n", uri.c_str(), id, width, height);
+	return id;
+}
+#endif
 
 }

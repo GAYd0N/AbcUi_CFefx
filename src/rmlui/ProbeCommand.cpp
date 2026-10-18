@@ -19,6 +19,8 @@
 #include "../data/Avatars.h"
 #include "../data/NetworkMessages.h"
 #include "../data/PlayerResource.h"
+#include "../data/SpriteResource.h"
+#include "../data/WeaponResource.h"
 #include "../framework/PanelManager.h"
 #include "../panels/cfefx/CfefxPanel.h"
 #include "../panels/itemhighlight/ItemHighlightPanel.h"
@@ -42,6 +44,7 @@
 #include <algorithm>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include <vector>
 namespace panels::scoreboard { extern panels::ScoreboardPanel* PanelInstance; }
 
@@ -156,6 +159,57 @@ namespace {
 			static_cast<int>(matches.size()));
 		for (const auto& match : matches)
 			abc::ConsolePrint("[AbcUi]   %s\n", match.c_str());
+	}
+
+	// Server-provided sprite diagnostic (abc_ui_sprprobe): the WeaponStack
+	// icons come from the server's own hud txt + downloaded .spr atlases. A
+	// solid tinted quad means the texture handle stayed 0; this dump walks the
+	// live DOM sources and re-resolves each stage so read / decode / crop /
+	// upload failure is visible instead of silent. An explicit atlas argument
+	// dumps one file's bytes + header whether or not a panel uses it yet.
+	void spriteProbeCommand() {
+		if (gEngfuncs.Cmd_Argc() >= 2) {
+			sprites::debugDumpAtlas(gEngfuncs.Cmd_Argv(1));
+			return;
+		}
+		Rml::Context* ctx = rmlui::context();
+		if (!ctx)
+			return;
+		for (const char* docName : {"weaponstack", "ammostack", "itemstack"}) {
+			Rml::ElementDocument* doc = ctx->GetDocument(docName);
+			if (!doc)
+				continue;
+			Rml::Element* container = doc->GetElementById("stack");
+			if (!container)
+				continue;
+			const int count = container->GetNumChildren();
+			abc::ConsolePrint("[AbcUi] sprprobe %s items=%d visible=%d\n", docName, count,
+				doc->IsVisible() ? 1 : 0);
+			for (int i = 0; i < count; i++) {
+				Rml::Element* item = container->GetChild(i);
+				Rml::Element* icon = item->GetFirstChild();
+				const Rml::String src = icon ? icon->GetAttribute<Rml::String>("src", "") : "";
+				if (std::string_view(docName) == "weaponstack") {
+					const int weaponId = item->GetAttribute<int>("weaponid", 0);
+					const weaponres::Weapon* weapon = weaponres::getWeapon(weaponId);
+					abc::ConsolePrint(
+						"[AbcUi] sprprobe[%d] id=%d name='%s' valid=%d atlas='%s' rect=%d,%d,%d,%d hasAmmo=%d src='%s'\n",
+						i, weaponId, weapon ? weapon->name.c_str() : "?",
+						weapon && weapon->inactive.valid ? 1 : 0,
+						weapon ? weapon->inactive.atlas.c_str() : "",
+						weapon ? weapon->inactive.rect.left : 0,
+						weapon ? weapon->inactive.rect.top : 0,
+						weapon ? weapon->inactive.rect.right : 0,
+						weapon ? weapon->inactive.rect.bottom : 0,
+						weapon && weaponres::hasAmmo(weapon) ? 1 : 0, src.c_str());
+				}
+				else {
+					abc::ConsolePrint("[AbcUi] sprprobe[%d] src='%s'\n", i, src.c_str());
+				}
+				if (!src.empty())
+					sprites::debugResolveUri(src);
+			}
+		}
 	}
 
 
@@ -929,6 +983,7 @@ void registerProbeCommand() {
 	abc::ADD_COMMAND("abc_ui_console_dump", consoleDumpCommand);
 	abc::ADD_COMMAND("abc_ui_console_submit", consoleSubmitCommand);
 	abc::ADD_COMMAND("abc_ui_console_complete", consoleCompleteCommand);
+	abc::ADD_COMMAND("abc_ui_sprprobe", spriteProbeCommand);
 }
 
 }
