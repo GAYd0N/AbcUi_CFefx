@@ -22,11 +22,12 @@ constexpr int kPrintNotify = 1;
 constexpr int kPrintCenter = 4;
 
 // (victim, attacker, inflictor); attacker empty on suicide.
-extern abc::CallbackList<void(const char*, const char*, const char*)> KillFeed;
+extern abc::CallbackList<void(const char *, const char *, const char *)>
+    KillFeed;
 // (target, formatted text) for HUDNOTICE targets 1/4.
-extern abc::CallbackList<void(int, const char*)> Notice;
+extern abc::CallbackList<void(int, const char *)> Notice;
 
 // HUD_Init-time: subscribes netmsg::TextMsg. Idempotent.
 void init();
 
-}
+} // namespace textfeed

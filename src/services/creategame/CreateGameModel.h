@@ -72,6 +72,7 @@
 // never persisted, and never leaves the single "sv_password" write.
 
 #include <cstddef>
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -87,152 +88,180 @@ namespace creategame {
 // a request map is either an enumerated engine name or refused.
 class MapCatalog {
 public:
-	static constexpr std::size_t kCapacity = 4096;
+  static constexpr std::size_t kCapacity = 4096;
 
-	bool addRawName(const char* relativeName);
-	void finalize();
-	void clear();
+  bool addRawName(const char *relativeName);
+  void finalize();
+  void clear();
 
-	std::size_t size() const { return Names.size(); }
-	const std::string& nameAt(std::size_t index) const { return Names[index]; }
-	bool contains(const std::string& map) const;
+  std::size_t size() const {
+    return Names.size();
+  }
+  const std::string &nameAt(std::size_t index) const {
+    return Names[index];
+  }
+  bool contains(const std::string &map) const;
 
-	// Launch-side token grammar (runs on every catalog entry AND on the
-	// request map): 1..127 bytes, [A-Za-z0-9_-] first, then
-	// [A-Za-z0-9_.-/]; no ".." sequence, no empty path segment, no trailing
-	// separator - a token can never traverse outside the maps/ tree and can
-	// never act as anything but the single argument of `map`.
-	static bool validMapToken(const char* map);
+  // Launch-side token grammar (runs on every catalog entry AND on the
+  // request map): 1..127 bytes, [A-Za-z0-9_-] first, then
+  // [A-Za-z0-9_.-/]; no ".." sequence, no empty path segment, no trailing
+  // separator - a token can never traverse outside the maps/ tree and can
+  // never act as anything but the single argument of `map`.
+  static bool validMapToken(const char *map);
 
 private:
-	std::vector<std::string> Names;
+  std::vector<std::string> Names;
 };
 
 // One create-local-game request: the four values the shipped Server page
 // collects (map / maxplayers / name / password).
 struct Request {
-	std::string Map;
-	int MaxPlayers = 0;
-	std::string ServerName;
-	std::string Password;
-	bool Lan = true;
-	std::vector<ServerOptionValue> Options;
+  std::string Map;
+  int MaxPlayers = 0;
+  std::string ServerName;
+  std::string Password;
+  bool Lan = true;
+  std::vector<ServerOptionValue> Options;
 };
 
 enum class Field {
-	kMap,
-	kMaxPlayers,
-	kServerName,
-	kPassword,
+  kMap,
+  kMaxPlayers,
+  kServerName,
+  kPassword,
 };
 
 enum class Error {
-	kNone,
-	kMapEmpty,
-	kMapToken,           // grammar violation (traversal / charset / length)
-	kMapNotEnumerated,   // well-formed but not in the enumerated set
-	kPlayersRange,       // not an integer in [1, 32]
-	kNameEmpty,
-	kNameLength,         // > 63 bytes
-	kNameCharset,        // control / quote / semicolon / backslash
-	kPasswordLength,     // > 63 bytes
-	kPasswordCharset,
+  kNone,
+  kMapEmpty,
+  kMapToken,         // grammar violation (traversal / charset / length)
+  kMapNotEnumerated, // well-formed but not in the enumerated set
+  kPlayersRange,     // not an integer in [1, 32]
+  kNameEmpty,
+  kNameLength,     // > 63 bytes
+  kNameCharset,    // control / quote / semicolon / backslash
+  kPasswordLength, // > 63 bytes
+  kPasswordCharset,
 };
 
 struct Validation {
-	Error error = Error::kNone;
-	Field field = Field::kMap;
-	bool ok() const { return error == Error::kNone; }
+  Error error = Error::kNone;
+  Field field = Field::kMap;
+  bool ok() const {
+    return error == Error::kNone;
+  }
 };
 
 // The production create-game service. Holds the catalog and the launch seams;
 // the module injects engine thunks (the offline test records).
 class CreateGameModel {
 public:
-	static constexpr int kMinPlayers = 1;
-	static constexpr int kMaxPlayers = 32;   // settings.scr NUMBER 1..32
-	static constexpr std::size_t kMaxTextBytes = 63;  // shipped strncpy 0x40
+  static constexpr int kMinPlayers = 1;
+  static constexpr int kMaxPlayers = 32;           // settings.scr NUMBER 1..32
+  static constexpr std::size_t kMaxTextBytes = 63; // shipped strncpy 0x40
 
-	// Request text rule for hostname/password (the validator's charset half).
-	// Bytes 0x20..0x7E and >= 0x80 pass (UTF-8 names are legitimate), except
-	// '"', ';' and '\\' (command/infostring delimiters) and 0x7F. Password may
-	// be empty; hostname may not.
-	static bool validTextChar(char c);
+  // Request text rule for hostname/password (the validator's charset half).
+  // Bytes 0x20..0x7E and >= 0x80 pass (UTF-8 names are legitimate), except
+  // '"', ';' and '\\' (command/infostring delimiters) and 0x7F. Password may
+  // be empty; hostname may not.
+  static bool validTextChar(char c);
 
-	// Strict base-10 parse of the players field text: the WHOLE string must be
-	// digits (no sign, no whitespace, no suffix) and the value must fit the
-	// [1, 32] range. Empty and overflowing texts refuse - the page's raw field
-	// text goes through here before a typed Request exists.
-	static bool parsePlayers(const char* text, int& out);
+  // Strict base-10 parse of the players field text: the WHOLE string must be
+  // digits (no sign, no whitespace, no suffix) and the value must fit the
+  // [1, 32] range. Empty and overflowing texts refuse - the page's raw field
+  // text goes through here before a typed Request exists.
+  static bool parsePlayers(const char *text, int &out);
 
-	void setCatalog(MapCatalog catalog) { Catalog = std::move(catalog); }
-	const MapCatalog& catalog() const { return Catalog; }
-	void setOptions(std::vector<ServerOption> Value) { Options = std::move(Value); }
-	const std::vector<ServerOption>& options() const { return Options; }
-	bool validOptions(const Request& Value) const { return validateServerOptions(Options, Value.Options); }
+  void setCatalog(MapCatalog catalog) {
+    Catalog = std::move(catalog);
+  }
+  const MapCatalog &catalog() const {
+    return Catalog;
+  }
+  void setOptions(std::vector<ServerOption> Value) {
+    Options = std::move(Value);
+  }
+  const std::vector<ServerOption> &options() const {
+    return Options;
+  }
+  bool validOptions(const Request &Value) const {
+    return validateServerOptions(Options, Value.Options);
+  }
 
-	static Validation validate(const MapCatalog& catalog, const Request& request);
+  static Validation validate(const MapCatalog &catalog, const Request &request);
 
-	// Engine seams. Plain function pointers, no captured state: production
-	// wires thin thunks, the offline test records.
-	struct Seams {
-		// Live cvar string value, or nullptr when the cvar does not exist
-		// (fail-closed: a missing cvar can never be snapshotted, its write
-		// fails verification and the launch aborts).
-		const char* (*readCvar)(const char* name) = nullptr;
-		// Typed string write, false when the cvar does not exist (the T10
-		// settings seam shape). Never a concatenated command string.
-		bool (*writeCvarString)(const char* name, const char* value) = nullptr;
-		void (*clientCmd)(const char* command) = nullptr;
-	};
-	void setSeams(const Seams& seams) { Seams_ = seams; }
-	bool wired() const {
-		return Seams_.readCvar && Seams_.writeCvarString && Seams_.clientCmd;
-	}
+  // Engine seams. Plain function pointers, no captured state: production
+  // wires thin thunks, the offline test records.
+  struct Seams {
+    // Live cvar string value, or nullptr when the cvar does not exist
+    // (fail-closed: a missing cvar can never be snapshotted, its write
+    // fails verification and the launch aborts).
+    const char *(*readCvar)(const char *name) = nullptr;
+    // Typed string write, false when the cvar does not exist (the T10
+    // settings seam shape). Never a concatenated command string.
+    bool (*writeCvarString)(const char *name, const char *value) = nullptr;
+    void (*clientCmd)(const char *command) = nullptr;
+  };
+  void setSeams(const Seams &seams) {
+    Seams_ = seams;
+  }
+  bool wired() const {
+    return Seams_.readCvar && Seams_.writeCvarString && Seams_.clientCmd;
+  }
 
-	enum class Launch {
-		kLaunched,     // every write verified, the map command left last
-		kInvalid,      // validation failed: zero engine calls
-		kWriteFailed,  // a cvar refused / did not stick; snapshots restored
-		kUnwired,      // a seam is missing: zero engine calls
-	};
+  enum class Launch {
+    kLaunched,    // every write verified, the map command left last
+    kInvalid,     // validation failed: zero engine calls
+    kWriteFailed, // a cvar refused / did not stick; snapshots restored
+    kUnwired,     // a seam is missing: zero engine calls
+  };
 
-	// Executes the shipped order (format string 0x1007f7a0), split into the
-	// recoverable-write and irreversible stages above.
-	Launch launch(const Request& request);
-	// After the local join, server-DLL cvars exist. Verify the queued options
-	// and repair values overwritten by map config through typed writes.
-	std::vector<std::string> settleOptions(const Request& Value);
+  // Executes the shipped order (format string 0x1007f7a0), split into the
+  // recoverable-write and irreversible stages above.
+  Launch launch(const Request &request);
+  // After the local join, server-DLL cvars exist. Verify the queued options
+  // and repair values overwritten by map config through typed writes.
+  std::vector<std::string> settleOptions(const Request &Value);
 
-	// The three recoverable cvars in write order (sv_lan, sv_password,
-	// hostname) and the evidence of the last launch: the failing cvar index
-	// (-1 = none), how many restores failed to read back, and the snapshot
-	// values. A snapshot can contain the PREVIOUS sv_password; it is restore
-	// machinery only - callers must never log snapshot values.
-	static constexpr int kRecoverableCount = 3;
-	static const char* recoverableName(int index);
-	const std::string& snapshot(int index) const { return Snapshots[index].Value; }
-	bool snapshotPresent(int index) const { return Snapshots[index].Present; }
-	int lastFailIndex() const { return FailIndex; }
-	int lastRestoreFailures() const { return RestoreFailures; }
+  // The three recoverable cvars in write order (sv_lan, sv_password,
+  // hostname) and the evidence of the last launch: the failing cvar index
+  // (-1 = none), how many restores failed to read back, and the snapshot
+  // values. A snapshot can contain the PREVIOUS sv_password; it is restore
+  // machinery only - callers must never log snapshot values.
+  static constexpr int kRecoverableCount = 3;
+  static const char *recoverableName(int index);
+  const std::string &snapshot(int index) const {
+    static const std::string kEmpty;
+    return index >= 0 && index < kRecoverableCount ? Snapshots[index].Value
+                                                   : kEmpty;
+  }
+  bool snapshotPresent(int index) const {
+    return index >= 0 && index < kRecoverableCount && Snapshots[index].Present;
+  }
+  int lastFailIndex() const {
+    return FailIndex;
+  }
+  int lastRestoreFailures() const {
+    return RestoreFailures;
+  }
 
 private:
-	struct Snapshot {
-		bool Present = false;
-		std::string Value;
-	};
+  struct Snapshot {
+    bool Present = false;
+    std::string Value;
+  };
 
-	bool writeAndVerify(int index, const char* value);
-	Launch restoreAndFail(int failIndex);
+  bool writeAndVerify(int index, const char *value);
+  Launch restoreAndFail(int failIndex);
 
-	MapCatalog Catalog;
-	std::vector<ServerOption> Options;
-	Seams Seams_;
-	Snapshot Snapshots[kRecoverableCount];
-	bool Wrote[kRecoverableCount] = {};
-	int FailIndex = -1;
-	int RestoreFailures = 0;
+  MapCatalog Catalog;
+  std::vector<ServerOption> Options;
+  Seams Seams_;
+  std::array<Snapshot, kRecoverableCount> Snapshots;
+  std::array<bool, kRecoverableCount> Wrote = {};
+  int FailIndex = -1;
+  int RestoreFailures = 0;
 };
 
-}
-}
+} // namespace creategame
+} // namespace services

@@ -24,46 +24,59 @@ namespace panels::settings::sections {
 
 class SpraySection {
 public:
-	using RequestSink = std::function<void(const std::string& path)>;
+  using RequestSink = std::function<void(const std::string &path)>;
 
-	SpraySection();
-	SpraySection(const SpraySection&) = delete;
-	SpraySection& operator=(const SpraySection&) = delete;
+  SpraySection();
+  SpraySection(const SpraySection &) = delete;
+  SpraySection &operator=(const SpraySection &) = delete;
 
-	void setRequestSink(RequestSink sink) { Request = std::move(sink); }
+  void setRequestSink(RequestSink sink) {
+    Request = std::move(sink);
+  }
 
-	// Opens the picker at the game folder (the engine's working directory,
-	// where the original dialog started too) and projects its first list.
-	void open(Rml::ElementDocument* document);
-	// Drops the picker state (layer dismissed by the page or a leave).
-	void close(Rml::ElementDocument* document);
-	bool browsing() const { return BrowseOpen; }
+  // Opens the picker at the game folder (the engine's working directory,
+  // where the original dialog started too) and projects its first list.
+  void open(Rml::ElementDocument *document);
+  // Drops the picker state (layer dismissed by the page or a leave).
+  void close(Rml::ElementDocument *document);
+  bool browsing() const {
+    return BrowseOpen;
+  }
 
-	// One picker intent from the page's click handler (data-action plus
-	// data-entry/data-root on the clicked element).
-	void handleAction(const std::string& action, Rml::Element* entry, Rml::ElementDocument* document);
+  // One picker intent from the page's click handler (data-action plus
+  // data-entry/data-root on the clicked element).
+  void handleAction(const std::string &action, Rml::Element *entry,
+                    Rml::ElementDocument *document);
 
-	// The maker's answer from the module.
-	void setResult(bool ok, const std::string& message);
-	// Rml source of the made spray's preview texture (the module uploads it);
-	// an empty uri clears the preview.
-	void setPreviewUri(std::string uri) { PreviewUri = std::move(uri); }
-	// Maker status + preview uri, projected by the page on every render.
-	const std::string& statusText() const { return Message; }
-	bool hasPreview() const { return !PreviewUri.empty(); }
-	const std::string& previewUri() const { return PreviewUri; }
+  // The maker's answer from the module.
+  void setResult(bool ok, const std::string &message);
+  // Rml source of the made spray's preview texture (the module uploads it);
+  // an empty uri clears the preview.
+  void setPreviewUri(std::string uri) {
+    PreviewUri = std::move(uri);
+  }
+  // Maker status + preview uri, projected by the page on every render.
+  const std::string &statusText() const {
+    return Message;
+  }
+  bool hasPreview() const {
+    return !PreviewUri.empty();
+  }
+  const std::string &previewUri() const {
+    return PreviewUri;
+  }
 
-	// Rebuilds the picker DOM (path, roots, list, status).
-	void renderBrowser(Rml::ElementDocument* document);
+  // Rebuilds the picker DOM (path, roots, list, status).
+  void renderBrowser(Rml::ElementDocument *document);
 
 private:
-	services::filedialog::FileBrowser Browser;
-	RequestSink Request;
-	// The selected file inside the current directory (empty: nothing picked).
-	std::string Selected;
-	std::string Message;
-	std::string PreviewUri;
-	bool BrowseOpen = false;
+  services::filedialog::FileBrowser Browser;
+  RequestSink Request;
+  // The selected file inside the current directory (empty: nothing picked).
+  std::string Selected;
+  std::string Message;
+  std::string PreviewUri;
+  bool BrowseOpen = false;
 };
 
 } // namespace panels::settings::sections

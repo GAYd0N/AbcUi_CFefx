@@ -43,17 +43,17 @@ namespace services::console {
 // without the trailing newline. Sequence is monotonic for the process and is
 // never reused, so a consumer can page forward (copySince) across Clear.
 struct ConsoleLine {
-	std::string Text;
-	std::uint64_t Sequence = 0;
-	bool Developer = false;  // assembled from DPrintf fragments
-	bool Truncated = false;  // hit kMaxLineBytes; the remainder was cut
+  std::string Text;
+  std::uint64_t Sequence = 0;
+  bool Developer = false; // assembled from DPrintf fragments
+  bool Truncated = false; // hit kMaxLineBytes; the remainder was cut
 };
 
 struct ConsoleBufferStats {
-	std::uint64_t Fragments = 0;              // pushText calls seen
-	std::uint64_t DroppedBytes = 0;           // bytes cut by the line byte cap
-	std::uint64_t DroppedLines = 0;           // lines evicted by the line cap
-	std::uint64_t RejectedAfterShutdown = 0;  // pushes after shutdown()
+  std::uint64_t Fragments = 0;             // pushText calls seen
+  std::uint64_t DroppedBytes = 0;          // bytes cut by the line byte cap
+  std::uint64_t DroppedLines = 0;          // lines evicted by the line cap
+  std::uint64_t RejectedAfterShutdown = 0; // pushes after shutdown()
 };
 
 // A bounded tail of the engine console. Two producers feed it: the engine
@@ -70,49 +70,50 @@ struct ConsoleBufferStats {
 // across call boundaries).
 class ConsoleBuffer {
 public:
-	static constexpr std::size_t kMaxLines = 1024;
-	static constexpr std::size_t kMaxLineBytes = 1024;
+  static constexpr std::size_t kMaxLines = 1024;
+  static constexpr std::size_t kMaxLineBytes = 1024;
 
-	// Producer entry (engine callback side). Copies immediately; the caller's
-	// buffer never outlives the call. `developer` marks a DPrintf fragment:
-	// any dev fragment marks the whole assembled line.
-	void pushText(const char* text, std::size_t length, bool developer);
+  // Producer entry (engine callback side). Copies immediately; the caller's
+  // buffer never outlives the call. `developer` marks a DPrintf fragment:
+  // any dev fragment marks the whole assembled line.
+  void pushText(const char *text, std::size_t length, bool developer);
 
-	// Clear semantics (engine IGameConsole::Clear): drop every line AND the
-	// pending fragment, bump the generation. The sequence counter keeps
-	// counting - a consumer watching generation() knows to reset its view.
-	void clear();
+  // Clear semantics (engine IGameConsole::Clear): drop every line AND the
+  // pending fragment, bump the generation. The sequence counter keeps
+  // counting - a consumer watching generation() knows to reset its view.
+  void clear();
 
-	// Teardown, called ONCE after the producers were stopped (callbacks
-	// unregistered / capture detached) - never before. Idempotent. After
-	// this, pushText is refused and counted.
-	void shutdown();
+  // Teardown, called ONCE after the producers were stopped (callbacks
+  // unregistered / capture detached) - never before. Idempotent. After
+  // this, pushText is refused and counted.
+  void shutdown();
 
-	bool stopped() const;
-	std::uint64_t generation() const;
-	std::uint64_t latestSequence() const;
-	std::size_t lineCount() const;
-	ConsoleBufferStats stats() const;
+  bool stopped() const;
+  std::uint64_t generation() const;
+  std::uint64_t latestSequence() const;
+  std::size_t lineCount() const;
+  ConsoleBufferStats stats() const;
 
-	// Copies up to `max` lines newer than `since` into `out` (cleared first).
-	// When more lines qualify than `max` (an unbounded cache cannot page a
-	// lagging consumer from the start), the NEWEST `max` are returned.
-	// Returns the number copied.
-	std::size_t copySince(std::uint64_t since, std::vector<ConsoleLine>& out, std::size_t max) const;
+  // Copies up to `max` lines newer than `since` into `out` (cleared first).
+  // When more lines qualify than `max` (an unbounded cache cannot page a
+  // lagging consumer from the start), the NEWEST `max` are returned.
+  // Returns the number copied.
+  std::size_t copySince(std::uint64_t since, std::vector<ConsoleLine> &out,
+                        std::size_t max) const;
 
 private:
-	void finalizeLineLocked();
-	void trimPartialSequenceLocked();
+  void finalizeLineLocked();
+  void trimPartialSequenceLocked();
 
-	mutable std::mutex Mutex;
-	std::deque<ConsoleLine> Lines;
-	std::string Pending;
-	bool PendingDeveloper = false;
-	bool PendingTruncated = false;
-	std::uint64_t SequenceCounter = 0;
-	std::uint64_t GenerationCounter = 1;
-	bool Stopped = false;
-	ConsoleBufferStats Stats;
+  mutable std::mutex Mutex;
+  std::deque<ConsoleLine> Lines;
+  std::string Pending;
+  bool PendingDeveloper = false;
+  bool PendingTruncated = false;
+  std::uint64_t SequenceCounter = 0;
+  std::uint64_t GenerationCounter = 1;
+  bool Stopped = false;
+  ConsoleBufferStats Stats;
 };
 
 // The producer-side seam: one capture per engine console, fed by the
@@ -124,55 +125,58 @@ private:
 // engine UI callbacks run there); the buffer itself carries the lock.
 class ConsoleCapture {
 public:
-	// Per-message-key (wrapper string object, method, byte length) seen in
-	// the pre phase, waiting for its post echo. Small and fixed: the real
-	// dispatch is pre->post adjacent; the entries tolerate nested re-entry
-	// (a plugin printing during dispatch) without double-storing.
-	static constexpr std::size_t kMaxPending = 8;
+  // Per-message-key (wrapper string object, method, byte length) seen in
+  // the pre phase, waiting for its post echo. Small and fixed: the real
+  // dispatch is pre->post adjacent; the entries tolerate nested re-entry
+  // (a plugin printing during dispatch) without double-storing.
+  static constexpr std::size_t kMaxPending = 8;
 
-	explicit ConsoleCapture(ConsoleBuffer& buffer)
-		: Buffer(buffer) {}
+  explicit ConsoleCapture(ConsoleBuffer &buffer) : Buffer(buffer) {}
 
-	// `source` is the wrapper's IVGUI2Extension_String object identity
-	// (opaque here); `data`/`length` the formatted text. `post` is the
-	// proxy phase.
-	void onPrintf(const void* source, const char* data, std::size_t length, bool post);
-	void onDPrintf(const void* source, const char* data, std::size_t length, bool post);
-	void onClear(bool post);
+  // `source` is the wrapper's IVGUI2Extension_String object identity
+  // (opaque here); `data`/`length` the formatted text. `post` is the
+  // proxy phase.
+  void onPrintf(const void *source, const char *data, std::size_t length,
+                bool post);
+  void onDPrintf(const void *source, const char *data, std::size_t length,
+                 bool post);
+  void onClear(bool post);
 
-	// Producer stop/start. detach() makes every later callback a no-op (the
-	// teardown order: detach -> unregister -> buffer.shutdown()). attach()
-	// exists for the Debug dump seam (printing cached text through the
-	// engine console would otherwise loop back into the capture).
-	void detach();
-	void attach();
-	bool attached() const { return !Detached; }
+  // Producer stop/start. detach() makes every later callback a no-op (the
+  // teardown order: detach -> unregister -> buffer.shutdown()). attach()
+  // exists for the Debug dump seam (printing cached text through the
+  // engine console would otherwise loop back into the capture).
+  void detach();
+  void attach();
+  bool attached() const {
+    return !Detached;
+  }
 
 private:
-	enum : std::uint8_t { kPrintf = 0, kDPrintf = 1 };
+  enum : std::uint8_t { kPrintf = 0, kDPrintf = 1 };
 
-	struct PendingKey {
-		const void* Source;
-		std::uint8_t Kind;
-		std::size_t Length;
-	};
+  struct PendingKey {
+    const void *Source;
+    std::uint8_t Kind;
+    std::size_t Length;
+  };
 
-	void capture(const void* source, const char* data, std::size_t length, bool post,
-		std::uint8_t kind);
+  void capture(const void *source, const char *data, std::size_t length,
+               bool post, std::uint8_t kind);
 
-	ConsoleBuffer& Buffer;
-	std::vector<PendingKey> Pending;
-	// One Clear dispatch pair: the pre phase clears and arms the flag; the
-	// post phase consumes it. A post without an armed flag means the pre was
-	// superseded upstream - that post still clears (once).
-	bool ClearPreSeen = false;
-	bool Detached = false;
+  ConsoleBuffer &Buffer;
+  std::vector<PendingKey> Pending;
+  // One Clear dispatch pair: the pre phase clears and arms the flag; the
+  // post phase consumes it. A post without an armed flag means the pre was
+  // superseded upstream - that post still clears (once).
+  bool ClearPreSeen = false;
+  bool Detached = false;
 };
 
 // Process-scoped singletons (the plugin TU lifetime). consoleCapture() is
 // wired to consoleBuffer(): the engine stream and its cache are one object
 // pair for the whole engine session.
-ConsoleBuffer& consoleBuffer();
-ConsoleCapture& consoleCapture();
+ConsoleBuffer &consoleBuffer();
+ConsoleCapture &consoleCapture();
 
-}
+} // namespace services::console

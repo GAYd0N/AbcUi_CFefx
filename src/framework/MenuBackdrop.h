@@ -16,13 +16,13 @@ class ElementDocument;
 
 namespace framework::menubackdrop {
 
-using Attacher = void (*)(Rml::ElementDocument* document);
+using Attacher = void (*)(Rml::ElementDocument *document);
 
 // Installs/replaces the implementation; null restores the no-op.
 void setAttacher(Attacher attacher);
 
 // Inserts the backdrop into the document when an implementation is installed.
 // Returns true when the document was handed to an attacher.
-bool attach(Rml::ElementDocument* document);
+bool attach(Rml::ElementDocument *document);
 
 } // namespace framework::menubackdrop

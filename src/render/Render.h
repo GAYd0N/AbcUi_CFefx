@@ -19,7 +19,7 @@ namespace abc {
 
 // Renderer.dll interface, resolved lazily by MetaRendererInit(). Null until
 // init succeeds (Renderer plugin absent).
-IMetaRenderer* MetaRenderer();
+IMetaRenderer *MetaRenderer();
 // Locates the Renderer plugin through the MetaHook plugin registry and grabs
 // METARENDERER_INTERFACE_VERSION. Fatals via abc::SysError when missing.
 void MetaRendererInit();
@@ -30,14 +30,15 @@ void BindTexture(int gltexturenum);
 
 // Full-control textured quad (positions p1..p4 = TL, BL, BR, TR in screen
 // space; uv spans 0..1). mode kRenderTransAdd selects additive blending.
-void DrawTexturePos(int tex, int mode, float p1[2], float p2[2], float p3[2], float p4[2],
-	unsigned char r, unsigned char g, unsigned char b, unsigned char a);
+void DrawTexturePos(int tex, int mode, float p1[2], float p2[2], float p3[2],
+                    float p4[2], unsigned char r, unsigned char g,
+                    unsigned char b, unsigned char a);
 
 // Shader compilation through the renderer; paths are mod-relative
 // ("abcui/shader/x.vsh"). Returns a program handle usable with
 // IMetaRenderer (0 on failure).
-unsigned int CompileShaderFile(const char* vsfile, const char* fsfile);
+unsigned int CompileShaderFile(const char *vsfile, const char *fsfile);
 
-}
+} // namespace abc
 
-#endif //ABC_RENDER_H
+#endif // ABC_RENDER_H

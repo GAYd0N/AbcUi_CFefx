@@ -44,77 +44,89 @@ void setPointerMode(bool enabled);
 // ShowPanel(intermission > 0)) and mutes +/-showscores (old !m_iInterMission
 // guards).
 void setIntermission(bool intermission);
-}
+} // namespace scoreboard
 
-class ScoreboardPanel : public framework::HudPanel, private framework::uiinput::Owner {
-public:
-	ScoreboardPanel();
-	~ScoreboardPanel() override;
-
-	void reset() override;
-
-protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
-
-private:
-	friend bool scoreboard::onKeyEvent(int down, int keynum);
-	friend void scoreboard::setIntermission(bool intermission);
-	friend bool scoreboard::wantsWheel();
-	friend void scoreboard::setPointerMode(bool enabled);
-	friend class TableListener;
-	class TableListener;
-
-	// Old EnableMousePointer / KeyCodeTyped path.
-	bool answerKey(int down, int keynum);
-
-	// Old FullUpdate on show; refresh on the 0.5s period (old
-	// UPDATE_PERIOD) or a data-version bump.
-	void rebuildTable();
-	void updateHeader();
-	// Change-gated header write (Phase 8): RmlUi SetInnerRML always rebuilds
-	// the element's text subtree (no same-string early-out), so an ungated
-	// per-frame write re-lays-out the whole document every frame - the P8
-	// benchmark measured ~18ms/frame of exactly that with the board up.
-	// `slot` addresses the applied-string cache; returns true when written.
-	bool setHeaderRml(int slot, const char* id, const std::string& rml);
-	void openContextMenu(int clientIndex, const Rml::Vector2f& position);
-	bool overMenu(const Rml::Vector2f& position);
-	void closeContextMenu();
-	void menuAction(int action);
-	void setVisible(bool visible);
-	void setMouseMode(bool enabled);
-
-	// framework::uiinput::Owner (interactive-HUD tier): the pointer-mode key
-	// contract is answerKey's MouseMode branch. Consulted only while this
-	// panel's token is top-of-stack, so keyboard keys keep their play
-	// behavior (chat etc.) while the pointer is up.
-	bool claimsKey(int down, int keynum) override;
-	bool claimsWheel() override;
-	// Force-release (focus loss / teardown): re-sync the mirror through
-	// setMouseMode(false) - the token is stale, release() would no-op.
-	void onOwnershipLost() override;
-
-	std::string ServerName;
-	std::string NextMap;
-	int TimeEndCount = 0;
-	double TimeEndBase = 0.0;
-	double LastRefresh = 0.0;
-	double ClientTimeNow = 0.0;
-	float AppliedRowHeight = -1;
-	bool Visible = false;
-	bool MouseMode = false;
-	bool Intermission = false;
-	long DataVersion = 0;
-	long AppliedVersion = -1;
-	int MenuClient = 0;
-	TableListener* Listener = nullptr;
-	// Applied-string cache for the header slots (setHeaderRml) and the last
-	// centered content height (update's vertical centering).
-	std::string HeaderCache[5];
-	float CenteredHeight = -1.0f;
-	// Router ownership of pointer mode (T06); MouseMode above mirrors it.
-	framework::uiinput::Token PointerToken;
+// Context-menu intents. The RML data-action attribute still carries the
+// integer, but the panel no longer switches on magic numbers.
+enum class ScoreboardAction : int {
+  kOpenProfile = 0,
+  kCopyProfileUrl,
+  kCopySteamName,
+  kCopyGameName,
+  kCopySteamId,
+  kCopySteamId64,
 };
 
-}
+class ScoreboardPanel : public framework::HudPanel,
+                        private framework::uiinput::Owner {
+public:
+  ScoreboardPanel();
+  ~ScoreboardPanel() override;
+
+  void reset() override;
+
+protected:
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
+
+private:
+  friend bool scoreboard::onKeyEvent(int down, int keynum);
+  friend void scoreboard::setIntermission(bool intermission);
+  friend bool scoreboard::wantsWheel();
+  friend void scoreboard::setPointerMode(bool enabled);
+  friend class TableListener;
+  class TableListener;
+
+  // Old EnableMousePointer / KeyCodeTyped path.
+  bool answerKey(int down, int keynum);
+
+  // Old FullUpdate on show; refresh on the 0.5s period (old
+  // UPDATE_PERIOD) or a data-version bump.
+  void rebuildTable();
+  void updateHeader();
+  // Change-gated header write (Phase 8): RmlUi SetInnerRML always rebuilds
+  // the element's text subtree (no same-string early-out), so an ungated
+  // per-frame write re-lays-out the whole document every frame - the P8
+  // benchmark measured ~18ms/frame of exactly that with the board up.
+  // `slot` addresses the applied-string cache; returns true when written.
+  bool setHeaderRml(int slot, const char *id, const std::string &rml);
+  void openContextMenu(int clientIndex, const Rml::Vector2f &position);
+  bool overMenu(const Rml::Vector2f &position);
+  void closeContextMenu();
+  void menuAction(ScoreboardAction action);
+  void setVisible(bool visible);
+  void setMouseMode(bool enabled);
+
+  // framework::uiinput::Owner (interactive-HUD tier): the pointer-mode key
+  // contract is answerKey's MouseMode branch. Consulted only while this
+  // panel's token is top-of-stack, so keyboard keys keep their play
+  // behavior (chat etc.) while the pointer is up.
+  bool claimsKey(int down, int keynum) override;
+  bool claimsWheel() override;
+  // Force-release (focus loss / teardown): re-sync the mirror through
+  // setMouseMode(false) - the token is stale, release() would no-op.
+  void onOwnershipLost() override;
+
+  std::string ServerName;
+  std::string NextMap;
+  int TimeEndCount = 0;
+  double TimeEndBase = 0.0;
+  double LastRefresh = 0.0;
+  double ClientTimeNow = 0.0;
+  float AppliedRowHeight = -1;
+  bool Visible = false;
+  bool MouseMode = false;
+  bool Intermission = false;
+  long DataVersion = 0;
+  long AppliedVersion = -1;
+  int MenuClient = 0;
+  TableListener *Listener = nullptr;
+  // Applied-string cache for the header slots (setHeaderRml) and the last
+  // centered content height (update's vertical centering).
+  std::string HeaderCache[5];
+  float CenteredHeight = -1.0f;
+  // Router ownership of pointer mode (T06); MouseMode above mirrors it.
+  framework::uiinput::Token PointerToken;
+};
+
+} // namespace panels

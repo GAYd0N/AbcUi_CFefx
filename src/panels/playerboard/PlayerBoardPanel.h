@@ -14,23 +14,23 @@ namespace panels {
 namespace playerboard {
 // HUD_Init-time cvar registration (plan 08 §4.9).
 void registerCvars();
-}
+} // namespace playerboard
 
 class PlayerBoardPanel : public framework::HudPanel {
 public:
-	PlayerBoardPanel();
+  PlayerBoardPanel();
 
-	void reset() override;
+  void reset() override;
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
-	void onRedraw(double frameTime) override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
+  void onRedraw(double frameTime) override;
 
 private:
-	framework::DomState AppliedDom;
-	// Old UpdateClientInfo: name/bars/icons refresh; false hides the tile.
-	bool updateClientInfo(Rml::Element* tile, int entindex);
+  framework::DomState AppliedDom;
+  // Old UpdateClientInfo: name/bars/icons refresh; false hides the tile.
+  bool updateClientInfo(Rml::Element *tile, int entindex);
 };
 
-}
+} // namespace panels

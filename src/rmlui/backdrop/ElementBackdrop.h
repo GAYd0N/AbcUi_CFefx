@@ -20,53 +20,53 @@ namespace rmlui::backdrop {
 
 // Debug diagnostics (abc_ui_probe): what the backdrop looks like right now.
 struct ProbeInfo {
-	int Elements = 0;
-	int Visible = 0;
-	bool Published = false;
-	// Rml::String members (not borrowed pointers): the probe reads them after
-	// the owning objects may have moved their caches.
-	Rml::String Uri;
-	// First visible element's layout facts (empty when none is visible).
-	Rml::String Document;
-	Rml::String ImageSrc;
-	Rml::String ImageVisibility;
-	float Width = 0.0f;
-	float Height = 0.0f;
-	float ImageWidth = 0.0f;
-	float ImageHeight = 0.0f;
+  int Elements = 0;
+  int Visible = 0;
+  bool Published = false;
+  // Rml::String members (not borrowed pointers): the probe reads them after
+  // the owning objects may have moved their caches.
+  Rml::String Uri;
+  // First visible element's layout facts (empty when none is visible).
+  Rml::String Document;
+  Rml::String ImageSrc;
+  Rml::String ImageVisibility;
+  float Width = 0.0f;
+  float Height = 0.0f;
+  float ImageWidth = 0.0f;
+  float ImageHeight = 0.0f;
 };
 
 class ElementBackdrop : public Rml::Element {
 public:
-	explicit ElementBackdrop(const Rml::String& Tag);
-	~ElementBackdrop() override;
+  explicit ElementBackdrop(const Rml::String &Tag);
+  ~ElementBackdrop() override;
 
-	// Mirrors the shared backdrop state into this element (change-gated: a
-	// steady backdrop writes no DOM at all).
-	bool sync();
-	// Drops the image source (the shared backdrop's GPU targets went away).
-	void dropImageSource();
-	// Debug diagnostics (abc_ui_probe): fills the element-side layout facts.
-	void fillProbeInfo(ProbeInfo& info);
+  // Mirrors the shared backdrop state into this element (change-gated: a
+  // steady backdrop writes no DOM at all).
+  bool sync();
+  // Drops the image source (the shared backdrop's GPU targets went away).
+  void dropImageSource();
+  // Debug diagnostics (abc_ui_probe): fills the element-side layout facts.
+  void fillProbeInfo(ProbeInfo &info);
 
 protected:
-	void OnAttributeChange(const Rml::ElementAttributes& Changed) override;
+  void OnAttributeChange(const Rml::ElementAttributes &Changed) override;
 
 private:
-	Rml::Element* Image = nullptr;
-	Rml::Element* Dimmer = nullptr;
-	// The document's explicit `blur` attribute; -1 = none, so the
-	// abc_ui_menu_backdrop_blur cvar owns the value (and keeps owning it when
-	// the user changes it in the settings).
-	int Rounds = -1;
-	// Last cvar value pushed to the shared backdrop, so a steady cvar costs
-	// one compare and a user edit takes effect without a restart.
-	int AppliedCvarRounds = -1;
-	float Dim = -1.0f;
-	float AppliedDim = -1.0f;
-	// Last video path pushed from the abc_ui_menu_video cvar: a user edit takes
-	// effect without a restart, a steady value costs one string compare.
-	std::string AppliedVideoCvar;
+  Rml::Element *Image = nullptr;
+  Rml::Element *Dimmer = nullptr;
+  // The document's explicit `blur` attribute; -1 = none, so the
+  // abc_ui_menu_backdrop_blur cvar owns the value (and keeps owning it when
+  // the user changes it in the settings).
+  int Rounds = -1;
+  // Last cvar value pushed to the shared backdrop, so a steady cvar costs
+  // one compare and a user edit takes effect without a restart.
+  int AppliedCvarRounds = -1;
+  float Dim = -1.0f;
+  float AppliedDim = -1.0f;
+  // Last video path pushed from the abc_ui_menu_video cvar: a user edit takes
+  // effect without a restart, a steady value costs one string compare.
+  std::string AppliedVideoCvar;
 };
 
 void registerElement();
@@ -83,6 +83,6 @@ void invalidateTargets();
 
 // Inserts a <backdrop> as the document's first child (painted behind every
 // other node) unless the document already declares one. Returns the element.
-Rml::Element* attachToDocument(Rml::ElementDocument* document);
+Rml::Element *attachToDocument(Rml::ElementDocument *document);
 
 } // namespace rmlui::backdrop

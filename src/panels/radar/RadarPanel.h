@@ -40,34 +40,33 @@ void registerCvars();
 void registerCommands();
 
 // Live panel for the command seams (old GetRadarPanel()).
-extern RadarPanel* PanelInstance;
 
 #ifndef NDEBUG
 // abc_ui_probe aid: FBO texture id (0 = not ready).
 int debugFboTexture();
 #endif
 
-}
+} // namespace radar
 
 class RadarPanel : public framework::HudPanel {
 public:
-	RadarPanel();
-	~RadarPanel() override;
+  RadarPanel();
+  ~RadarPanel() override;
 
-	void reset() override;
+  void reset() override;
 
-	// Old SetScale (the +/-scale_radar pair): swap the plate box between the
-	// base and the scaled size.
-	void setScale(bool state);
+  // Old SetScale (the +/-scale_radar pair): swap the plate box between the
+  // base and the scaled size.
+  void setScale(bool state);
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
 
 private:
-	framework::DomState AppliedDom;
-	std::unordered_map<int,Rml::Element*> AvatarElements;
-	bool Scaled = false;
+  framework::DomState AppliedDom;
+  std::unordered_map<int, Rml::Element *> AvatarElements;
+  bool Scaled = false;
 };
 
-}
+} // namespace panels

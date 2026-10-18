@@ -35,4 +35,4 @@ Rml::Input::KeyIdentifier mapKeyCode(int keynum);
 // friends) never appear on this stream and are deliberately rejected.
 int mapSdlKeycode(int keycode);
 
-}
+} // namespace rmlui

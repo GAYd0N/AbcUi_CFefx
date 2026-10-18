@@ -1,33 +1,26 @@
-/* sidetext.rcss - SidePanel layout, from the old
-   abcenchance/res/SideTextPanel.res (0/c-64 anchor, 72x24, ecco bg). */
+/* sidetext.rcss - SidePanel layout. Rebuilt from the old
+   abcenchance/res/SideTextPanel.res 72x24 pill (ecco bg) into the HL2 readout
+   language: the value alone, drawn straight on the scene with no plate, no
+   money prefix and no icon. The panel keeps the old anchors - the readout
+   still sits a little above the vertical centre on the left edge. */
 
 #sidetext {
 	position: absolute;
-	left: 0dp;
+	left: 16dp;
 	top: 50%;
-	width: 72dp;
-	height: 24dp;
 	margin-top: -64dp;
 }
 
-#sidetext .bg {
-	position: absolute;
-	left: 0dp;
-	top: 0dp;
-	width: 72dp;
-	height: 24dp;
-}
-
+/* Value template ({SCORE}/{SPEED}/{MAXSPEED}) at the small side-readout size;
+   the panel writes it as additive glyph ink (framework::glyphs), so the font
+   below only drives the em sizing and the text fallback. */
 #sidetext #message {
-	position: absolute;
-	left: 12dp;
-	top: 0dp;
-	width: 60dp;
-	height: 24dp;
-	text-align: center;
-	/* vgui Labels centre their text vertically; Rml needs the explicit
-	   line box (box height = one line, template ships single-line). */
-	line-height: 24dp;
-	/* Old SideText.TextFgColor = scheme Default. */
-	color: #00ff00;
+	font-family: Verdana;
+	font-weight: bold;
+	font-size: 14dp;
+	line-height: 18dp;
+	letter-spacing: 0.2dp;
+	white-space: nowrap;
+	color: var(--abc-hud-accent);
+	opacity: var(--abc-hud-value-opacity);
 }

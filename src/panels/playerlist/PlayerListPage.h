@@ -37,56 +37,63 @@
 namespace Rml {
 class Element;
 class Event;
-}
+} // namespace Rml
 
 namespace panels {
 namespace playerlist {
 
-using ActionSink = std::function<void(const char* action)>;
+using ActionSink = std::function<void(const char *action)>;
 
 class PlayerListPage final : public framework::InteractiveDocument {
 public:
-	PlayerListPage();
-	~PlayerListPage() override;
+  PlayerListPage();
+  ~PlayerListPage() override;
 
-	void setActionSink(ActionSink sink) { Sink = std::move(sink); }
-	using SelectionSink = std::function<void(const services::playerlist::SelectionKey&)>;
-	void setSelectionSink(SelectionSink Handler) { SelectionHandler = std::move(Handler); }
-	void setModel(services::playerlist::PlayerListModel* model) { Model = model; }
+  void setActionSink(ActionSink sink) {
+    Sink = std::move(sink);
+  }
+  using SelectionSink =
+      std::function<void(const services::playerlist::SelectionKey &)>;
+  void setSelectionSink(SelectionSink Handler) {
+    SelectionHandler = std::move(Handler);
+  }
+  void setModel(services::playerlist::PlayerListModel *model) {
+    Model = model;
+  }
 
-	// Re-projects the model snapshot into the DOM (rows, selection highlight,
-	// mute label/enable, status line). Called on presentation and on every
-	// model change (the module's frame beat).
-	void render();
+  // Re-projects the model snapshot into the DOM (rows, selection highlight,
+  // mute label/enable, status line). Called on presentation and on every
+  // model change (the module's frame beat).
+  void render();
 
-	// Re-takes the safe default focus (module's per-frame focus guard): the
-	// first row when one exists, else the close button.
-	void refocusDefault();
+  // Re-takes the safe default focus (module's per-frame focus guard): the
+  // first row when one exists, else the close button.
+  void refocusDefault();
 
 protected:
-	void onDocumentReady() override;
+  void onDocumentReady() override;
 
 private:
-	class PageListener final : public Rml::EventListener {
-	public:
-		explicit PageListener(PlayerListPage* owner) : Owner(owner) {}
-		void ProcessEvent(Rml::Event& event) override;
+  class PageListener final : public Rml::EventListener {
+  public:
+    explicit PageListener(PlayerListPage *owner) : Owner(owner) {}
+    void ProcessEvent(Rml::Event &event) override;
 
-	private:
-		PlayerListPage* Owner;
-	};
+  private:
+    PlayerListPage *Owner;
+  };
 
-	void handleClick(Rml::Event& event);
-	Rml::Element* node(const char* id) const;
+  void handleClick(Rml::Event &event);
+  Rml::Element *node(const char *id) const;
 
-	ActionSink Sink;
-	SelectionSink SelectionHandler;
-	PlayerListPage* Self = nullptr;
-	services::playerlist::PlayerListModel* Model = nullptr;
-	PageListener Listener;
-	// Revision of the last projection (skip redundant rebuilds).
-	std::size_t RenderedRevision = static_cast<std::size_t>(-1);
+  ActionSink Sink;
+  SelectionSink SelectionHandler;
+  PlayerListPage *Self = nullptr;
+  services::playerlist::PlayerListModel *Model = nullptr;
+  PageListener Listener;
+  // Revision of the last projection (skip redundant rebuilds).
+  std::size_t RenderedRevision = static_cast<std::size_t>(-1);
 };
 
-}
-}
+} // namespace playerlist
+} // namespace panels

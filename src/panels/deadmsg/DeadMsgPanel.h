@@ -12,27 +12,27 @@ namespace panels {
 namespace deadmsg {
 // HUD_Init-time cvar registration (plan 08 §4.9).
 void registerCvars();
-}
+} // namespace deadmsg
 
 class DeadMsgPanel : public framework::HudPanel {
 public:
-	DeadMsgPanel();
+  DeadMsgPanel();
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
-	void reset() override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
+  void reset() override;
 
 private:
-	void addItem(const char* victim, const char* attacker, const char* inflictor);
+  void addItem(const char *victim, const char *attacker, const char *inflictor);
 
-	struct Row {
-		Rml::Element* element = nullptr;
-		double createTime = 0.0;
-		double fadeStartTime = -1.0;
-	};
-	double ClientTimeNow = 0.0;
-	std::vector<Row> Rows;
+  struct Row {
+    Rml::Element *element = nullptr;
+    double createTime = 0.0;
+    double fadeStartTime = -1.0;
+  };
+  double ClientTimeNow = 0.0;
+  std::vector<Row> Rows;
 };
 
-}
+} // namespace panels

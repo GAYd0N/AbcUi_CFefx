@@ -42,7 +42,7 @@
 	width: 10dp;
 	height: 10dp;
 	/* DMGTiles.IconColor = scheme Default. */
-	image-color: #00ff00;
+	image-color: var(--abc-hud-accent);
 }
 
 #dmgtiles .label {
@@ -52,6 +52,6 @@
 	width: 75dp;
 	height: 10dp;
 	/* DMGTiles.TextColor = scheme Default. */
-	color: #00ff00;
+	color: var(--abc-hud-accent);
 	line-height: 10dp;
 }

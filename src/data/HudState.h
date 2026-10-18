@@ -21,14 +21,14 @@ namespace hudstate {
 // Hide-HUD token bits (old Viewport.h HUD_HIDEWEAPONS...; the values arrive
 // on the HideWeapon/HideHUD messages).
 enum HudHideBits {
-	kHideWeapons = 1 << 0,
-	kHideFlashlight = 1 << 1,
-	kHideAll = 1 << 2,
-	kHideHealth = 1 << 3,
-	kHideSelection = 1 << 4,
-	kHideBattery = 1 << 5,
-	kHideCustom1 = 1 << 6,
-	kHideCustom2 = 1 << 7,
+  kHideWeapons = 1 << 0,
+  kHideFlashlight = 1 << 1,
+  kHideAll = 1 << 2,
+  kHideHealth = 1 << 3,
+  kHideSelection = 1 << 4,
+  kHideBattery = 1 << 5,
+  kHideCustom1 = 1 << 6,
+  kHideCustom2 = 1 << 7,
 };
 
 extern abc::CallbackList<void(bool)> SuitChanged;
@@ -40,18 +40,26 @@ extern abc::CallbackList<void(int)> HideTokenChanged;
 
 void init();
 void reset();
-struct MessageSnapshot { int Health = 0; int Armor = 0; int FlashBattery = 100; bool FlashOn = false; std::string ServerName; std::string NextMap; int TimeEnd = 0; };
-const MessageSnapshot& messages();
+struct MessageSnapshot {
+  int Health = 0;
+  int Armor = 0;
+  int FlashBattery = 100;
+  bool FlashOn = false;
+  std::string ServerName;
+  std::string NextMap;
+  int TimeEnd = 0;
+};
+const MessageSnapshot &messages();
 
 // Spine feed (HUD_UpdateClientData chain). Tracks suit bits, longjump
 // (physinfo "slj") and spectate (local player iuser1), firing the change
 // events above.
-void onUpdateClientData(const client_data_s* cdata);
+void onUpdateClientData(const client_data_s *cdata);
 
 // Spine feed (HUD_TxferLocalOverrides chain): captures the prediction client
 // data pointer the old code read as gClientData (crosshair health/punchangle,
 // Effect waterlevel). The pointer is engine-owned and refreshed every frame.
-void onTxferLocalOverrides(const clientdata_s* client);
+void onTxferLocalOverrides(const clientdata_s *client);
 
 bool hasSuit();
 bool hasLongJump();
@@ -66,8 +74,8 @@ int debugHideTokens();
 // Old gClientData readers (null until the first prediction frame).
 float health();
 int waterlevel();
-const float* punchangle();
+const float *punchangle();
 // Old s_flFov: the HUD_UpdateClientData fov (view zoom state).
 float fov();
 
-}
+} // namespace hudstate

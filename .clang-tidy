@@ -1,0 +1,10 @@
+# Advisory baseline. The release does not gate on clang-tidy yet: the legacy
+# ABCEnchance-derived files still carry C-style casts and UpperCamelCase API.
+# Keep the safe mechanical checks on so new code does not add to the backlog.
+Checks: >
+  -*,
+  modernize-use-nullptr,
+  modernize-use-using,
+  performance-*
+WarningsAsErrors: ''
+FormatStyle: file

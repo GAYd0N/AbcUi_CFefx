@@ -25,20 +25,20 @@ namespace gindicator {
 void registerCvars();
 // Spine seam (old Viewport::AddEntity -> GIndicator::AddEntity). Applies the
 // gates (model name, studio type, messagenum, range) inline.
-void onAddEntity(cl_entity_s* ent, const char* modelname);
+void onAddEntity(cl_entity_s *ent, const char *modelname);
 
-}
+} // namespace gindicator
 
 class GIndicatorPanel : public framework::HudPanel {
 public:
-	GIndicatorPanel();
+  GIndicatorPanel();
 
-	void reset() override;
+  void reset() override;
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
-	void onRedraw(double frameTime) override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
+  void onRedraw(double frameTime) override;
 };
 
-}
+} // namespace panels

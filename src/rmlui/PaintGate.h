@@ -51,4 +51,4 @@ void uninstallPaintGate();
 // Diagnostics (debug command + acceptance).
 bool paintGateInstalled();
 
-}
+} // namespace rmlui

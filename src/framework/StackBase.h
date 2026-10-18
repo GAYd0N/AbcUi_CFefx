@@ -18,43 +18,45 @@ namespace framework {
 
 class StackBase {
 public:
-	virtual ~StackBase();
+  virtual ~StackBase();
 
 protected:
-	// Grabs the container element; call from onDocumentReady.
-	void initStack(Rml::ElementDocument* document, const char* containerId);
+  // Grabs the container element; call from onDocumentReady.
+  void initStack(Rml::ElementDocument *document, const char *containerId);
 
-	// Appends an item: a <div class=itemClass> wrapping <itemRml>. Drops the
-	// oldest beyond maxItems (the old CalculateMaxItemCount capacity).
-	Rml::Element* appendItem(const char* itemClass, const char* itemRml);
+  // Appends an item: a <div class=itemClass> wrapping <itemRml>. Drops the
+  // oldest beyond maxItems (the old CalculateMaxItemCount capacity).
+  Rml::Element *appendItem(const char *itemClass, const char *itemRml);
 
-	// Expiry + fade bookkeeping; call from onData.
-	void tickItems(double frameTime);
+  // Expiry + fade bookkeeping; call from onData.
+  void tickItems(double frameTime);
 
-	void clearItems();
+  void clearItems();
 
-	// The scroll container (children are the live stack items).
-	Rml::Element* stackContainer() const { return Container; }
+  // The scroll container (children are the live stack items).
+  Rml::Element *stackContainer() const {
+    return Container;
+  }
 
-	// Old CBaseStackPanel ApplySettings values; each panel pins its own from
-	// its .res (keep/fade times, item box, capacity).
-	struct ItemParams {
-		float keepTime = 2.0f;
-		float fadeIn = 0.1f;
-		float fadeOut = 0.3f;
-		int maxItems = 10;
-	} StackParams;
+  // Old CBaseStackPanel ApplySettings values; each panel pins its own from
+  // its .res (keep/fade times, item box, capacity).
+  struct ItemParams {
+    float keepTime = 2.0f;
+    float fadeIn = 0.1f;
+    float fadeOut = 0.3f;
+    int maxItems = 10;
+  } StackParams;
 
 private:
-	struct Item {
-		Rml::Element* element = nullptr;
-		double expireTime = 0.0; // client time the keep phase ends
-		double fadeStartTime = -1.0; // client time the fade-out started
-		bool fadeInPending = true; // opacity flips to 1 on the next tick
-	};
-	double clientTimeNow = 0.0;
-	Rml::Element* Container = nullptr;
-	std::vector<Item> Items;
+  struct Item {
+    Rml::Element *element = nullptr;
+    double expireTime = 0.0;     // client time the keep phase ends
+    double fadeStartTime = -1.0; // client time the fade-out started
+    bool fadeInPending = true;   // opacity flips to 1 on the next tick
+  };
+  double clientTimeNow = 0.0;
+  Rml::Element *Container = nullptr;
+  std::vector<Item> Items;
 };
 
-}
+} // namespace framework

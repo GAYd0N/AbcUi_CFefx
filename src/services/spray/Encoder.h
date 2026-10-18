@@ -23,27 +23,28 @@ namespace services::spray {
 // constants (14336 / 14436) that could only differ by one shrink step; this
 // port keeps one cap and documents it.
 struct SizeLimits {
-	int MaxArea = 14336;
-	int MaxSide = 256;
-	int Align = 16;
-	float Shrink = 0.95f;
+  int MaxArea = 14336;
+  int MaxSide = 256;
+  int Align = 16;
+  float Shrink = 0.95f;
 };
 
 // Fits an arbitrary image size into the spray limits. False for empty sizes.
-bool fitSize(int width, int height, const SizeLimits& limits, int& outWidth, int& outHeight);
+bool fitSize(int width, int height, const SizeLimits &limits, int &outWidth,
+             int &outHeight);
 
 struct EncodedSpray {
-	std::vector<unsigned char> Bytes;
-	// The encoded pixels as top-down RGBA (transparent index -> alpha 0) for
-	// the UI's result preview: what the spray will look like, quantization and
-	// all, not the source image.
-	framework::ImageLoader::DecodedImage Preview;
-	int Width = 0;
-	int Height = 0;
-	// Palette entries written (always 256; index 255 is the transparent blue
-	// when the source had transparent pixels).
-	int ColorCount = 0;
-	bool HasTransparency = false;
+  std::vector<unsigned char> Bytes;
+  // The encoded pixels as top-down RGBA (transparent index -> alpha 0) for
+  // the UI's result preview: what the spray will look like, quantization and
+  // all, not the source image.
+  framework::ImageLoader::DecodedImage Preview;
+  int Width = 0;
+  int Height = 0;
+  // Palette entries written (always 256; index 255 is the transparent blue
+  // when the source had transparent pixels).
+  int ColorCount = 0;
+  bool HasTransparency = false;
 };
 
 // Encodes one image. Fails (with a human-readable reason) on an empty image,
@@ -55,7 +56,7 @@ struct EncodedSpray {
 // and left the pixels opaque (a broken spray). This port always quantizes to
 // 255 colours and writes the reserved blue itself, so the slot is free by
 // construction and opaque pixels can never land on the transparent index.
-bool encode(const framework::ImageLoader::DecodedImage& source, EncodedSpray& output,
-	std::string& error);
+bool encode(const framework::ImageLoader::DecodedImage &source,
+            EncodedSpray &output, std::string &error);
 
 } // namespace services::spray

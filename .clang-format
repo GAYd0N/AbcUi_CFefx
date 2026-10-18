@@ -1,0 +1,17 @@
+# ABC house style, LLVM-derived.
+# Deliberate deviations from LLVM: k-prefixed constants and #pragma once
+# (documented in each AGENTS.md). Formatting is LLVM: 2 spaces, 80 columns,
+# pointer/reference bound to the name.
+BasedOnStyle: LLVM
+IndentWidth: 2
+ContinuationIndentWidth: 4
+UseTab: Never
+ColumnLimit: 80
+PointerAlignment: Right
+ReferenceAlignment: Pointer
+SortIncludes: false
+IncludeBlocks: Preserve
+NamespaceIndentation: None
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Empty
+LineEnding: LF

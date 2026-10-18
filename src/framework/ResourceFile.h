@@ -19,7 +19,7 @@ namespace ResourceFile {
 
 // Canonical engine-relative path: '/' separators, no '.', '..' or repeated
 // separators. Returns false for absolute paths and paths escaping the root.
-bool normalize(std::string_view path, std::string& out);
+bool normalize(std::string_view path, std::string &out);
 
 // Engine filesystem lookup across every mounted search path.
 bool exists(std::string_view path);
@@ -27,8 +27,9 @@ bool exists(std::string_view path);
 // Reads the complete resource. Fails when the engine filesystem is not ready,
 // the path is invalid, or the file is larger than maxBytes. `bytes` is empty
 // on failure (and for a valid zero-byte resource).
-bool read(std::string_view path, std::vector<unsigned char>& bytes, std::size_t maxBytes);
+bool read(std::string_view path, std::vector<unsigned char> &bytes,
+          std::size_t maxBytes);
 
-}
+} // namespace ResourceFile
 
-}
+} // namespace framework

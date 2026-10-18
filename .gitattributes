@@ -1,2 +1,18 @@
 # Catalog index hashes cover the snapshot's exact bytes.
 assets/gamedata/** text eol=lf
+
+# Normalize first-party text to LF in the repository; binaries stay binary.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.dds binary
+*.vtf binary
+*.mp3 binary
+*.mp4 binary
+*.ogg binary
+*.wav binary
+*.dll binary
+*.lib binary
+*.zip binary

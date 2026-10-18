@@ -31,73 +31,77 @@ namespace panels::menushared {
 
 // Same seam contract as panels::mainmenu::ActionSink (fixed page-internal
 // action names, never user strings).
-using ActionSink = std::function<void(const char* action)>;
+using ActionSink = std::function<void(const char *action)>;
 
 class ConfirmQuitOverlay final : public framework::InteractiveDocument {
 public:
-	ConfirmQuitOverlay();
-	~ConfirmQuitOverlay() override;
+  ConfirmQuitOverlay();
+  ~ConfirmQuitOverlay() override;
 
-	void setActionSink(ActionSink sink) { Sink = std::move(sink); }
+  void setActionSink(ActionSink sink) {
+    Sink = std::move(sink);
+  }
 
-	// Re-takes the safe default (cancel) when a focus thief (debug hook,
-	// hidden-document hand-off) took the context focus; the module's frame
-	// guard calls this.
-	void refocusDefault();
+  // Re-takes the safe default (cancel) when a focus thief (debug hook,
+  // hidden-document hand-off) took the context focus; the module's frame
+  // guard calls this.
+  void refocusDefault();
 
 protected:
-	void onDocumentReady() override;
+  void onDocumentReady() override;
 
 private:
-	class WindowListener final : public Rml::EventListener {
-	public:
-		explicit WindowListener(ConfirmQuitOverlay* owner) : Owner(owner) {}
-		void ProcessEvent(Rml::Event& event) override;
+  class WindowListener final : public Rml::EventListener {
+  public:
+    explicit WindowListener(ConfirmQuitOverlay *owner) : Owner(owner) {}
+    void ProcessEvent(Rml::Event &event) override;
 
-	private:
-		ConfirmQuitOverlay* Owner;
-	};
+  private:
+    ConfirmQuitOverlay *Owner;
+  };
 
-	void handle(Rml::Event& event);
+  void handle(Rml::Event &event);
 
-	WindowListener Listener;
-	ActionSink Sink;
+  WindowListener Listener;
+  ActionSink Sink;
 };
 
 class MenuStubPage final : public framework::InteractiveDocument {
 public:
-	// `name` distinguishes the two instances ("menusub" page stub,
-	// "menuconsole" overlay placeholder) - the document id rides the rml.
-	MenuStubPage(const char* name, const char* documentPath);
-	~MenuStubPage() override;
+  // `name` distinguishes the two instances ("menusub" page stub,
+  // "menuconsole" overlay placeholder) - the document id rides the rml.
+  MenuStubPage(const char *name, const char *documentPath);
+  ~MenuStubPage() override;
 
-	void setActionSink(ActionSink sink) { Sink = std::move(sink); }
+  void setActionSink(ActionSink sink) {
+    Sink = std::move(sink);
+  }
 
-	// Points the stub at one unfinished surface. `title`/`body` are display
-	// strings already resolved by the caller ("#token" through Localization
-	// or plain text); they are copied and escaped before they reach the DOM.
-	void showFor(const char* title, const char* body);
+  // Points the stub at one unfinished surface. `title`/`body` are display
+  // strings already resolved by the caller ("#token" through Localization
+  // or plain text); they are copied and escaped before they reach the DOM.
+  void showFor(const char *title, const char *body);
 
-	// Re-takes the return-entry focus (module's per-frame focus guard).
-	void refocusDefault();
+  // Re-takes the return-entry focus (module's per-frame focus guard).
+  void refocusDefault();
 
 protected:
-	void onDocumentReady() override;
+  void onDocumentReady() override;
 
 private:
-	class WindowListener final : public Rml::EventListener {
-	public:
-		explicit WindowListener(MenuStubPage* owner) : Owner(owner) {}
-		void ProcessEvent(Rml::Event& event) override;
+  class WindowListener final : public Rml::EventListener {
+  public:
+    explicit WindowListener(MenuStubPage *owner) : Owner(owner) {}
+    void ProcessEvent(Rml::Event &event) override;
 
-	private:
-		MenuStubPage* Owner;
-	};
+  private:
+    MenuStubPage *Owner;
+  };
 
-	void handle(Rml::Event& event);
+  void handle(Rml::Event &event);
 
-	WindowListener Listener;
-	ActionSink Sink;
+  WindowListener Listener;
+  ActionSink Sink;
 };
 
-}
+} // namespace panels::menushared

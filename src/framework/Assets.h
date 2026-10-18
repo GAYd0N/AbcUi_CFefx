@@ -13,12 +13,12 @@ namespace framework {
 namespace Assets {
 
 // Canonical asset-root prefix as referenced from RML/RCSS.
-constexpr const char* kRootPrefix = "abc/abcui/";
+constexpr const char *kRootPrefix = "abc/abcui/";
 
 // LoadClient time: verify the installed assets, warn (once) about missing
 // ones (plugin loads even without them).
 void verifyInstalled();
 
-}
+} // namespace Assets
 
-}
+} // namespace framework

@@ -64,50 +64,56 @@ namespace modules {
 
 class IUiModule {
 public:
-	virtual ~IUiModule() = default;
+  virtual ~IUiModule() = default;
 
-	virtual const char* name() const = 0;
-	// HUD_Init-time guarded block: cvar/command registration only. The Rml
-	// context does not exist yet - never touch DOM here.
-	virtual void onInit() {}
-	// The context exists; re-fired after every shutdown cycle (map change /
-	// reconnect), because module documents die with each context and must be
-	// rebuilt.
-	virtual void onContextReady(Rml::Context* context) { (void)context; }
-	// HUD_Frame, after the panel data pump, before Context::Update.
-	virtual void onFrame(double frameTime) { (void)frameTime; }
-	// HUD_VidInit, after the context resize and the panel resets.
-	virtual void onVidInit() {}
-	// While the context is still alive: release everything the module owns
-	// (documents, listeners, borrowed handles). Not re-fired until the next
-	// initAll or contextReadyAll.
-	virtual void onShutdown() {}
+  virtual const char *name() const = 0;
+  // HUD_Init-time guarded block: cvar/command registration only. The Rml
+  // context does not exist yet - never touch DOM here.
+  virtual void onInit() {}
+  // The context exists; re-fired after every shutdown cycle (map change /
+  // reconnect), because module documents die with each context and must be
+  // rebuilt.
+  virtual void onContextReady(Rml::Context *context) {
+    (void)context;
+  }
+  // HUD_Frame, after the panel data pump, before Context::Update.
+  virtual void onFrame(double frameTime) {
+    (void)frameTime;
+  }
+  // HUD_VidInit, after the context resize and the panel resets.
+  virtual void onVidInit() {}
+  // While the context is still alive: release everything the module owns
+  // (documents, listeners, borrowed handles). Not re-fired until the next
+  // initAll or contextReadyAll.
+  virtual void onShutdown() {}
 };
 
 class ModuleRegistry {
 public:
-	static constexpr size_t kMaxModules = 16;
+  static constexpr size_t kMaxModules = 16;
 
-	// Constant-initialized, so add() is safe from any static
-	// initializer in the DLL regardless of translation-unit order.
-	constexpr ModuleRegistry() = default;
+  // Constant-initialized, so add() is safe from any static
+  // initializer in the DLL regardless of translation-unit order.
+  constexpr ModuleRegistry() = default;
 
-	void add(IUiModule* module);
+  void add(IUiModule *module);
+  // Debug/backend lookup by module name; nullptr when not registered yet.
+  IUiModule *find(const char *name) const;
 
-	void initAll();
-	void contextReadyAll(Rml::Context* context);
-	void frameAll(double frameTime);
-	void vidInitAll();
-	// Idempotent until initAll or contextReadyAll re-arms dispatch.
-	void shutdownAll();
+  void initAll();
+  void contextReadyAll(Rml::Context *context);
+  void frameAll(double frameTime);
+  void vidInitAll();
+  // Idempotent until initAll or contextReadyAll re-arms dispatch.
+  void shutdownAll();
 
 private:
-	IUiModule* Modules[kMaxModules] = {};
-	size_t Count = 0;
-	bool ShutDown = true;
+  IUiModule *Modules[kMaxModules] = {};
+  size_t Count = 0;
+  bool ShutDown = true;
 };
 
 // Per-DLL singleton (function-local static; no static-init-order hazards).
-ModuleRegistry& registry();
+ModuleRegistry &registry();
 
-}
+} // namespace modules

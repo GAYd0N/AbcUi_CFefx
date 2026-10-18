@@ -11,12 +11,12 @@ namespace panels {
 
 class AmmoStackPanel : public framework::HudPanel, public framework::StackBase {
 public:
-	AmmoStackPanel();
+  AmmoStackPanel();
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
-	void reset() override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
+  void reset() override;
 };
 
-}
+} // namespace panels

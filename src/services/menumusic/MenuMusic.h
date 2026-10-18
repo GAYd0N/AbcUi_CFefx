@@ -18,36 +18,36 @@ namespace menumusic {
 
 class MenuMusic {
 public:
-	// Mod-relative track path as the engine's mp3 player spells it
-	// ("abc/abcui/gameui/scence/audio/opfor.mp3" - the shape the legacy plugin's
-	// "media/gamestartup.mp3" used). Empty disables playback entirely; a value
-	// that is not a safe relative path is refused (the cvar is user-editable
-	// and its text becomes part of an engine command line).
-	void setSource(const std::string& trackPath);
-	const std::string& source() const;
-	void setEnabled(bool enabled);
-	bool enabled() const;
+  // Mod-relative track path as the engine's mp3 player spells it
+  // ("abc/abcui/gameui/scence/audio/opfor.mp3" - the shape the legacy plugin's
+  // "media/gamestartup.mp3" used). Empty disables playback entirely; a value
+  // that is not a safe relative path is refused (the cvar is user-editable
+  // and its text becomes part of an engine command line).
+  void setSource(const std::string &trackPath);
+  const std::string &source() const;
+  void setEnabled(bool enabled);
+  bool enabled() const;
 
-	// Per-frame: starts/stops the track to match `menuVisible`.
-	void update(bool menuVisible);
+  // Per-frame: starts/stops the track to match `menuVisible`.
+  void update(bool menuVisible);
 
-	// Stops playback now (shutdown / level start).
-	void stop();
+  // Stops playback now (shutdown / level start).
+  void stop();
 
-	// Diagnostics: whether the service has the track running (the engine owns
-	// the actual playback and its loop).
-	bool playing() const;
+  // Diagnostics: whether the service has the track running (the engine owns
+  // the actual playback and its loop).
+  bool playing() const;
 
 private:
-	bool startTrack();
+  bool startTrack();
 
-	std::string Source;
-	bool On = true;
-	bool Playing = false;
-	// A refused (unsafe) source warns once, not every frame.
-	bool Refused = false;
+  std::string Source;
+  bool On = true;
+  bool Playing = false;
+  // A refused (unsafe) source warns once, not every frame.
+  bool Refused = false;
 };
 
-MenuMusic& menuMusic();
+MenuMusic &menuMusic();
 
 } // namespace menumusic

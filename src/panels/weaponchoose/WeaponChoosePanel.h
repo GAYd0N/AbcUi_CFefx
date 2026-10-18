@@ -24,38 +24,38 @@ void registerCommands();
 bool textmenuOpen();
 // +attack seam: attempt the confirm while the bar shows (consumed = true).
 bool attackConfirm();
-}
+} // namespace weaponchoose
 
 class WeaponChoosePanel : public framework::HudPanel {
 public:
-	WeaponChoosePanel();
-	~WeaponChoosePanel() override;
+  WeaponChoosePanel();
+  ~WeaponChoosePanel() override;
 
-	void reset() override;
+  void reset() override;
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
 
 private:
-	// Rebuilds the bar DOM from weaponres (old PerformLayout); keeps the
-	// panel open on selection changes.
-	void rebuild();
-	bool shouldDraw() const;
-	// Old SelectWeapon: confirm the highlight (ammo gate + select sound);
-	// true = the command went out (old m_bSelectBlock armed only on success).
-	bool confirmSelection();
-	// +attack while the bar shows: attempt the confirm, swallow the press
-	// only when it confirmed (old confirm + BlockAttackOnce pair).
-	bool attackConfirm();
-	void setVisible(bool visible);
+  // Rebuilds the bar DOM from weaponres (old PerformLayout); keeps the
+  // panel open on selection changes.
+  void rebuild();
+  bool shouldDraw() const;
+  // Old SelectWeapon: confirm the highlight (ammo gate + select sound);
+  // true = the command went out (old m_bSelectBlock armed only on success).
+  bool confirmSelection();
+  // +attack while the bar shows: attempt the confirm, swallow the press
+  // only when it confirmed (old confirm + BlockAttackOnce pair).
+  bool attackConfirm();
+  void setVisible(bool visible);
 
-	friend bool weaponchoose::attackConfirm();
+  friend bool weaponchoose::attackConfirm();
 
-	double CloseAtTime = 0.0;
-	double ClientTimeNow = 0.0;
-	bool Visible = false;
-	int RainbowCounter = 0;
+  double CloseAtTime = 0.0;
+  double ClientTimeNow = 0.0;
+  bool Visible = false;
+  int RainbowCounter = 0;
 };
 
-}
+} // namespace panels

@@ -17,6 +17,6 @@ namespace projection {
 // keeps this header self-contained (09 §2).
 int worldToScreen(const float world[3], float screen[2]);
 
-}
+} // namespace projection
 
-}
+} // namespace framework

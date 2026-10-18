@@ -19,24 +19,25 @@ namespace rmlui {
 
 class AbcSystemInterface : public Rml::SystemInterface {
 public:
-	double GetElapsedTime() override;
-	int TranslateString(Rml::String& translated, const Rml::String& input) override;
-	bool LogMessage(Rml::Log::Type type, const Rml::String& message) override;
-	void SetClipboardText(const Rml::String& text) override;
-	void GetClipboardText(Rml::String& text) override;
-	// IME placement (T07 step 3). No-ops without a resolvable game window
-	// (the composition stays at the platform default position then).
-	void ActivateKeyboard(Rml::Vector2f caretPosition, float lineHeight) override;
-	void DeactivateKeyboard() override;
+  double GetElapsedTime() override;
+  int TranslateString(Rml::String &translated,
+                      const Rml::String &input) override;
+  bool LogMessage(Rml::Log::Type type, const Rml::String &message) override;
+  void SetClipboardText(const Rml::String &text) override;
+  void GetClipboardText(Rml::String &text) override;
+  // IME placement (T07 step 3). No-ops without a resolvable game window
+  // (the composition stays at the platform default position then).
+  void ActivateKeyboard(Rml::Vector2f caretPosition, float lineHeight) override;
+  void DeactivateKeyboard() override;
 };
 
 class AbcFileInterface : public Rml::FileInterface {
 public:
-	Rml::FileHandle Open(const Rml::String& path) override;
-	void Close(Rml::FileHandle file) override;
-	size_t Read(void* buffer, size_t size, Rml::FileHandle file) override;
-	bool Seek(Rml::FileHandle file, long offset, int origin) override;
-	size_t Tell(Rml::FileHandle file) override;
+  Rml::FileHandle Open(const Rml::String &path) override;
+  void Close(Rml::FileHandle file) override;
+  size_t Read(void *buffer, size_t size, Rml::FileHandle file) override;
+  bool Seek(Rml::FileHandle file, long offset, int origin) override;
+  size_t Tell(Rml::FileHandle file) override;
 };
 
-}
+} // namespace rmlui

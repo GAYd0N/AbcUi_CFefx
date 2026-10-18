@@ -27,59 +27,59 @@ namespace video {
 // Borrowed decoded pixels, top-left origin, tightly packed RGBA8. Valid until
 // the next advance()/seek()/close() on the same decoder.
 struct FrameView {
-	const unsigned char* Pixels = nullptr;
-	int Width = 0;
-	int Height = 0;
+  const unsigned char *Pixels = nullptr;
+  int Width = 0;
+  int Height = 0;
 };
 
 class Decoder {
 public:
-	Decoder();
-	~Decoder();
-	Decoder(const Decoder&) = delete;
-	Decoder& operator=(const Decoder&) = delete;
+  Decoder();
+  ~Decoder();
+  Decoder(const Decoder &) = delete;
+  Decoder &operator=(const Decoder &) = delete;
 
-	// Opens `path` (a filesystem path) and prepares an RGBA output of exactly
-	// `outputWidth` x `outputHeight` (clamped to sane bounds). Re-opening
-	// replaces the previous file. Returns false and leaves error() set on
-	// failure; the caller decides whether that is fatal for the document.
-	bool open(const char* path, int outputWidth, int outputHeight);
-	void close();
-	bool isOpen() const;
+  // Opens `path` (a filesystem path) and prepares an RGBA output of exactly
+  // `outputWidth` x `outputHeight` (clamped to sane bounds). Re-opening
+  // replaces the previous file. Returns false and leaves error() set on
+  // failure; the caller decides whether that is fatal for the document.
+  bool open(const char *path, int outputWidth, int outputHeight);
+  void close();
+  bool isOpen() const;
 
-	// Advances the media clock and decodes whatever frames that clock has
-	// passed. Returns true when a NEW frame is ready (the caller re-uploads);
-	// false means "the previous frame is still current". `deltaSeconds` is the
-	// engine frame time, so the video plays at wall-clock speed regardless of
-	// the frame rate. A rate of zero (hidden document) costs nothing.
-	bool advance(double deltaSeconds);
+  // Advances the media clock and decodes whatever frames that clock has
+  // passed. Returns true when a NEW frame is ready (the caller re-uploads);
+  // false means "the previous frame is still current". `deltaSeconds` is the
+  // engine frame time, so the video plays at wall-clock speed regardless of
+  // the frame rate. A rate of zero (hidden document) costs nothing.
+  bool advance(double deltaSeconds);
 
-	// The current frame; null until the first advance() produced one.
-	const FrameView& frame() const;
+  // The current frame; null until the first advance() produced one.
+  const FrameView &frame() const;
 
-	// Restarts at the beginning once the end is reached (loop) or stops
-	// decoding and keeps the last frame (no loop). Set before or after open().
-	void setLooping(bool looping);
-	bool looping() const;
-	bool atEnd() const;
+  // Restarts at the beginning once the end is reached (loop) or stops
+  // decoding and keeps the last frame (no loop). Set before or after open().
+  void setLooping(bool looping);
+  bool looping() const;
+  bool atEnd() const;
 
-	// Source dimensions / duration in seconds (<= 0 when unknown).
-	int sourceWidth() const;
-	int sourceHeight() const;
-	double duration() const;
+  // Source dimensions / duration in seconds (<= 0 when unknown).
+  int sourceWidth() const;
+  int sourceHeight() const;
+  double duration() const;
 
-	// True when the decode path is usable at all (Mile.FFmpeg loaded and the
-	// ABI matched). Distinguishes "no SDK installed" from "this file failed".
-	static bool available();
+  // True when the decode path is usable at all (Mile.FFmpeg loaded and the
+  // ABI matched). Distinguishes "no SDK installed" from "this file failed".
+  static bool available();
 
-	// Presentation time of the frame currently on screen (< 0 before the first).
-	double lastSeconds() const;
+  // Presentation time of the frame currently on screen (< 0 before the first).
+  double lastSeconds() const;
 
-	const std::string& error() const;
+  const std::string &error() const;
 
 private:
-	struct State;
-	std::unique_ptr<State> Data;
+  struct State;
+  std::unique_ptr<State> Data;
 };
 
 } // namespace video

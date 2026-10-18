@@ -20,9 +20,9 @@
 namespace playertrace {
 
 enum class TraceType {
-	View,
-	Head,
-	Foot,
+  View,
+  Head,
+  Foot,
 };
 
 // HUD_Frame pump (old GetPlayerTrace()->Update()): no-op without a local
@@ -37,6 +37,6 @@ void update(bool levelActive);
 // Cached trace; never null (an update that has not run yet yields the
 // zero-initialised trace, exactly like the old module before its first
 // Update).
-const pmtrace_t* get(TraceType type);
+const pmtrace_t *get(TraceType type);
 
-}
+} // namespace playertrace

@@ -27,99 +27,109 @@ namespace {
 
 // Part element ids in services::crosshair::Part order (center, top, bottom,
 // left, right) - the settings.rml contracts.
-constexpr const char* kCoreIds[services::crosshair::kPartCount] = {
-	"cx-core-center", "cx-core-top", "cx-core-bottom", "cx-core-left", "cx-core-right"};
-constexpr const char* kOutlineIds[services::crosshair::kPartCount] = {
-	"cx-outline-center", "cx-outline-top", "cx-outline-bottom", "cx-outline-left", "cx-outline-right"};
+constexpr const char *kCoreIds[services::crosshair::kPartCount] = {
+    "cx-core-center", "cx-core-top", "cx-core-bottom", "cx-core-left",
+    "cx-core-right"};
+constexpr const char *kOutlineIds[services::crosshair::kPartCount] = {
+    "cx-outline-center", "cx-outline-top", "cx-outline-bottom",
+    "cx-outline-left", "cx-outline-right"};
 
-constexpr const char* kTransparent = "rgba(0, 0, 0, 0)";
+constexpr const char *kTransparent = "rgba(0, 0, 0, 0)";
 
 std::string rgba(float red, float green, float blue, float alpha) {
-	char Buffer[48];
-	std::snprintf(Buffer, sizeof(Buffer), "rgba(%d, %d, %d, %d)",
-		static_cast<int>(red), static_cast<int>(green), static_cast<int>(blue),
-		static_cast<int>(alpha));
-	return Buffer;
+  char Buffer[48];
+  std::snprintf(Buffer, sizeof(Buffer), "rgba(%d, %d, %d, %d)",
+                static_cast<int>(red), static_cast<int>(green),
+                static_cast<int>(blue), static_cast<int>(alpha));
+  return Buffer;
 }
 
-std::string translate(const services::crosshair::Rect& rect) {
-	char Buffer[64];
-	std::snprintf(Buffer, sizeof(Buffer), "translate(%gpx, %gpx)",
-		static_cast<double>(rect.X), static_cast<double>(rect.Y));
-	return Buffer;
+std::string translate(const services::crosshair::Rect &rect) {
+  char Buffer[64];
+  std::snprintf(Buffer, sizeof(Buffer), "translate(%gpx, %gpx)",
+                static_cast<double>(rect.X), static_cast<double>(rect.Y));
+  return Buffer;
 }
 
 std::string sizeText(float value) {
-	char Buffer[32];
-	std::snprintf(Buffer, sizeof(Buffer), "%gpx", static_cast<double>(value));
-	return Buffer;
+  char Buffer[32];
+  std::snprintf(Buffer, sizeof(Buffer), "%gpx", static_cast<double>(value));
+  return Buffer;
 }
 
-void applyPart(Rml::Element* element, sections::CrosshairPreviewState::Part& applied, const char* color,
-	const services::crosshair::Rect& rect) {
-	if (!element)
-		return;
-	const bool same = applied.Valid && applied.Color == color
-		&& applied.Rect.X == rect.X && applied.Rect.Y == rect.Y
-		&& applied.Rect.Width == rect.Width && applied.Rect.Height == rect.Height;
-	if (same)
-		return;
-	applied.Valid = true;
-	applied.Color = color;
-	applied.Rect = rect;
-	element->SetProperty("background-color", color);
-	element->SetProperty("transform", translate(rect));
-	element->SetProperty("width", sizeText(rect.Width));
-	element->SetProperty("height", sizeText(rect.Height));
+void applyPart(Rml::Element *element,
+               sections::CrosshairPreviewState::Part &applied,
+               const char *color, const services::crosshair::Rect &rect) {
+  if (!element)
+    return;
+  const bool same = applied.Valid && applied.Color == color &&
+                    applied.Rect.X == rect.X && applied.Rect.Y == rect.Y &&
+                    applied.Rect.Width == rect.Width &&
+                    applied.Rect.Height == rect.Height;
+  if (same)
+    return;
+  applied.Valid = true;
+  applied.Color = color;
+  applied.Rect = rect;
+  element->SetProperty("background-color", color);
+  element->SetProperty("transform", translate(rect));
+  element->SetProperty("width", sizeText(rect.Width));
+  element->SetProperty("height", sizeText(rect.Height));
 }
 
 } // namespace
 
 void SettingsPage::renderCrosshairPreview() {
-	Rml::ElementDocument* Doc = document();
-	if (!Doc || !Model)
-		return;
-	Rml::Element* Box = Doc->GetElementById("crosshair-preview");
-	if (!Box)
-		return;
+  Rml::ElementDocument *Doc = document();
+  if (!Doc || !Model)
+    return;
+  Rml::Element *Box = Doc->GetElementById("crosshair-preview");
+  if (!Box)
+    return;
 
-	// Draft values with the shipped defaults as the fallback (a page is free
-	// to omit a row; the preview then shows the documented default).
-	const auto Value = [this](const char* Cvar, float fallback) {
-		const auto* View = Model->find(Cvar);
-		if (!View || View->missing)
-			return fallback;
-		return View->state == services::settings::RowState::kInvalid
-			? View->engineValue : View->draftValue;
-	};
-	services::crosshair::Layout Layout;
-	Layout.Thickness = Value("cl_crosshairthickness", 2.0f);
-	Layout.Length = Value("cl_crosshairsize", 24.0f);
-	Layout.Offset = Value("cl_crosshairgap", 16.0f);
-	Layout.OutlineWidth = Value("cl_crosshair_outline_draw", 1.0f) > 0.0f
-		? Value("cl_crosshair_outline", 1.0f) : 0.0f;
-	Layout.Dot = Value("cl_crosshairdot", 0.0f) > 0.0f;
-	Layout.TShape = Value("cl_crosshair_t", 0.0f) > 0.0f;
+  // Draft values with the shipped defaults as the fallback (a page is free
+  // to omit a row; the preview then shows the documented default).
+  const auto Value = [this](const char *Cvar, float fallback) {
+    const auto View = Model->find(Cvar);
+    if (!View || View->missing)
+      return fallback;
+    return View->state == services::settings::RowState::kInvalid
+               ? View->engineValue
+               : View->draftValue;
+  };
+  services::crosshair::Layout Layout;
+  Layout.Thickness = Value("cl_crosshairthickness", 2.0f);
+  Layout.Length = Value("cl_crosshairsize", 24.0f);
+  Layout.Offset = Value("cl_crosshairgap", 16.0f);
+  Layout.OutlineWidth = Value("cl_crosshair_outline_draw", 1.0f) > 0.0f
+                            ? Value("cl_crosshair_outline", 1.0f)
+                            : 0.0f;
+  Layout.Dot = Value("cl_crosshairdot", 0.0f) > 0.0f;
+  Layout.TShape = Value("cl_crosshair_t", 0.0f) > 0.0f;
 
-	const std::string CoreColor = rgba(Value("cl_crosshaircolor_r", 50.0f),
-		Value("cl_crosshaircolor_g", 250.0f), Value("cl_crosshaircolor_b", 50.0f),
-		Value("cl_crosshairalpha", 200.0f));
-	const std::string OutlineColor = rgba(Value("cl_crosshaircolor_outline_r", 0.0f),
-		Value("cl_crosshaircolor_outline_g", 0.0f), Value("cl_crosshaircolor_outline_b", 0.0f),
-		Value("cl_crosshair_outline_alpha", 255.0f));
+  const std::string CoreColor = rgba(
+      Value("cl_crosshaircolor_r", 50.0f), Value("cl_crosshaircolor_g", 250.0f),
+      Value("cl_crosshaircolor_b", 50.0f), Value("cl_crosshairalpha", 200.0f));
+  const std::string OutlineColor =
+      rgba(Value("cl_crosshaircolor_outline_r", 0.0f),
+           Value("cl_crosshaircolor_outline_g", 0.0f),
+           Value("cl_crosshaircolor_outline_b", 0.0f),
+           Value("cl_crosshair_outline_alpha", 255.0f));
 
-	services::crosshair::Rect Core[services::crosshair::kPartCount];
-	services::crosshair::Rect Outline[services::crosshair::kPartCount];
-	services::crosshair::coreRects(Layout, Core);
-	services::crosshair::outlineRects(Layout, Outline);
-	for (int I = 0; I < services::crosshair::kPartCount; ++I) {
-		const auto Index = static_cast<services::crosshair::Part>(I);
-		const bool Shown = services::crosshair::partVisible(Layout, Index);
-		applyPart(Doc->GetElementById(kCoreIds[I]), CrosshairPreview.Core[I],
-			Shown ? CoreColor.c_str() : kTransparent, Core[I]);
-		applyPart(Doc->GetElementById(kOutlineIds[I]), CrosshairPreview.Outline[I],
-			(Shown && Layout.OutlineWidth > 0.0f) ? OutlineColor.c_str() : kTransparent, Outline[I]);
-	}
+  services::crosshair::Rect Core[services::crosshair::kPartCount];
+  services::crosshair::Rect Outline[services::crosshair::kPartCount];
+  services::crosshair::coreRects(Layout, Core);
+  services::crosshair::outlineRects(Layout, Outline);
+  for (int I = 0; I < services::crosshair::kPartCount; ++I) {
+    const auto Index = static_cast<services::crosshair::Part>(I);
+    const bool Shown = services::crosshair::partVisible(Layout, Index);
+    applyPart(Doc->GetElementById(kCoreIds[I]), CrosshairPreview.Core[I],
+              Shown ? CoreColor.c_str() : kTransparent, Core[I]);
+    applyPart(Doc->GetElementById(kOutlineIds[I]), CrosshairPreview.Outline[I],
+              (Shown && Layout.OutlineWidth > 0.0f) ? OutlineColor.c_str()
+                                                    : kTransparent,
+              Outline[I]);
+  }
 }
 
 } // namespace panels::settings

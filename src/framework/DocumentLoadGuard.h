@@ -33,34 +33,34 @@ namespace documentload {
 
 // Bumped by the Rml log seam. Plain ints, single-threaded (the Rml context
 // and every load run on the main thread by construction).
-inline uint64_t& failureCounter() {
-	static uint64_t counter = 0;
-	return counter;
+inline uint64_t &failureCounter() {
+  static uint64_t counter = 0;
+  return counter;
 }
 
 // Called from AbcSystemInterface::LogMessage. `type` is Rml::Log::Type
 // (LT_ERROR=1, LT_ASSERT=2, LT_WARNING=3 - kept as int to avoid an RmlUi
 // include here).
-inline void noteRmlLog(int type, const char* message) {
-	constexpr int kLtError = 1;
-	constexpr int kLtAssert = 2;
-	constexpr int kLtWarning = 3;
-	if (type == kLtError || type == kLtAssert) {
-		++failureCounter();
-		return;
-	}
-	if (type == kLtWarning && message && std::strstr(message, "XML parse error"))
-		++failureCounter();
+inline void noteRmlLog(int type, const char *message) {
+  constexpr int kLtError = 1;
+  constexpr int kLtAssert = 2;
+  constexpr int kLtWarning = 3;
+  if (type == kLtError || type == kLtAssert) {
+    ++failureCounter();
+    return;
+  }
+  if (type == kLtWarning && message && std::strstr(message, "XML parse error"))
+    ++failureCounter();
 }
 
 // Bracket one synchronous load: mark = begin(); ...; failedSince(mark).
 inline uint64_t begin() {
-	return failureCounter();
+  return failureCounter();
 }
 
 inline bool failedSince(uint64_t mark) {
-	return failureCounter() != mark;
+  return failureCounter() != mark;
 }
 
-}
-}
+} // namespace documentload
+} // namespace framework

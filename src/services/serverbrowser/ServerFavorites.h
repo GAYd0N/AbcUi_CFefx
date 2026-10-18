@@ -16,7 +16,8 @@
 //                                    queryPort, flags=1, time)
 //       +0x0c RemoveFavoriteGame    (0x1000bf70: ip, connPort, queryPort,
 //                                    flags=1)
-//   - flags are the SDK's k_unFavoriteFlagFavorite (1) / k_unFavoriteFlagHistory
+//   - flags are the SDK's k_unFavoriteFlagFavorite (1) /
+//   k_unFavoriteFlagHistory
 //     (2); the shipped ConnectedToGame handler (0x1000ef00) records every
 //     successful join with flags=2 - history is Steam's own "最近玩过的
 //    服务器" list, and RequestFavoritesServerList / RequestHistoryServerList
@@ -39,27 +40,31 @@ namespace services::serverbrowser {
 // binding is unavailable.
 class IServerFavorites {
 public:
-	virtual ~IServerFavorites() = default;
+  virtual ~IServerFavorites() = default;
 
-	virtual bool available() = 0;
-	// Steam records key on (ip, connPort, queryPort) + flags; queryPort may
-	// be 0 for a stale record (the SDK stores what it was told).
-	virtual bool isFavorite(uint32_t ip, uint16_t connPort, uint16_t queryPort) = 0;
-	virtual bool addFavorite(uint32_t ip, uint16_t connPort, uint16_t queryPort) = 0;
-	virtual bool removeFavorite(uint32_t ip, uint16_t connPort, uint16_t queryPort) = 0;
-	// The connect-memory entry (flags=2): the shipped browser writes it when
-	// a join succeeds; it is what the History tab lists.
-	virtual bool addHistory(uint32_t ip, uint16_t connPort, uint16_t queryPort) = 0;
-	// Live counts (diagnostics / empty-state truth).
-	virtual int favoriteCount() = 0;
-	virtual int historyCount() = 0;
+  virtual bool available() = 0;
+  // Steam records key on (ip, connPort, queryPort) + flags; queryPort may
+  // be 0 for a stale record (the SDK stores what it was told).
+  virtual bool isFavorite(uint32_t ip, uint16_t connPort,
+                          uint16_t queryPort) = 0;
+  virtual bool addFavorite(uint32_t ip, uint16_t connPort,
+                           uint16_t queryPort) = 0;
+  virtual bool removeFavorite(uint32_t ip, uint16_t connPort,
+                              uint16_t queryPort) = 0;
+  // The connect-memory entry (flags=2): the shipped browser writes it when
+  // a join succeeds; it is what the History tab lists.
+  virtual bool addHistory(uint32_t ip, uint16_t connPort,
+                          uint16_t queryPort) = 0;
+  // Live counts (diagnostics / empty-state truth).
+  virtual int favoriteCount() = 0;
+  virtual int historyCount() = 0;
 };
 
 // The production adapter (ServerQuerySteam.cpp): bounded to the proven
 // vtable slots above. Never null; available() reports whether the live
 // Steam client currently serves the binding (auto re-probe, like the query
 // provider).
-IServerFavorites* steamFavorites();
+IServerFavorites *steamFavorites();
 
 // --- pure helpers (offline-tested) ------------------------------------------
 
@@ -73,16 +78,18 @@ std::string formatServerIp(uint32_t ip);
 // (the same string the shipped browser hands to "connect %s"). The port is
 // the CONNECTION port; 0 falls back to the query port, and both 0 fail with
 // an empty string (fail closed - never a connect to port 0).
-std::string buildConnectAddress(const ServerEntry& entry);
+std::string buildConnectAddress(const ServerEntry &entry);
 
 // The key tuple Steam stores a record under. A zero queryPort is stored as
 // the entry's connection port (the shipped read-back compares all three).
 struct FavoriteKey {
-	uint32_t ip = 0;
-	uint16_t connPort = 0;
-	uint16_t queryPort = 0;
-	bool valid() const { return ip != 0 && connPort != 0; }
+  uint32_t ip = 0;
+  uint16_t connPort = 0;
+  uint16_t queryPort = 0;
+  bool valid() const {
+    return ip != 0 && connPort != 0;
+  }
 };
-FavoriteKey favoriteKeyOf(const ServerEntry& entry);
+FavoriteKey favoriteKeyOf(const ServerEntry &entry);
 
-}
+} // namespace services::serverbrowser

@@ -53,70 +53,92 @@ namespace loading {
 // (StartProgressBar with steps <= 0 and no fraction yet): the page shows no
 // fill and no percentage - never a fabricated animation.
 struct LoadingProgress {
-	bool Known = false;
-	int Point = 0;
-	int Steps = 0;
-	float Fraction = 0.0f;  // 0..1 engine truth (preferred when present)
+  bool Known = false;
+  int Point = 0;
+  int Steps = 0;
+  float Fraction = 0.0f; // 0..1 engine truth (preferred when present)
 };
 
 class LoadingModel {
 public:
-	// Strict "host[:port]" parse; `address` is taken as-is (never normalized
-	// away), `outHost` receives the host part, `outPort` the port (0 = none).
-	static bool parseAddress(const char* address, std::string& outHost, int& outPort);
+  // Strict "host[:port]" parse; `address` is taken as-is (never normalized
+  // away), `outHost` receives the host part, `outPort` the port (0 = none).
+  static bool parseAddress(const char *address, std::string &outHost,
+                           int &outPort);
 
-	// A new attempt owns the model: generation must be non-zero. Values from
-	// the previous attempt are dropped, the address is replaced.
-	void startAttempt(uint32_t generation, const char* address);
-	// The attempt retired (cancel / success / failure): every later event for
-	// it drops. The address is kept so a retry can reuse it.
-	void retire();
+  // A new attempt owns the model: generation must be non-zero. Values from
+  // the previous attempt are dropped, the address is replaced.
+  void startAttempt(uint32_t generation, const char *address);
+  // The attempt retired (cancel / success / failure): every later event for
+  // it drops. The address is kept so a retry can reuse it.
+  void retire();
 
-	// Engine stream. Every entry is generation-filtered: generation 0 or a
-	// retired/superseded generation is dropped silently (the cancel and
-	// late-arrival rule of T14 step a.3).
-	void loadingStarted(uint32_t generation, const char* resourceType, const char* resourceName);
-	void loadingFinished(uint32_t generation, const char* resourceType);
-	void startProgress(uint32_t generation, const char* progressType, int steps);
-	void continueProgress(uint32_t generation, int point, float fraction);
-	void stopProgress(uint32_t generation, bool error);
-	void setStatusText(uint32_t generation, const char* text);
-	void setSecondaryProgress(uint32_t generation, float fraction);
-	void setSecondaryProgressText(uint32_t generation, const char* text);
+  // Engine stream. Every entry is generation-filtered: generation 0 or a
+  // retired/superseded generation is dropped silently (the cancel and
+  // late-arrival rule of T14 step a.3).
+  void loadingStarted(uint32_t generation, const char *resourceType,
+                      const char *resourceName);
+  void loadingFinished(uint32_t generation, const char *resourceType);
+  void startProgress(uint32_t generation, const char *progressType, int steps);
+  void continueProgress(uint32_t generation, int point, float fraction);
+  void stopProgress(uint32_t generation, bool error);
+  void setStatusText(uint32_t generation, const char *text);
+  void setSecondaryProgress(uint32_t generation, float fraction);
+  void setSecondaryProgressText(uint32_t generation, const char *text);
 
-	// Once-only cancel latch for the live generation: true exactly on the
-	// first request. The module turns it into the controller's cancel intent
-	// (whose phase gate is the second guard) - the backend command itself is
-	// issued once by the controller path.
-	bool requestCancel(uint32_t generation);
+  // Once-only cancel latch for the live generation: true exactly on the
+  // first request. The module turns it into the controller's cancel intent
+  // (whose phase gate is the second guard) - the backend command itself is
+  // issued once by the controller path.
+  bool requestCancel(uint32_t generation);
 
-	uint32_t generation() const { return Generation; }
-	const std::string& address() const { return Address; }
-	bool canceled() const { return Canceled; }
-	bool levelStarted() const { return LevelStarted; }
-	bool levelFinished() const { return LevelFinished; }
-	const LoadingProgress& primary() const { return Primary; }
-	float secondaryFraction() const { return SecondaryFraction; }
-	const std::string& statusText() const { return StatusText; }
-	const std::string& secondaryText() const { return SecondaryText; }
-	const std::string& resourceText() const { return ResourceText; }
+  uint32_t generation() const {
+    return Generation;
+  }
+  const std::string &address() const {
+    return Address;
+  }
+  bool canceled() const {
+    return Canceled;
+  }
+  bool levelStarted() const {
+    return LevelStarted;
+  }
+  bool levelFinished() const {
+    return LevelFinished;
+  }
+  const LoadingProgress &primary() const {
+    return Primary;
+  }
+  float secondaryFraction() const {
+    return SecondaryFraction;
+  }
+  const std::string &statusText() const {
+    return StatusText;
+  }
+  const std::string &secondaryText() const {
+    return SecondaryText;
+  }
+  const std::string &resourceText() const {
+    return ResourceText;
+  }
 
 private:
-	bool live(uint32_t generation) const {
-		return generation != 0 && generation == Generation;
-	}
+  bool live(uint32_t generation) const {
+    return generation != 0 && generation == Generation;
+  }
 
-	uint32_t Generation = 0;
-	std::string Address;
-	bool Canceled = false;
-	bool LevelStarted = false;   // LoadingStarted("level") seen
-	bool LevelFinished = false;  // LoadingFinished("level") seen
-	LoadingProgress Primary;
-	float SecondaryFraction = 0.0f;
-	std::string StatusText;
-	std::string SecondaryText;
-	std::string ResourceText;  // last LoadingStarted resource (name or type)
+  uint32_t Generation = 0;
+  std::string Address;
+  bool Canceled = false;
+  bool LevelStarted = false;  // LoadingStarted("level") seen
+  bool LevelFinished = false; // LoadingFinished("level") seen
+  LoadingProgress Primary;
+  float SecondaryFraction = 0.0f;
+  std::string StatusText;
+  std::string SecondaryText;
+  std::string ResourceText; // last LoadingStarted resource (name or type)
 };
 
-}
-}
+} // namespace loading
+} // namespace services

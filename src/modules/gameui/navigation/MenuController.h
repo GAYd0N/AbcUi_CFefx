@@ -120,63 +120,78 @@ namespace menu {
 
 class MenuController {
 public:
-	explicit MenuController(services::IGameUiBackend* backend = nullptr);
+  explicit MenuController(services::IGameUiBackend *backend = nullptr);
 
-	// Single entry point; `event` is taken by const& and copied, nothing
-	// borrowed from it outlives the call.
-	void dispatch(const MenuEvent& event);
+  // Single entry point; `event` is taken by const& and copied, nothing
+  // borrowed from it outlives the call.
+  void dispatch(const MenuEvent &event);
 
-	const MenuState& state() const { return State; }
+  const MenuState &state() const {
+    return State;
+  }
 
-	// Derived semantics (T04 step 5); invariants live on MenuState.
-	bool isMenuActive() const { return State.isMenuActive(); }
-	bool hasExclusiveInput() const { return State.hasExclusiveInput(); }
-	int activationFlag() const { return State.activationFlag(); }
-	PointerTarget pointerTarget() const { return State.pointerTarget(); }
-	TextInputTarget textInputTarget() const { return State.textInputTarget(); }
-	bool canCloseMenu() const { return State.canCloseMenu(); }
+  // Derived semantics (T04 step 5); invariants live on MenuState.
+  bool isMenuActive() const {
+    return State.isMenuActive();
+  }
+  bool hasExclusiveInput() const {
+    return State.hasExclusiveInput();
+  }
+  int activationFlag() const {
+    return State.activationFlag();
+  }
+  PointerTarget pointerTarget() const {
+    return State.pointerTarget();
+  }
+  TextInputTarget textInputTarget() const {
+    return State.textInputTarget();
+  }
+  bool canCloseMenu() const {
+    return State.canCloseMenu();
+  }
 
 private:
-	// Sequence filter for native events: true = first sight of
-	// (origin, seq), false = untagged or re-delivered (drop).
-	bool acceptNative(EventOrigin origin, uint32_t nativeSeq);
+  // Sequence filter for native events: true = first sight of
+  // (origin, seq), false = untagged or re-delivered (drop).
+  bool acceptNative(EventOrigin origin, uint32_t nativeSeq);
 
-	// Transition helpers; each is idempotent under repeated delivery.
-	void openPage(MenuPage page);
-	void goBack();
-	void menuToggle();
-	void closeMenuAndResume();
-	void toggleConsoleOverlay();
-	void toggleDirectConnectOverlay();
-	void openConsoleOverlay();
-	void closeConsoleOverlay();
-	void connectRequest(const std::string& address);
-	void createGameRequest(const std::string& map);
-	void cancelConnect();
-	void disconnectRequest();
-	void quitRequest();
-	void quitResolve(bool confirmed);
-	void passwordSubmit(const std::string& password);
-	void nativeActivate();
-	void nativeHide();
-	void menuShown();
-	void menuHidden();
-	void applyPhaseChange(uint32_t session, BackendPhase phase);
-	void loadingStarted(uint32_t generation);
-	void loadingFinished(uint32_t generation, LoadingOutcome outcome, const std::string& reason);
-	void applyFatal(const std::string& reason);
-	void applyShutdown();
+  // Transition helpers; each is idempotent under repeated delivery.
+  void openPage(MenuPage page);
+  void goBack();
+  void menuToggle();
+  void closeMenuAndResume();
+  void toggleConsoleOverlay();
+  void toggleDirectConnectOverlay();
+  void openConsoleOverlay();
+  void closeConsoleOverlay();
+  void connectRequest(const std::string &address);
+  void createGameRequest(const std::string &map);
+  void cancelConnect();
+  void disconnectRequest();
+  void quitRequest();
+  void quitResolve(bool confirmed);
+  void passwordSubmit(const std::string &password);
+  void nativeActivate();
+  void nativeHide();
+  void menuShown();
+  void menuHidden();
+  void applyPhaseChange(uint32_t session, BackendPhase phase);
+  void loadingStarted(uint32_t generation);
+  void loadingFinished(uint32_t generation, LoadingOutcome outcome,
+                       const std::string &reason);
+  void applyFatal(const std::string &reason);
+  void applyShutdown();
 
-	// Back to the no-map world: Main up, overlays and focus gone, attempt
-	// retired, stale reason dropped. Idempotent.
-	void enterDisconnected();
-	void retireAttempt();
+  // Back to the no-map world: Main up, overlays and focus gone, attempt
+  // retired, stale reason dropped. Idempotent.
+  void enterDisconnected();
+  void retireAttempt();
 
-	MenuState State;
-	services::IGameUiBackend* Backend;
-	uint32_t NextGeneration = 1;  // monotonic, never reused, never reset
-	uint32_t LastNativeSeq[3] = {};  // indexed by EventOrigin (kNone unused)
+  MenuState State;
+  services::IGameUiBackend *Backend;
+  uint32_t NextGeneration = 1;    // monotonic, never reused, never reset
+  uint32_t LastNativeSeq[3] = {}; // indexed by EventOrigin (kNone unused)
 };
 
-}
-}
+} // namespace menu
+} // namespace gameui

@@ -29,25 +29,29 @@ namespace services::loading {
 
 class AutoRetryGate {
 public:
-	// A full server may free a slot minutes later, so the chain is patient
-	// but still bounded (the player can cancel at any point, which resets).
-	static constexpr int kMaxAttempts = 10;
-	static constexpr double kDelaySeconds = 5.0;
+  // A full server may free a slot minutes later, so the chain is patient
+  // but still bounded (the player can cancel at any point, which resets).
+  static constexpr int kMaxAttempts = 10;
+  static constexpr double kDelaySeconds = 5.0;
 
-	// One frame of the policy. Returns true exactly on the frame the caller
-	// must issue the retry.
-	bool tick(double deltaSeconds, bool enabled, bool failed);
+  // One frame of the policy. Returns true exactly on the frame the caller
+  // must issue the retry.
+  bool tick(double deltaSeconds, bool enabled, bool failed);
 
-	// Start a fresh chain (budget restored, timer cleared).
-	void reset();
+  // Start a fresh chain (budget restored, timer cleared).
+  void reset();
 
-	int attempts() const { return Attempts; }
-	// False once the chain's budget is exhausted (the gate no longer tries).
-	bool retrying() const { return Delay >= 0.0 && Attempts < kMaxAttempts; }
+  int attempts() const {
+    return Attempts;
+  }
+  // False once the chain's budget is exhausted (the gate no longer tries).
+  bool retrying() const {
+    return Delay >= 0.0 && Attempts < kMaxAttempts;
+  }
 
 private:
-	int Attempts = 0;
-	double Delay = -1.0;  // < 0 = not armed
+  int Attempts = 0;
+  double Delay = -1.0; // < 0 = not armed
 };
 
-}  // namespace services::loading
+} // namespace services::loading

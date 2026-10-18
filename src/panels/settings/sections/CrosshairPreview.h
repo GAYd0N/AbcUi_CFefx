@@ -12,13 +12,13 @@
 namespace panels::settings::sections {
 
 struct CrosshairPreviewState {
-	struct Part {
-		std::string Color;
-		services::crosshair::Rect Rect;
-		bool Valid = false;
-	};
-	Part Core[services::crosshair::kPartCount];
-	Part Outline[services::crosshair::kPartCount];
+  struct Part {
+    std::string Color;
+    services::crosshair::Rect Rect;
+    bool Valid = false;
+  };
+  Part Core[services::crosshair::kPartCount];
+  Part Outline[services::crosshair::kPartCount];
 };
 
 } // namespace panels::settings::sections

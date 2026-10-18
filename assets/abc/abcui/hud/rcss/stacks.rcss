@@ -66,11 +66,14 @@
 #ammostack .icon {
 	position: absolute;
 	left: 0dp;
-	top: 5dp;
+	top: 0dp;
+	/* Old CAmmoStackItem::PerformLayout: img = min(w * 0.25, h) = 20, and
+	   ImageSprPanel was sized img x img - a SQUARE icon box. 20x10 squashed
+	   the square HUD sprite (e.g. the 24x24 ammo crops) by half. */
 	width: 20dp;
-	height: 10dp;
+	height: 20dp;
 	/* Old AmmoStack.IconColor = scheme Default (additive tint). */
-	image-color: #00ff00;
+	image-color: var(--abc-hud-accent);
 }
 #ammostack .count {
 	position: absolute;
@@ -78,7 +81,11 @@
 	top: 0dp;
 	width: 60dp;
 	height: 20dp;
-	color: #00ff00;
+	/* Old vgui Label a_west: left aligned, vertically centered in the
+	   20-tall item box (the icon is 20 tall too, so both share one line). */
+	line-height: 20dp;
+	white-space: nowrap;
+	color: var(--abc-hud-accent);
 }
 
 /* ItemStack: item 30x30, gap 1, icon only. */
@@ -96,7 +103,7 @@
 	width: 30dp;
 	height: 30dp;
 	/* Old ItemStack.IconColor = scheme Default. */
-	image-color: #00ff00;
+	image-color: var(--abc-hud-accent);
 }
 
 /* WeaponStack: item 120x30, gap 2, weapon sprite; empty tint via .empty
@@ -115,7 +122,7 @@
 	width: 120dp;
 	height: 30dp;
 	/* Old WeaponStack.IconColor = scheme Default. */
-	image-color: #00ff00;
+	image-color: var(--abc-hud-accent);
 }
 #weaponstack .item.empty .icon {
 	image-color: #ff0000;

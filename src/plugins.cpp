@@ -2,8 +2,9 @@
 // derivation + EXPOSE_SINGLE_INTERFACE. All assembly lives in rmlui/ (RmlUi
 // integration) and framework/ (panel framework).
 //
-// The metahook globals are defined once per plugin in CoreGlobals.cpp.
-// CAbcPluginBase mirrors the host pointers into AbcCore.dll.
+// The metahook globals are defined per plugin in src/CoreGlobals.cpp;
+// CAbcPluginBase copies them into AbcCore.dll through the versioned C ABI
+// interface (AbcCore_CreateInterface) during Init/LoadEngine/LoadClient.
 #include <metahook.h>
 
 #include <abc/Console.h>
@@ -12,7 +13,7 @@
 #include "hooks.h"
 #include "render/Render.h"
 #include "rmlui/RmlUiModule.h"
-#include "rmlui/SteamAPI.h"
+#include "services/steam/SteamAPI.h"
 #include "rmlui/VGUI2ExtensionImport.h"
 
 #ifndef NDEBUG
@@ -29,97 +30,104 @@
 
 #define ABC_UI_STACK_FRAMES 16
 
-int debugAssertReportHook(int reportType, char* message, int* returnValue) {
-	(void)reportType;
-	abc::ConsolePrint("[AbcUi][crt] %s\n", message ? message : "(no message)");
+int debugAssertReportHook(int reportType, char *message, int *returnValue) {
+  (void)reportType;
+  abc::ConsolePrint("[AbcUi][crt] %s\n", message ? message : "(no message)");
 
-	// The same lines to a file: this assert class fail-fasts after the hook
-	// returns, killing the console channel with it (P6 audit round).
-	FILE* trace = nullptr;
-	std::error_code pathError;
-	const auto directory = std::filesystem::temp_directory_path(pathError);
-	if (!pathError) _wfopen_s(&trace, (directory / L"abcui-assert-stack.log").c_str(), L"a");
-	if (trace)
-		fprintf(trace, "=== %s", message ? message : "(no message)");
+  // The same lines to a file: this assert class fail-fasts after the hook
+  // returns, killing the console channel with it (P6 audit round).
+  FILE *trace = nullptr;
+  std::error_code pathError;
+  const auto directory = std::filesystem::temp_directory_path(pathError);
+  if (!pathError)
+    _wfopen_s(&trace, (directory / L"abcui-assert-stack.log").c_str(), L"a");
+  if (trace)
+    fprintf(trace, "=== %s", message ? message : "(no message)");
 
-	void* frames[ABC_UI_STACK_FRAMES] = {};
-	const WORD count = RtlCaptureStackBackTrace(1, ABC_UI_STACK_FRAMES, frames, nullptr);
-	static bool symbolsReady = []() {
-		return SymInitialize(GetCurrentProcess(), nullptr, TRUE);
-	}();
-	for (WORD i = 0; i < count; i++) {
-		char line[320];
-		DWORD64 displacement = 0;
-		SYMBOL_INFO* symbol = static_cast<SYMBOL_INFO*>(alloca(sizeof(SYMBOL_INFO) + 128));
-		symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-		symbol->MaxNameLen = 127;
-		if (symbolsReady && SymFromAddr(GetCurrentProcess(), reinterpret_cast<DWORD64>(frames[i]), &displacement, symbol)) {
-			IMAGEHLP_LINEW64 srcLine{};
-			srcLine.SizeOfStruct = sizeof(srcLine);
-			DWORD lineDisplacement = 0;
-			if (symbolsReady && SymGetLineFromAddrW64(GetCurrentProcess(),
-					reinterpret_cast<DWORD64>(frames[i]), &lineDisplacement, &srcLine))
-				sprintf_s(line, "  %2u %s+0x%llx (%ws:%lu)", i, symbol->Name,
-					static_cast<unsigned long long>(displacement),
-					srcLine.FileName ? srcLine.FileName : L"?", srcLine.LineNumber);
-			else
-				sprintf_s(line, "  %2u %s+0x%llx", i, symbol->Name,
-					static_cast<unsigned long long>(displacement));
-		}
-		else
-			sprintf_s(line, "  %2u %p", i, frames[i]);
-		abc::ConsolePrint("[AbcUi][crt]%s\n", line);
-		if (trace) {
-			fprintf(trace, "%s\n", line);
-			fflush(trace);
-		}
-	}
-	if (trace)
-		fclose(trace);
-	if (returnValue)
-		*returnValue = 0;
-	return TRUE; // handled - no dialog, execution continues
+  void *frames[ABC_UI_STACK_FRAMES] = {};
+  const WORD count =
+      RtlCaptureStackBackTrace(1, ABC_UI_STACK_FRAMES, frames, nullptr);
+  static bool symbolsReady = []() {
+    return SymInitialize(GetCurrentProcess(), nullptr, TRUE);
+  }();
+  for (WORD i = 0; i < count; i++) {
+    char line[320];
+    DWORD64 displacement = 0;
+    SYMBOL_INFO *symbol =
+        static_cast<SYMBOL_INFO *>(alloca(sizeof(SYMBOL_INFO) + 128));
+    symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+    symbol->MaxNameLen = 127;
+    if (symbolsReady &&
+        SymFromAddr(GetCurrentProcess(), reinterpret_cast<DWORD64>(frames[i]),
+                    &displacement, symbol)) {
+      IMAGEHLP_LINEW64 srcLine{};
+      srcLine.SizeOfStruct = sizeof(srcLine);
+      DWORD lineDisplacement = 0;
+      if (symbolsReady &&
+          SymGetLineFromAddrW64(GetCurrentProcess(),
+                                reinterpret_cast<DWORD64>(frames[i]),
+                                &lineDisplacement, &srcLine))
+        sprintf_s(line, "  %2u %s+0x%llx (%ws:%lu)", i, symbol->Name,
+                  static_cast<unsigned long long>(displacement),
+                  srcLine.FileName ? srcLine.FileName : L"?",
+                  srcLine.LineNumber);
+      else
+        sprintf_s(line, "  %2u %s+0x%llx", i, symbol->Name,
+                  static_cast<unsigned long long>(displacement));
+    } else
+      sprintf_s(line, "  %2u %p", i, frames[i]);
+    abc::ConsolePrint("[AbcUi][crt]%s\n", line);
+    if (trace) {
+      fprintf(trace, "%s\n", line);
+      fflush(trace);
+    }
+  }
+  if (trace)
+    fclose(trace);
+  if (returnValue)
+    *returnValue = 0;
+  return TRUE; // handled - no dialog, execution continues
 }
 
 void installDebugAssertHook() {
-	_CrtSetReportHook(debugAssertReportHook);
+  _CrtSetReportHook(debugAssertReportHook);
 }
 #endif // NDEBUG
 
 class CAbcUi : public abc::CAbcPluginBase {
 public:
-	CAbcUi() : abc::CAbcPluginBase("AbcUi", "0.8.0") {}
+  CAbcUi() : abc::CAbcPluginBase("AbcUi", "0.8.0") {}
 
 protected:
-	void OnLoadClient(cl_exportfuncs_t* pExportFuncs) override {
+  void OnLoadClient(cl_exportfuncs_t *pExportFuncs) override {
 #ifndef NDEBUG
-		installDebugAssertHook();
+    installDebugAssertHook();
 #endif
-		// Fatal Renderer check + interface grab (plan 05 §2 startup order).
-		// Rml assembly itself defers to the first HUD_Frame (see
-		// RmlUiModule.h): the VGUI surface texture channel the font engine
-		// needs is not usable this early (Phase 3 trace finding).
-		abc::MetaRendererInit();
-		vgui2ext::init();
-		steamapi::init();
-		hooks::locateVanillaHudList();
-		hooks::locateNativeHudPanelInfo();
-		hooks::locatePlayerColor();
-		hooks::hookVanillaMenuRoute();
-		hooks::attachExports(pExportFuncs);
-		abc::ConsolePrint("[AbcUi] loaded %s\n", Version());
-	}
+    // Fatal Renderer check + interface grab (plan 05 §2 startup order).
+    // Rml assembly itself defers to the first HUD_Frame (see
+    // RmlUiModule.h): the VGUI surface texture channel the font engine
+    // needs is not usable this early (Phase 3 trace finding).
+    abc::MetaRendererInit();
+    vgui2ext::init();
+    steamapi::init();
+    hooks::locateVanillaHudList();
+    hooks::locateNativeHudPanelInfo();
+    hooks::locatePlayerColor();
+    hooks::hookVanillaMenuRoute();
+    hooks::attachExports(pExportFuncs);
+    abc::ConsolePrint("[AbcUi] loaded %s\n", Version());
+  }
 
-	void OnShutdown() override {
-		rmlui::shutdown();
-		steamapi::shutdown();
-		vgui2ext::shutdown();
-		// T08: the native-UI takeover callbacks and any still-installed
-		// paint gate come down last (plugin teardown only - the HUD-cycle
-		// shutdown() above must not drop them, or map changes would leave
-		// suppression gaps).
-		vgui2ext::shutdownNative();
-	}
+  void OnShutdown() override {
+    rmlui::shutdown();
+    steamapi::shutdown();
+    vgui2ext::shutdown();
+    // T08: the native-UI takeover callbacks and any still-installed
+    // paint gate come down last (plugin teardown only - the HUD-cycle
+    // shutdown() above must not drop them, or map changes would leave
+    // suppression gaps).
+    vgui2ext::shutdownNative();
+  }
 };
 
 EXPOSE_SINGLE_INTERFACE(CAbcUi, IPluginsV4, METAHOOK_PLUGIN_API_VERSION_V4);

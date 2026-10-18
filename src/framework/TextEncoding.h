@@ -22,14 +22,14 @@ namespace framework::text {
 // U+10FFFF. A truncated final sequence (the 31-byte event-buffer cut) is
 // dropped too; a later event resends it whole. Supplementary-plane
 // characters survive as their normal 4-byte UTF-8 form.
-std::string_view sanitizeUtf8(const char* data, std::size_t length);
+std::string_view sanitizeUtf8(const char *data, std::size_t length);
 
 // NUL-terminated convenience overload (stops at the first NUL).
-std::string_view sanitizeUtf8(const char* data);
+std::string_view sanitizeUtf8(const char *data);
 
 // UTF-8 byte offset -> character (code point) count, for translating the
 // platform's byte-offset cursor inside a composition string to RmlUi's
 // character-index caret. Clamps at the first malformed sequence.
 int countCharacters(std::string_view utf8);
 
-}
+} // namespace framework::text

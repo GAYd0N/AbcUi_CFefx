@@ -47,16 +47,16 @@
 namespace Rml {
 class Event;
 class ElementDocument;
-}
+} // namespace Rml
 
 namespace services::console {
 class ConsoleBuffer;
 class ConsoleBackend;
-}
+} // namespace services::console
 
 namespace panels::console {
 
-using ActionSink = std::function<void(const char* action)>;
+using ActionSink = std::function<void(const char *action)>;
 // Command execution sink (the module wires this to the T15 backend submit
 // path). One call per command line; a confirmed multi-line paste calls it
 // once per line, in order.
@@ -66,162 +66,170 @@ using ActionSink = std::function<void(const char* action)>;
 // nothing for it, and a loaded level's server may still own the name - the
 // module holds that fact). The page only formats and shows the line; engine
 // call ownership stays with the module.
-using SubmitSink = std::function<bool(const std::string& command)>;
+using SubmitSink = std::function<bool(const std::string &command)>;
 
 class ConsolePage final : public framework::InteractiveDocument {
 public:
-	// Frozen projection caps (T16 record).
-	static constexpr int kInitialLines = 200;  // first render of a view
-	static constexpr int kMaxDomLines = 300;   // DOM row cap
-	static constexpr int kMaxSuggestions = 10; // completion dropdown row cap
+  // Frozen projection caps (T16 record).
+  static constexpr int kInitialLines = 200;  // first render of a view
+  static constexpr int kMaxDomLines = 300;   // DOM row cap
+  static constexpr int kMaxSuggestions = 10; // completion dropdown row cap
 
 #ifndef NDEBUG
-	// Debug seam (abc_ui_console_ui_type): drives the editor and the live
-	// dropdown without an injectable keyboard.
-	void debugType(const char* text);
+  // Debug seam (abc_ui_console_ui_type): drives the editor and the live
+  // dropdown without an injectable keyboard.
+  void debugType(const char *text);
 #endif
 
-	ConsolePage();
-	~ConsolePage() override;
+  ConsolePage();
+  ~ConsolePage() override;
 
-	void setActionSink(ActionSink sink) { Sink = std::move(sink); }
-	void setSubmitSink(SubmitSink sink) { Submit = std::move(sink); }
-	// Non-const: the console's own local scrollback lines (the unknown-command
-	// answer) ride the same bounded mirror the engine stream fills, exactly
-	// where the vanilla console put its messages (see the two-producer note
-	// in ConsoleBuffer.h).
-	void setBuffer(services::console::ConsoleBuffer* buffer) { Buffer = buffer; }
-	void setBackend(const services::console::ConsoleBackend* backend) { Backend = backend; }
+  void setActionSink(ActionSink sink) {
+    Sink = std::move(sink);
+  }
+  void setSubmitSink(SubmitSink sink) {
+    Submit = std::move(sink);
+  }
+  // Non-const: the console's own local scrollback lines (the unknown-command
+  // answer) ride the same bounded mirror the engine stream fills, exactly
+  // where the vanilla console put its messages (see the two-producer note
+  // in ConsoleBuffer.h).
+  void setBuffer(services::console::ConsoleBuffer *buffer) {
+    Buffer = buffer;
+  }
+  void setBackend(const services::console::ConsoleBackend *backend) {
+    Backend = backend;
+  }
 
-	// Projects the buffer's new lines into the DOM (incremental, bounded).
-	// Safe to call every frame and on every presentation.
-	void render();
+  // Projects the buffer's new lines into the DOM (incremental, bounded).
+  // Safe to call every frame and on every presentation.
+  void render();
 
-	// Fresh opening: clear the editor and confirm pane, reseed the
-	// projection from the buffer's current tail, focus the editor.
-	void prepare();
+  // Fresh opening: clear the editor and confirm pane, reseed the
+  // projection from the buffer's current tail, focus the editor.
+  void prepare();
 
-	// Re-takes the editor focus (module's per-frame focus guard).
-	void refocusDefault();
+  // Re-takes the editor focus (module's per-frame focus guard).
+  void refocusDefault();
 
-	// T16 ESC layering: true exactly once after the confirm pane consumed
-	// an ESC press through the Rml feed. The module's owner action runs
-	// after that feed (router order: uiKeyDown then onClaimedKeyDown), so it
-	// checks-and-clears this claim instead of closing a second layer in the
-	// same physical press ("同一事件不关闭两层").
-	bool consumeEscapeClaim() {
-		const bool claimed = EscapeClaimed;
-		EscapeClaimed = false;
-		return claimed;
-	}
+  // T16 ESC layering: true exactly once after the confirm pane consumed
+  // an ESC press through the Rml feed. The module's owner action runs
+  // after that feed (router order: uiKeyDown then onClaimedKeyDown), so it
+  // checks-and-clears this claim instead of closing a second layer in the
+  // same physical press ("同一事件不关闭两层").
+  bool consumeEscapeClaim() {
+    const bool claimed = EscapeClaimed;
+    EscapeClaimed = false;
+    return claimed;
+  }
 
 protected:
-	void onDocumentReady() override;
+  void onDocumentReady() override;
 
 private:
-	class WindowListener final : public Rml::EventListener {
-	public:
-		explicit WindowListener(ConsolePage* owner) : Owner(owner) {}
-		void ProcessEvent(Rml::Event& event) override;
+  class WindowListener final : public Rml::EventListener {
+  public:
+    explicit WindowListener(ConsolePage *owner) : Owner(owner) {}
+    void ProcessEvent(Rml::Event &event) override;
 
-	private:
-		ConsolePage* Owner;
-	};
+  private:
+    ConsolePage *Owner;
+  };
 
-	// Capture-phase keydown on the document: the interaction keys (Enter,
-	// Up/Down, Tab, Ctrl+V paste inspection) are consumed before the editor
-	// widget and the document's own TAB navigation see them.
-	class KeyListener final : public Rml::EventListener {
-	public:
-		explicit KeyListener(ConsolePage* owner) : Owner(owner) {}
-		void ProcessEvent(Rml::Event& event) override;
+  // Capture-phase keydown on the document: the interaction keys (Enter,
+  // Up/Down, Tab, Ctrl+V paste inspection) are consumed before the editor
+  // widget and the document's own TAB navigation see them.
+  class KeyListener final : public Rml::EventListener {
+  public:
+    explicit KeyListener(ConsolePage *owner) : Owner(owner) {}
+    void ProcessEvent(Rml::Event &event) override;
 
-	private:
-		ConsolePage* Owner;
-	};
+  private:
+    ConsolePage *Owner;
+  };
 
-	void handleClick(Rml::Event& event);
-	void handlePointerDown(Rml::Event& event);
-	void handleDrag(Rml::Event& event);
-	void handleKey(Rml::Event& event);
-	Rml::ElementDocument* documentOrNull() const;
+  void handleClick(Rml::Event &event);
+  void handlePointerDown(Rml::Event &event);
+  void handleDrag(Rml::Event &event);
+  void handleKey(Rml::Event &event);
+  Rml::ElementDocument *documentOrNull() const;
 
-	// Projection.
-	void appendLine(const std::string& text, bool developer, bool truncated);
-	int trimDom();
-	void updateCountLine();
+  // Projection.
+  void appendLine(const std::string &text, bool developer, bool truncated);
+  int trimDom();
+  void updateCountLine();
 
-	// Selection. `caretFromPoint` maps a context-space point onto the
-	// laid-out output (row + UTF-8 byte offset); the highlight layer is
-	// rebuilt from the same line boxes the text renderer used.
-	struct Caret {
-		int Row = -1;
-		std::size_t Offset = 0;
-	};
-	Caret caretFromPoint(Rml::Vector2f point) const;
-	void clearSelection();
-	void copySelection();
-	void copyOutput();
-	void openContextMenu(Rml::Vector2f point);
-	void closeContextMenu();
-	void refreshSelectionOverlay(bool force = false);
+  // Selection. `caretFromPoint` maps a context-space point onto the
+  // laid-out output (row + UTF-8 byte offset); the highlight layer is
+  // rebuilt from the same line boxes the text renderer used.
+  struct Caret {
+    int Row = -1;
+    std::size_t Offset = 0;
+  };
+  Caret caretFromPoint(Rml::Vector2f point) const;
+  void clearSelection();
+  void copySelection();
+  void copyOutput();
+  void openContextMenu(Rml::Vector2f point);
+  void closeContextMenu();
+  void refreshSelectionOverlay(bool force = false);
 
-	// Interaction.
-	void submitFromEditor();
-	void openCompletionFor(const std::string& prefix);
-	// Live dropdown refresh while typing: recomputes the list for the current
-	// editor content without ever applying a completion (Tab/Enter do that).
-	void refreshSuggestions();
-	// Shared dropdown builder. `apply` = the Tab path (unique match completes
-	// in place, multiple matches extend to the common prefix); the live path
-	// only presents.
-	void rebuildCompletion(const std::string& prefix, bool apply);
-	void hideCompletion();
-	void applyCompletion(int index);
-	void openConfirm(const std::string& text, bool fromPaste);
-	void closeConfirm();
-	void executeConfirmed();
-	void answerUnknownCommand(const std::string& command);
-	void walkHistory(int delta);
+  // Interaction.
+  void submitFromEditor();
+  void openCompletionFor(const std::string &prefix);
+  // Live dropdown refresh while typing: recomputes the list for the current
+  // editor content without ever applying a completion (Tab/Enter do that).
+  void refreshSuggestions();
+  // Shared dropdown builder. `apply` = the Tab path (unique match completes
+  // in place, multiple matches extend to the common prefix); the live path
+  // only presents.
+  void rebuildCompletion(const std::string &prefix, bool apply);
+  void hideCompletion();
+  void applyCompletion(int index);
+  void openConfirm(const std::string &text, bool fromPaste);
+  void closeConfirm();
+  void executeConfirmed();
+  void answerUnknownCommand(const std::string &command);
+  void walkHistory(int delta);
 
-	WindowListener Listener;
-	KeyListener Keys;
-	ActionSink Sink;
-	SubmitSink Submit;
-	services::console::ConsoleBuffer* Buffer = nullptr;
-	const services::console::ConsoleBackend* Backend = nullptr;
+  WindowListener Listener;
+  KeyListener Keys;
+  ActionSink Sink;
+  SubmitSink Submit;
+  services::console::ConsoleBuffer *Buffer = nullptr;
+  const services::console::ConsoleBackend *Backend = nullptr;
 
-	// Projection cursor: the last projected buffer sequence and the buffer
-	// generation the DOM view belongs to (a Clear bump reseeds the view).
-	uint64_t ProjectedSequence = 0;
-	// Tail follow across the live frame ordering: an append arms it, the next
-	// render (fresh layout) applies it unless the reader scrolled up.
-	bool FollowPending = false;
-	float FollowFromScrollTop = 0.0f;
-	uint64_t ProjectedGeneration = 0;
-	// The pending multi-line text (confirm pane); empty = pane closed.
-	std::string PendingText;
-	bool PendingFromPaste = false;
-	// Completion state for the current editor content.
-	std::vector<std::string> Suggestions;
-	int SuggestionIndex = -1;
-	// History walk cursor: -1 = live editing, else an offset from the tail
-	// of the backend history; the draft restores on the way back down.
-	int HistoryCursor = -1;
-	std::string HistoryDraft;
-	// Set when the confirm pane consumed an ESC press (see consumeEscapeClaim).
-	bool EscapeClaimed = false;
-	// The visible rows' source text, index-aligned with the history's
-	// children (the DOM can be trimmed; this mirror trims with it).
-	std::vector<std::string> RowTexts;
-	ConsoleSelection Selection;
-	bool SelectionDirty = false;
-	bool ContextMenuOpen = false;
-	// Layout inputs of the last highlight build: a scroll, resize, append or
-	// trim invalidates the cached rectangles.
-	float SelectionScrollTop = -1.0f;
-	float SelectionScrollHeight = -1.0f;
-	float SelectionWidth = -1.0f;
+  // Projection cursor: the last projected buffer sequence and the buffer
+  // generation the DOM view belongs to (a Clear bump reseeds the view).
+  uint64_t ProjectedSequence = 0;
+  // Tail follow across the live frame ordering: an append arms it, the next
+  // render (fresh layout) applies it unless the reader scrolled up.
+  bool FollowPending = false;
+  float FollowFromScrollTop = 0.0f;
+  uint64_t ProjectedGeneration = 0;
+  // The pending multi-line text (confirm pane); empty = pane closed.
+  std::string PendingText;
+  bool PendingFromPaste = false;
+  // Completion state for the current editor content.
+  std::vector<std::string> Suggestions;
+  int SuggestionIndex = -1;
+  // History walk cursor: -1 = live editing, else an offset from the tail
+  // of the backend history; the draft restores on the way back down.
+  int HistoryCursor = -1;
+  std::string HistoryDraft;
+  // Set when the confirm pane consumed an ESC press (see consumeEscapeClaim).
+  bool EscapeClaimed = false;
+  // The visible rows' source text, index-aligned with the history's
+  // children (the DOM can be trimmed; this mirror trims with it).
+  std::vector<std::string> RowTexts;
+  ConsoleSelection Selection;
+  bool SelectionDirty = false;
+  bool ContextMenuOpen = false;
+  // Layout inputs of the last highlight build: a scroll, resize, append or
+  // trim invalidates the cached rectangles.
+  float SelectionScrollTop = -1.0f;
+  float SelectionScrollHeight = -1.0f;
+  float SelectionWidth = -1.0f;
 };
 
-}
+} // namespace panels::console

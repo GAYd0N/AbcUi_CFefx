@@ -10,14 +10,15 @@
 
 namespace panels {
 
-class WeaponStackPanel : public framework::HudPanel, public framework::StackBase {
+class WeaponStackPanel : public framework::HudPanel,
+                         public framework::StackBase {
 public:
-	WeaponStackPanel();
+  WeaponStackPanel();
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
-	void reset() override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
+  void reset() override;
 };
 
-}
+} // namespace panels

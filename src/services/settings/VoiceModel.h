@@ -31,67 +31,83 @@ namespace settings {
 
 class VoiceModel {
 public:
-	struct Seams {
-		// All null-safe: a null tweakInterface fails the section closed.
-		void* (*tweakInterface)() = nullptr;              // pVoiceTweak
-		int (*startTest)() = nullptr;                     // StartVoiceTweakMode (0 on error)
-		void (*stopTest)() = nullptr;                     // EndVoiceTweakMode
-		float (*getControl)(int which) = nullptr;         // GetControlFloat
-		bool (*setControl)(int which, float value) = nullptr; // SetControlFloat
-		int (*speakingVolume)() = nullptr;                // GetSpeakingVolume 0..255
-	};
+  struct Seams {
+    // All null-safe: a null tweakInterface fails the section closed.
+    void *(*tweakInterface)() = nullptr; // pVoiceTweak
+    int (*startTest)() = nullptr;        // StartVoiceTweakMode (0 on error)
+    void (*stopTest)() = nullptr;        // EndVoiceTweakMode
+    float (*getControl)(int which) = nullptr;             // GetControlFloat
+    bool (*setControl)(int which, float value) = nullptr; // SetControlFloat
+    int (*speakingVolume)() = nullptr; // GetSpeakingVolume 0..255
+  };
 
-	void setSeams(const Seams& seams) { Seams_ = seams; }
+  void setSeams(const Seams &seams) {
+    Seams_ = seams;
+  }
 
-	// Reads the interface availability and the current control floats. A
-	// null interface leaves the section unavailable (kUnavailable).
-	void snapshot();
+  // Reads the interface availability and the current control floats. A
+  // null interface leaves the section unavailable (kUnavailable).
+  void snapshot();
 
-	bool available() const { return Available_; }
+  bool available() const {
+    return Available_;
+  }
 
-	// Mic transmit volume, engine scale 0..1 (the original page displays
-	// x100; the page maps, the model keeps engine units).
-	float micVolume() const { return MicVolume_; }
-	// Boost state (0/1).
-	bool micBoost() const { return MicBoost_; }
+  // Mic transmit volume, engine scale 0..1 (the original page displays
+  // x100; the page maps, the model keeps engine units).
+  float micVolume() const {
+    return MicVolume_;
+  }
+  // Boost state (0/1).
+  bool micBoost() const {
+    return MicBoost_;
+  }
 
-	// Draft edits (nothing reaches the device until apply()).
-	void setMicVolumeDraft(float value);
-	void setMicBoostDraft(bool value);
-	float micVolumeDraft() const { return MicVolumeDraft_; }
-	bool micBoostDraft() const { return MicBoostDraft_; }
-	bool micDirty() const;
-	bool micBoostDirty() const;
-	bool isDirty() const { return micDirty() || micBoostDirty(); }
+  // Draft edits (nothing reaches the device until apply()).
+  void setMicVolumeDraft(float value);
+  void setMicBoostDraft(bool value);
+  float micVolumeDraft() const {
+    return MicVolumeDraft_;
+  }
+  bool micBoostDraft() const {
+    return MicBoostDraft_;
+  }
+  bool micDirty() const;
+  bool micBoostDirty() const;
+  bool isDirty() const {
+    return micDirty() || micBoostDirty();
+  }
 
-	// Apply = SetControlFloat + read-back. A refused write or a disagreeing
-	// read-back keeps the draft and returns false (the page reports the
-	// failure; no fake success). The device floats carry NO persistence -
-	// they are hardware state by definition.
-	bool applyMicVolume();
-	bool applyMicBoost();
+  // Apply = SetControlFloat + read-back. A refused write or a disagreeing
+  // read-back keeps the draft and returns false (the page reports the
+  // failure; no fake success). The device floats carry NO persistence -
+  // they are hardware state by definition.
+  bool applyMicVolume();
+  bool applyMicBoost();
 
-	// Microphone test session: one start, guaranteed stop. start() fails
-	// when the interface is missing or the engine refuses the mode; the
-	// level is 0 while not testing.
-	bool startTest();
-	void stopTest();
-	bool testing() const { return Testing_; }
-	// Live input level 0..1 from GetSpeakingVolume (0..255). Not animated,
-	// not sampled while the session is down - the raw engine answer.
-	float speakingLevel() const;
+  // Microphone test session: one start, guaranteed stop. start() fails
+  // when the interface is missing or the engine refuses the mode; the
+  // level is 0 while not testing.
+  bool startTest();
+  void stopTest();
+  bool testing() const {
+    return Testing_;
+  }
+  // Live input level 0..1 from GetSpeakingVolume (0..255). Not animated,
+  // not sampled while the session is down - the raw engine answer.
+  float speakingLevel() const;
 
 private:
-	Seams Seams_;
-	bool Available_ = false;
-	float MicVolume_ = 0.0f;
-	bool MicBoost_ = false;
-	float MicVolumeDraft_ = 0.0f;
-	bool MicBoostDraft_ = false;
-	bool MicVolumeDirty_ = false;
-	bool MicBoostDirty_ = false;
-	bool Testing_ = false;
+  Seams Seams_;
+  bool Available_ = false;
+  float MicVolume_ = 0.0f;
+  bool MicBoost_ = false;
+  float MicVolumeDraft_ = 0.0f;
+  bool MicBoostDraft_ = false;
+  bool MicVolumeDirty_ = false;
+  bool MicBoostDirty_ = false;
+  bool Testing_ = false;
 };
 
-}
-}
+} // namespace settings
+} // namespace services

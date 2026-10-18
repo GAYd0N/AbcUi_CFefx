@@ -10,23 +10,28 @@ namespace services::serverbrowser {
 
 class ServerBrowserSession {
 public:
-	ServerBrowserSession() = default;
-	ServerBrowserSession(const ServerBrowserSession&) = delete;
-	ServerBrowserSession& operator=(const ServerBrowserSession&) = delete;
-	void setProvider(IServerQueryProvider* Provider) { Backend = Provider; }
-	void setBlacklist(ServerBlacklist* Value) { Blacklist = Value; List.setBlacklist(Value); }
-	void startContext();
-	void closeContext();
+  ServerBrowserSession() = default;
+  ServerBrowserSession(const ServerBrowserSession &) = delete;
+  ServerBrowserSession &operator=(const ServerBrowserSession &) = delete;
+  void setProvider(IServerQueryProvider *Provider) {
+    Backend = Provider;
+  }
+  void setBlacklist(ServerBlacklist *Value) {
+    Blacklist = Value;
+    List.setBlacklist(Value);
+  }
+  void startContext();
+  void closeContext();
 
-	ServerQuery Query;
-	ServerListModel List;
-	bool Presented = false;
-	bool Open = false;
-	QueryStatus LastStatus = QueryStatus::Idle;
+  ServerQuery Query;
+  ServerListModel List;
+  bool Presented = false;
+  bool Open = false;
+  QueryStatus LastStatus = QueryStatus::Idle;
 
 private:
-	IServerQueryProvider* Backend = nullptr;
-	ServerBlacklist* Blacklist = nullptr;
+  IServerQueryProvider *Backend = nullptr;
+  ServerBlacklist *Blacklist = nullptr;
 };
 
-}
+} // namespace services::serverbrowser

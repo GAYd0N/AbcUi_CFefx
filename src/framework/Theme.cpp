@@ -3,7 +3,7 @@
 
 #include <RmlUi/Core/Context.h>
 
-#include "render/Render.h"
+#include "ScreenMetrics.h"
 
 #include <algorithm>
 
@@ -15,19 +15,17 @@ namespace {
 float CurrentScale = 1.0f;
 }
 
-void applyScale(Rml::Context* context) {
-	const float height = abc::MetaRenderer()
-		? static_cast<float>(abc::MetaRenderer()->GetSwapChainHeight())
-		: 480.0f;
-	CurrentScale = std::clamp(height / 480.0f, 0.25f, 8.0f);
-	if (context)
-		context->SetDensityIndependentPixelRatio(CurrentScale);
+void applyScale(Rml::Context *context) {
+  const float height = static_cast<float>(framework::ScreenHeight());
+  CurrentScale = std::clamp(height / 480.0f, 0.25f, 8.0f);
+  if (context)
+    context->SetDensityIndependentPixelRatio(CurrentScale);
 }
 
 float scale() {
-	return CurrentScale;
+  return CurrentScale;
 }
 
-}
+} // namespace Theme
 
-}
+} // namespace framework

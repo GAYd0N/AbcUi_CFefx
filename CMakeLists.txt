@@ -15,6 +15,11 @@ if(NOT EXISTS "${ABC_CORE_DIR}/CMakeLists.txt")
 endif()
 add_subdirectory("${ABC_CORE_DIR}" AbcCore-build)
 
+# AbcUi and AbcCore.dll must share one CRT heap. Pin the core target
+# explicitly so a sibling or aggregate-source checkout always builds /MD.
+set_target_properties(abc_core PROPERTIES
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+
 # Renderer public interfaces are a direct AbcUi dependency. AbcCore deliberately
 # stays renderer-free so non-UI consumers do not inherit the Renderer checkout.
 set(ABCUI_RENDERER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/Renderer")
@@ -80,21 +85,22 @@ add_library(AbcUi MODULE
     src/CoreGlobals.cpp
     src/hooks.cpp
     src/render/Render.cpp
+    src/render/ScreenMetrics.cpp
     src/rmlui/AbcRenderInterface.cpp
     src/rmlui/model/ElementModel.cpp
     src/rmlui/backdrop/ElementBackdrop.cpp
     src/rmlui/video/ElementVideo.cpp
-    src/services/menubackdrop/Backdrop.cpp
+    src/rmlui/backdrop/Backdrop.cpp
     src/services/menumusic/MenuMusic.cpp
     src/services/friends/FriendsModel.cpp
     src/services/friends/FriendsSteam.cpp
-    src/services/modelpreview/Options.cpp
-    src/services/modelpreview/Target.cpp
+    src/rmlui/modelpreview/Options.cpp
+    src/rmlui/modelpreview/Target.cpp
     src/services/video/Decoder.cpp
     src/services/video/AsyncDecoder.cpp
     src/services/video/Options.cpp
-    src/services/video/VideoTexture.cpp
-    src/services/texture/DynamicTexture.cpp
+    src/rmlui/video/VideoTexture.cpp
+    src/rmlui/texture/DynamicTexture.cpp
     src/services/filedialog/FileBrowser.cpp
     src/services/spray/Encoder.cpp
     src/modules/modeltest/ModelTest.cpp
@@ -105,15 +111,18 @@ add_library(AbcUi MODULE
     src/rmlui/NativeEntryCallbacks.cpp
     src/rmlui/PaintGate.cpp
     src/rmlui/RmlUiModule.cpp
-    src/rmlui/ProbeCommand.cpp
+    src/modules/gameui/debug/ProbeCommand.cpp
     src/rmlui/TextInput.cpp
+    src/rmlui/TextureChannel.cpp
+    src/rmlui/LanguageChannel.cpp
     src/rmlui/SourceSpewStub.cpp
-    src/rmlui/SteamAPI.cpp
-    src/rmlui/SteamApiBridge.cpp
-    src/rmlui/SteamApiNative.cpp
+    src/services/steam/SteamAPI.cpp
+    src/services/steam/SteamApiBridge.cpp
+    src/services/steam/SteamApiNative.cpp
     src/rmlui/VGUI2ExtensionImport.cpp
     src/framework/Assets.cpp
     src/framework/ResourceFile.cpp
+    src/framework/ShellActions.cpp
     src/framework/Commands.cpp
     src/framework/FatalExit.cpp
     src/framework/TextEncoding.cpp
@@ -124,17 +133,18 @@ add_library(AbcUi MODULE
     src/framework/InteractiveDocument.cpp
     src/framework/UiInputRouter.cpp
     src/framework/Localization.cpp
-    src/data/Avatars.cpp
+    src/rmlui/texture/Avatars.cpp
     src/data/HudState.cpp
     src/data/NetworkMessages.cpp
     src/data/PlayerResource.cpp
     src/data/PlayerTrace.cpp
-    src/data/SpriteResource.cpp
-    src/data/SpriteUri.cpp
+    src/rmlui/texture/SpriteResource.cpp
+    src/rmlui/texture/SpriteUri.cpp
     src/data/TextFeed.cpp
     src/data/TeamResource.cpp
     src/data/WeaponResource.cpp
     src/modules/UiModuleRegistry.cpp
+    src/modules/HudPanelCatalog.cpp
     src/modules/gameui/GameUiModule.cpp
     src/modules/gameui/lifecycle/Frame.cpp
     src/modules/gameui/lifecycle/BackgroundWork.cpp
@@ -146,7 +156,7 @@ add_library(AbcUi MODULE
     src/modules/gameui/navigation/MenuAction.cpp
     src/modules/gameui/input/MenuInput.cpp
     src/modules/gameui/settings/SettingsFlow.cpp
-    src/modules/gameui/settings/SprayMakerFlow.cpp
+    src/modules/gameui/settings/SprayMaker.cpp
     src/modules/gameui/settings/VideoFlow.cpp
     src/modules/gameui/serverbrowser/ServerBrowserFlow.cpp
     src/modules/gameui/creategame/CreateGameFlow.cpp
@@ -188,6 +198,7 @@ add_library(AbcUi MODULE
     src/services/loading/LoadingModel.cpp
     src/services/loading/AutoRetryGate.cpp
     src/services/settings/SettingsModel.cpp
+    src/services/settings/UserScrParser.cpp
     src/services/settings/KeyBindModel.cpp
     src/services/settings/VideoModeModel.cpp
     src/services/settings/VideoPendingStore.cpp
@@ -197,6 +208,7 @@ add_library(AbcUi MODULE
     src/framework/PanelManagerLifecycle.cpp
     src/framework/Theme.cpp
     src/framework/StackBase.cpp
+    src/framework/GlyphText.cpp
     src/framework/Projection.cpp
     src/panels/ammostack/AmmoStackPanel.cpp
     src/panels/ammobar/AmmoBarPanel.cpp
@@ -249,9 +261,11 @@ add_library(AbcUi MODULE
     # Generic CreateInterface export (EXPOSE_SINGLE_INTERFACE implementation)
     "${METAHOOK_INCLUDE_DIR}/HLSDK/common/interface.cpp"
 )
-target_compile_definitions(AbcUi PRIVATE WIN32 _WINDOWS _USRDLL _CRT_SECURE_NO_WARNINGS)
+target_compile_definitions(AbcUi PRIVATE WIN32 _WINDOWS _USRDLL _CRT_SECURE_NO_WARNINGS NOMINMAX)
+target_compile_options(AbcUi PRIVATE /W4)
 target_compile_options(AbcUi PRIVATE /FIabc/ForceImport.h)
 # imm32: T07 IME placement/cancel (ImmSetCompositionWindow / ImmNotifyIME).
+target_compile_definitions(AbcUi PRIVATE ABC_CORE_STATIC)
 target_link_libraries(AbcUi PRIVATE Abc::Core RmlUi::RmlUi FreeImage imm32 abc_ui_config)
 
 # Renderer's gl_common constants are the source of truth for the render vertex

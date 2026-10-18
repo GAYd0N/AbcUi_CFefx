@@ -33,35 +33,36 @@ bool available();
 // Texture channel (ids live in the surface texture namespace that
 // IMetaRenderer's DrawTexturedRect consumes). Returns 0 when unavailable.
 int createTexture();
-void uploadTexture(int textureId, const unsigned char* rgba, int width, int height);
+void uploadTexture(int textureId, const unsigned char *rgba, int width,
+                   int height);
 void deleteTextureById(int textureId);
 
 // Cursor state for InputBridge (window/pixel coords, y-down). Returns false
 // when unavailable.
-bool getCursorPos(int& x, int& y);
+bool getCursorPos(int &x, int &y);
 bool isCursorVisible();
 
 // Game language setting ("english"/"schinese"/...), empty when unavailable.
-const char* currentLanguage();
+const char *currentLanguage();
 
 // IGameUIFuncs::Key_NameForKey (engine factory) - the display name for an
 // engine keynum, "" when unavailable (vote panel yes/no labels).
-const char* keyNameForKey(int keynum);
+const char *keyNameForKey(int keynum);
 
 // T11: IGameUIFuncs::Key_BindingForKey (vtable slot 3; hw.dll 0x01dbd2b0
 // reads the same key table the `bind` command writes) - the command bound
 // to a keynum, "" / null when unbound or unavailable.
-const char* keyBindingForKey(int keynum);
+const char *keyBindingForKey(int keynum);
 
 // T11: IGameUIFuncs::Key_KeyStringToKeyNum (vtable slot 9) - the keynum for
 // a key name, -1 for unknown / unavailable.
-int keyStringToKeyNum(const char* name);
+int keyStringToKeyNum(const char *name);
 
 // T13: IGameUIFuncs::IsKeyDown (vtable slot 1, hw.dll 0x01dbd370) - the
 // button-state query behind the original voice/mouse command toggles
 // ("in_mlook"/"in_jlook"). false when the interface is missing or the
 // engine rejects the name (fail-closed: the row then reads as off).
-bool isKeyDown(const char* name);
+bool isKeyDown(const char *name);
 
 // T14: the loading surfaces' password prompt. Sven's engine asks for a server
 // password through IGameUI slot +0x58 (CGameUI::ShowServerPasswordDialog,
@@ -79,26 +80,26 @@ void uninstallGameUiLoadingHook();
 // loading progress/status/failure strings the shipped dialog displays). ""
 // when the token is unknown or the interface is missing - the caller keeps
 // the raw text in that case (never a silently blanked line).
-std::string localizeToken(const char* token);
+std::string localizeToken(const char *token);
 
 namespace video {
 struct Mode {
-	int Width = 0;
-	int Height = 0;
-	int Bpp = 0;
+  int Width = 0;
+  int Height = 0;
+  int Bpp = 0;
 };
-}
+} // namespace video
 
 // T12: IGameUIFuncs::GetCurrentVideoMode / GetCurrentRenderer (slots 6/7;
 // hw.dll 0x01dbd2f0/0x01dbd310) - the ACTUAL current mode plus the windowed
 // flag. false when the engine interface is unavailable or the mode is
 // unreadable.
-bool currentVideoMode(int& width, int& height, int& bpp, bool& windowed);
+bool currentVideoMode(int &width, int &height, int &bpp, bool &windowed);
 
 // T12: IGameUIFuncs::GetVideoModes (slot 5; hw.dll 0x01dbd2d0) - copies up
 // to `max` enumerated modes, returns the full enumerated count (0 when
 // unavailable). The caller owns the buffer.
-int videoModeList(video::Mode* out, int max);
+int videoModeList(video::Mode *out, int max);
 
 // Selects and locks the native arrow without moving it. Owned by the
 // router's exclusive edge, shared by menus and interactive HUD owners.
@@ -131,4 +132,4 @@ bool nativeCallbacksRegistered();
 // unavailable (logged once; the callers still lower their own state).
 bool hideGameUi();
 
-}
+} // namespace vgui2ext

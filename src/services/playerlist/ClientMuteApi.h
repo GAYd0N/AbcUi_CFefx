@@ -8,19 +8,21 @@ namespace services::playerlist {
 
 class ClientMuteApi {
 public:
-	bool attach(void* Object);
-	bool available() const { return Object_ != nullptr; }
-	bool isMuted(int Index) const;
-	bool mute(int Index) const;
-	bool unmute(int Index) const;
+  bool attach(void *Object);
+  bool available() const {
+    return Object_ != nullptr;
+  }
+  bool isMuted(int Index) const;
+  bool mute(int Index) const;
+  bool unmute(int Index) const;
 
 private:
-	using QueryFn = bool (__thiscall*)(void*, int);
-	using SetFn = void (__thiscall*)(void*, int);
-	void* Object_ = nullptr;
-	QueryFn Query = nullptr;
-	SetFn SetMuted = nullptr;
-	SetFn SetUnmuted = nullptr;
+  using QueryFn = bool(__thiscall *)(void *, int);
+  using SetFn = void(__thiscall *)(void *, int);
+  void *Object_ = nullptr;
+  QueryFn Query = nullptr;
+  SetFn SetMuted = nullptr;
+  SetFn SetUnmuted = nullptr;
 };
 
-}
+} // namespace services::playerlist

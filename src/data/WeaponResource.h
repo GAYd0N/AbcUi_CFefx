@@ -16,6 +16,7 @@
 // Sprite sources: sprites/<sprName>.txt parsed via SPR_GetList, atlas file +
 // rect stored per slot; panels build spricon:// URIs through data::sprites.
 
+#include <cstddef>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -32,48 +33,48 @@ constexpr size_t kInvalidWeaponSlot = kMaxWeaponSlot + 1;
 
 // Old CAmmoPanel::WEAPONSTATE - CurWeapon state bits the AmmoBar keys on.
 enum WeaponState {
-	kWeaponStateNotValid = 0,
-	kWeaponStateValid = 1 << 0,
-	kWeaponStateOnTarget = 1 << 1,
-	kWeaponStateUzi = 1 << 2,
+  kWeaponStateNotValid = 0,
+  kWeaponStateValid = 1 << 0,
+  kWeaponStateOnTarget = 1 << 1,
+  kWeaponStateUzi = 1 << 2,
 };
 
 // Old ITEM_FLAGS (subset the registry logic uses).
 enum ItemFlags {
-	kItemFlagSelectOnEmpty = 1 << 0,
-	kItemFlagExhaustible = 1 << 4,
+  kItemFlagSelectOnEmpty = 1 << 0,
+  kItemFlagExhaustible = 1 << 4,
 };
 
 struct Weapon {
-	std::string name;
-	std::string sprName;
-	int ammoType = -1;
-	int ammo2Type = -1;
-	int max1 = -1;
-	int max2 = -1;
-	int slot = 0;
-	int slotPos = 0;
-	int flags = 0;
-	int id = 0;
-	int clip = 0;
-	int clip2 = 0;
-	int state = 0;
+  std::string name;
+  std::string sprName;
+  int ammoType = -1;
+  int ammo2Type = -1;
+  int max1 = -1;
+  int max2 = -1;
+  int slot = 0;
+  int slotPos = 0;
+  int flags = 0;
+  int id = 0;
+  int clip = 0;
+  int clip2 = 0;
+  int state = 0;
 
-	// Sprite source (sprites/<atlas> crop). invalid = the entry was missing
-	// from the weapon's sprite list.
-	struct SpriteSource {
-		std::string atlas;
-		wrect_t rect{};
-		bool valid = false;
-	};
-	SpriteSource active;         // "weapon_s"
-	SpriteSource inactive;       // "weapon"
-	SpriteSource ammo;           // "ammo"
-	SpriteSource ammo2;          // "ammo2" (falls back to "ammo")
-	SpriteSource crosshair;      // batch B
-	SpriteSource autoaim;        // batch B
-	SpriteSource zoomedCrosshair;
-	SpriteSource zoomedAutoaim;
+  // Sprite source (sprites/<atlas> crop). invalid = the entry was missing
+  // from the weapon's sprite list.
+  struct SpriteSource {
+    std::string atlas;
+    wrect_t rect{};
+    bool valid = false;
+  };
+  SpriteSource active;    // "weapon_s"
+  SpriteSource inactive;  // "weapon"
+  SpriteSource ammo;      // "ammo"
+  SpriteSource ammo2;     // "ammo2" (falls back to "ammo")
+  SpriteSource crosshair; // batch B
+  SpriteSource autoaim;   // batch B
+  SpriteSource zoomedCrosshair;
+  SpriteSource zoomedAutoaim;
 };
 
 // HUD_Init-time: subscribes the netmsg weapon feed. Idempotent.
@@ -81,32 +82,32 @@ void init();
 // Map transition (HUD_VidInit chain): registry starts from scratch.
 void reset();
 // Prediction sync (HUD_TxferPredictionData chain): ownership + clip diff.
-void onTxferPredictionData(const weapon_data_s* weaponDataArray);
+void onTxferPredictionData(const weapon_data_s *weaponDataArray);
 
-const Weapon* getWeapon(int id);
-const Weapon* getWeapon(const char* name);
-const Weapon* getWeapon(int slot, int pos);
+const Weapon *getWeapon(int id);
+const Weapon *getWeapon(const char *name);
+const Weapon *getWeapon(int slot, int pos);
 // Every registered weapon (server WeaponList entries); the UI enumerates this
 // instead of assuming the weapon id is a dense array index.
-std::vector<const Weapon*> allWeapons();
+std::vector<const Weapon *> allWeapons();
 bool hasWeapon(int slot, int pos);
 // Ownership check for a registry weapon (old m_pOwnedWeaponData membership).
-bool isOwned(const Weapon* weapon);
-const Weapon* currentWeapon();
+bool isOwned(const Weapon *weapon);
+const Weapon *currentWeapon();
 
 // Old hud_fastswitch read (SetSelectWeapon/ShouldDraw gate).
 bool fastSwitchOn();
 
 int countAmmo(int ammoType);
 // Old HasAmmo: unlimited weapons (max1/max2 == -1) always true.
-bool hasAmmo(const Weapon* weapon);
+bool hasAmmo(const Weapon *weapon);
 // Old GetAmmoPicFromWeapon: icon source of the ammo type, from any weapon
 // using it. Returns false when no weapon carries the type.
-bool ammoIcon(int ammoType, std::string& atlas, wrect_t& rect);
+bool ammoIcon(int ammoType, std::string &atlas, wrect_t &rect);
 
 #pragma region slot selection (batch C, WeaponChoose data feed)
 // The UI selection highlight (old m_pNowSelected) and its slot.
-const Weapon* selectedWeapon();
+const Weapon *selectedWeapon();
 int selectedSlot();
 
 // Old SelectSlot: slot keys enter a slot (then cycle within it), the
@@ -117,10 +118,14 @@ int selectedSlot();
 void selectSlot(int slot, int advance, bool wheel);
 
 // Selection/ownership feeds for the WeaponChoose UI.
-extern abc::CallbackList<void(const Weapon*)> ChooseWeapon; // highlight changed
-extern abc::CallbackList<void(const Weapon*)> PickupWeapon;
-extern abc::CallbackList<void(const Weapon*)> DropWeapon;
+extern abc::CallbackList<void(const Weapon *)>
+    ChooseWeapon; // highlight changed
+// hud_fastswitch requested an immediate weapon change. The engine command is
+// sent by the UI/module subscriber, never by this data registry.
+extern abc::CallbackList<void(const Weapon *)> FastSwitchWeapon;
+extern abc::CallbackList<void(const Weapon *)> PickupWeapon;
+extern abc::CallbackList<void(const Weapon *)> DropWeapon;
 extern abc::CallbackList<void()> DropAllWeapons;
 #pragma endregion
 
-}
+} // namespace weaponres

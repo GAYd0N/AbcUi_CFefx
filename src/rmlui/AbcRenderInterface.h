@@ -18,7 +18,8 @@
 //   the sprite's black background and lets the Rml opacity transition ride
 //   the same alpha term (old panel-alpha fade).
 // - Rml texture handles are opaque per-load records, separate from engine IDs.
-//   Sprite/avatar caches own their IDs until shutdown; file/font records own theirs.
+//   Sprite/avatar caches own their IDs until shutdown; file/font records own
+//   theirs.
 // - Scissor (Spike R-1): IMetaRenderer has no glScissor equivalent, but
 //   Set2DEx(x, y, w, h) installs viewport = rect AND an ortho projection
 //   mapping local (0..w, 0..h) into it; rasterization outside a viewport is
@@ -46,12 +47,16 @@
 //   RenderManager identity reset whenever the next element is untransformed,
 //   so nothing lingers across the frame.
 // - Extra texture URIs handled here:
+//     tex://<mod-relative path>    -> file loaded straight-alpha. The scheme
+//     keeps Rml from joining the document directory, so markup composed in
+//     code resolves from any document (framework::glyphs outline layer).
 //     texadd://<mod-relative path> -> file loaded additive (old
-//     kRenderTransAdd TGA panels: the pain indicator).
+//     kRenderTransAdd TGA panels: the pain indicator; the additive glyph ink).
 
 #include <RmlUi/Core/RenderInterface.h>
 #include <RmlUi/Core/Types.h>
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -61,115 +66,129 @@ namespace rmlui {
 
 class AbcRenderInterface : public Rml::RenderInterface {
 public:
-	AbcRenderInterface() = default;
-	~AbcRenderInterface() override;
+  AbcRenderInterface() = default;
+  ~AbcRenderInterface() override;
 
-	// Bracket one render pass (see header note on 2D state ownership).
-	void beginFrame();
-	void endFrame();
+  // Bracket one render pass (see header note on 2D state ownership).
+  void beginFrame();
+  void endFrame();
 
-	// Rml::RenderInterface - required set.
-	Rml::CompiledGeometryHandle CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices) override;
-	void RenderGeometry(Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation, Rml::TextureHandle texture) override;
-	void ReleaseGeometry(Rml::CompiledGeometryHandle geometry) override;
+  // Rml::RenderInterface - required set.
+  Rml::CompiledGeometryHandle
+  CompileGeometry(Rml::Span<const Rml::Vertex> vertices,
+                  Rml::Span<const int> indices) override;
+  void RenderGeometry(Rml::CompiledGeometryHandle geometry,
+                      Rml::Vector2f translation,
+                      Rml::TextureHandle texture) override;
+  void ReleaseGeometry(Rml::CompiledGeometryHandle geometry) override;
 
-	Rml::TextureHandle LoadTexture(Rml::Vector2i& dimensions, const Rml::String& source) override;
-	Rml::TextureHandle GenerateTexture(Rml::Span<const Rml::byte> source, Rml::Vector2i dimensions) override;
-	void ReleaseTexture(Rml::TextureHandle texture) override;
+  Rml::TextureHandle LoadTexture(Rml::Vector2i &dimensions,
+                                 const Rml::String &source) override;
+  Rml::TextureHandle GenerateTexture(Rml::Span<const Rml::byte> source,
+                                     Rml::Vector2i dimensions) override;
+  void ReleaseTexture(Rml::TextureHandle texture) override;
 
-	void EnableScissorRegion(bool enable) override;
-	void SetScissorRegion(Rml::Rectanglei region) override;
-	void SetTransform(const Rml::Matrix4f* transform) override;
+  void EnableScissorRegion(bool enable) override;
+  void SetScissorRegion(Rml::Rectanglei region) override;
+  void SetTransform(const Rml::Matrix4f *transform) override;
 
-	// Forgets the additive-texture marks (SpriteResource bulk-deletes its
-	// textures outside RmlUi on shutdown - stale ids must not tint regular
-	// textures that later reuse them).
-	void clearAdditiveTextures();
+  // Forgets the additive-texture marks (SpriteResource bulk-deletes its
+  // textures outside RmlUi on shutdown - stale ids must not tint regular
+  // textures that later reuse them).
+  void clearAdditiveTextures();
 
-	// Externally-owned live texture (batch D - the radar FBO). Requests whose
-	// source starts with `uriPrefix` resolve to `texture` (never deleted by
-	// ReleaseTexture; the owner frees it), carry the given pixel dimensions,
-	// and draw through *maskSlot as a mask texture whenever it is non-zero
-	// (radar shape select) - the old CRadarMapImage::Paint semantics. The
-	// query suffix on the URI is a cache-bust only (the FBO texture id
-	// changes when the engine regenerates frame buffers; the owner bumps the
-	// suffix and re-registers).
-	void registerExternalTexture(const Rml::String& uriPrefix, Rml::TextureHandle texture,
-		int width, int height, const int* maskSlot, bool premultiplied = false);
-	void unregisterExternalTexture(const Rml::String& uriPrefix);
+  // Externally-owned live texture (batch D - the radar FBO). Requests whose
+  // source starts with `uriPrefix` resolve to `texture` (never deleted by
+  // ReleaseTexture; the owner frees it), carry the given pixel dimensions,
+  // and draw through *maskSlot as a mask texture whenever it is non-zero
+  // (radar shape select) - the old CRadarMapImage::Paint semantics. The
+  // query suffix on the URI is a cache-bust only (the FBO texture id
+  // changes when the engine regenerates frame buffers; the owner bumps the
+  // suffix and re-registers).
+  void registerExternalTexture(const Rml::String &uriPrefix,
+                               Rml::TextureHandle texture, int width,
+                               int height, const int *maskSlot,
+                               bool premultiplied = false);
+  void unregisterExternalTexture(const Rml::String &uriPrefix);
 
 private:
-	// Renderer-native baked vertex shapes, mirroring texturedrectvertex_t /
-	// filledrectvertex_t from render/RenderCommon.h byte for byte (float[2]/
-	// float[4] members = vec2_t/vec4_t). Kept local so the engine headers
-	// stay on the .cpp side of the seam; the static_asserts there pin the
-	// layout, so a Renderer-side drift cannot pass silently (R-14 lesson).
-	struct BakedTexturedVertex {
-		float pos[2];
-		float texcoord[2];
-		float col[4];
-	};
-	struct BakedFilledVertex {
-		float pos[2];
-		float col[4];
-	};
+  // Renderer-native baked vertex shapes, mirroring texturedrectvertex_t /
+  // filledrectvertex_t from render/RenderCommon.h byte for byte (float[2]/
+  // float[4] members = vec2_t/vec4_t). Kept local so the engine headers
+  // stay on the .cpp side of the seam; the static_asserts there pin the
+  // layout, so a Renderer-side drift cannot pass silently (R-14 lesson).
+  struct BakedTexturedVertex {
+    float pos[2];
+    float texcoord[2];
+    float col[4];
+  };
+  struct BakedFilledVertex {
+    float pos[2];
+    float col[4];
+  };
 
-	struct CompiledGeometry {
-		// Positions stay in Rml space (translation is per-render-call and
-		// rides the world matrix); colours are converted at compile time.
-		std::vector<BakedTexturedVertex> Textured;
-		std::vector<uint32_t> Indices;
-		// Untextured draws need the 16-byte filled shape; baked lazily on the
-		// first untextured draw and reused (solid-colour meshes draw every
-		// frame, and the texture of a mesh never changes after RmlUi built it).
-		std::vector<BakedFilledVertex> Filled;
-	};
+  struct CompiledGeometry {
+    // Positions stay in Rml space (translation is per-render-call and
+    // rides the world matrix); colours are converted at compile time.
+    std::vector<BakedTexturedVertex> Textured;
+    std::vector<uint32_t> Indices;
+    // Untextured draws need the 16-byte filled shape; baked lazily on the
+    // first untextured draw and reused (solid-colour meshes draw every
+    // frame, and the texture of a mesh never changes after RmlUi built it).
+    std::vector<BakedFilledVertex> Filled;
+  };
 
-	// Applies the active Rml transform (if any) to a screen-space point.
-	Rml::Vector2f applyTransform(const Rml::Vector2f& point) const;
-	// File decode behind both the plain-path and texadd:// calls goes
-	// through framework::ImageLoader (FreeImage); this wrapper uploads the
-	// result to the VGUI2 surface texture channel.
-	Rml::TextureHandle loadFileTexture(Rml::Vector2i& dimensions, const Rml::String& source);
-	// Uploads pixels through the VGUI2 surface texture channel, ending any
-	// active 2D pass first (surface uploads are not re-entrant with the
-	// renderer's batched pass - see the .cpp note). 0 = upload unavailable.
-	int uploadSurfaceTexture(const unsigned char* rgba, int width, int height);
+  // Applies the active Rml transform (if any) to a screen-space point.
+  Rml::Vector2f applyTransform(const Rml::Vector2f &point) const;
+  // File decode behind both the plain-path and texadd:// calls goes
+  // through framework::ImageLoader (FreeImage); this wrapper uploads the
+  // result to the VGUI2 surface texture channel.
+  Rml::TextureHandle loadFileTexture(Rml::Vector2i &dimensions,
+                                     const Rml::String &source);
+  // Uploads pixels through the VGUI2 surface texture channel, ending any
+  // active 2D pass first (surface uploads are not re-entrant with the
+  // renderer's batched pass - see the .cpp note). 0 = upload unavailable.
+  int uploadSurfaceTexture(const unsigned char *rgba, int width, int height);
 
-	// External live textures (see registerExternalTexture) plus the handles
-	// this interface created itself through the VGUI surface channel: only
-	// owned handles may be deleted on ReleaseTexture (external ones - the
-	// radar FBO - belong to their owner).
-	struct ExternalTexture {
-		Rml::TextureHandle Texture = 0;
-		int Width = 0;
-		int Height = 0;
-		const int* MaskSlot = nullptr;
-		bool Premultiplied = false;
-	};
-	std::unordered_map<Rml::String, ExternalTexture> ExternalTextures;
-	struct TextureRecord { int Id; bool Owned; Rml::String ExternalPrefix; };
-		std::unordered_map<Rml::TextureHandle, TextureRecord> Textures;
-		Rml::TextureHandle NextTexture = 1;
-		Rml::TextureHandle retainTexture(int id, bool owned, Rml::String external = {});
+  // External live textures (see registerExternalTexture) plus the handles
+  // this interface created itself through the VGUI surface channel: only
+  // owned handles may be deleted on ReleaseTexture (external ones - the
+  // radar FBO - belong to their owner).
+  struct ExternalTexture {
+    Rml::TextureHandle Texture = 0;
+    int Width = 0;
+    int Height = 0;
+    const int *MaskSlot = nullptr;
+    bool Premultiplied = false;
+  };
+  std::unordered_map<Rml::String, ExternalTexture> ExternalTextures;
+  struct TextureRecord {
+    int Id;
+    bool Owned;
+    Rml::String ExternalPrefix;
+  };
+  std::unordered_map<Rml::TextureHandle, TextureRecord> Textures;
+  Rml::TextureHandle NextTexture = 1;
+  Rml::TextureHandle retainTexture(int id, bool owned,
+                                   Rml::String external = {});
 
-	bool ScissorEnabled = false;
-	Rml::Rectanglei ScissorRect = Rml::Rectanglei::MakeInvalid();
-	// Mirrors what the renderer is currently set up for, so consecutive
-	// geometries under one scissor state skip redundant Set2D calls.
-	bool TwoDActive = false;
-	bool AppliedScissor = false;
-	Rml::Rectanglei AppliedScissorRect = Rml::Rectanglei::MakeInvalid();
-	// Sprite textures draw additive (see header note).
-	std::unordered_set<Rml::TextureHandle> AdditiveTextures;
-	// Current element transform (null = identity); RmlUi only calls
-	// SetTransform when the value actually changes (RenderManager).
-	Rml::Matrix4f Transform = Rml::Matrix4f::Identity();
-	bool TransformActive = false;
-	// Transform-path scratch (transformed elements only): sized per call, no
-	// reallocation after the first few frames.
-	std::vector<BakedTexturedVertex> ScratchTextured;
-	std::vector<BakedFilledVertex> ScratchFilled;
+  bool ScissorEnabled = false;
+  Rml::Rectanglei ScissorRect = Rml::Rectanglei::MakeInvalid();
+  // Mirrors what the renderer is currently set up for, so consecutive
+  // geometries under one scissor state skip redundant Set2D calls.
+  bool TwoDActive = false;
+  bool AppliedScissor = false;
+  Rml::Rectanglei AppliedScissorRect = Rml::Rectanglei::MakeInvalid();
+  // Sprite textures draw additive (see header note).
+  std::unordered_set<Rml::TextureHandle> AdditiveTextures;
+  // Current element transform (null = identity); RmlUi only calls
+  // SetTransform when the value actually changes (RenderManager).
+  Rml::Matrix4f Transform = Rml::Matrix4f::Identity();
+  bool TransformActive = false;
+  // Transform-path scratch (transformed elements only): sized per call, no
+  // reallocation after the first few frames.
+  std::vector<BakedTexturedVertex> ScratchTextured;
+  std::vector<BakedFilledVertex> ScratchFilled;
 };
 
-}
+} // namespace rmlui

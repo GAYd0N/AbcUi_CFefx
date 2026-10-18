@@ -15,25 +15,25 @@ namespace panels {
 namespace sidetext {
 // HUD_Init-time cvar registration (plan 08 §4.9).
 void registerCvars();
-}
+} // namespace sidetext
 
 class SideTextPanel : public framework::HudPanel {
 public:
-	SideTextPanel();
+  SideTextPanel();
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
-	void reset() override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
+  void reset() override;
 
 private:
-	void updateVisibility();
+  void updateVisibility();
 
-	std::string Template;
-	std::string LastText;
-	float MaxSpeed = 0.0f;
-	int LocalFrags = 0;
-	bool TemplateLoaded = false;
+  std::string Template;
+  std::string LastText;
+  float MaxSpeed = 0.0f;
+  int LocalFrags = 0;
+  bool TemplateLoaded = false;
 };
 
-}
+} // namespace panels

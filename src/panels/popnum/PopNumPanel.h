@@ -18,37 +18,37 @@ namespace popnum {
 // HUD_Init-time cvar registration (plan 08 §4.9; the old hud_popnumber lived
 // in the Viewport ctor).
 void registerCvars();
-}
+} // namespace popnum
 
 class PopNumPanel : public framework::HudPanel {
 public:
-	PopNumPanel();
+  PopNumPanel();
 
-	void reset() override;
+  void reset() override;
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
-	void onRedraw(double frameTime) override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
+  void onRedraw(double frameTime) override;
 
 private:
-	static constexpr float kBoxWidth = 48.0f;  // old PopNumberPanel.res wide
-	static constexpr float kBoxHeight = 64.0f; // old PopNumberPanel.res tall
+  static constexpr float kBoxWidth = 48.0f;  // old PopNumberPanel.res wide
+  static constexpr float kBoxHeight = 64.0f; // old PopNumberPanel.res tall
 
-	struct Number {
-		float origin[3] = {};
-		double createTime = 0.0;
-		float alpha = 255.0f; // fades over kNumberLifetime (D-17: time-based)
-		Rml::Element* element = nullptr;
-	};
+  struct Number {
+    float origin[3] = {};
+    double createTime = 0.0;
+    float alpha = 255.0f; // fades over kNumberLifetime (D-17: time-based)
+    Rml::Element *element = nullptr;
+  };
 
-	void addNumber(const float origin[3], int value, const int color[4]);
+  void addNumber(const float origin[3], int value, const int color[4]);
 
-	// Old localization tokens (PopNumber_O/K/M/B) with the %s1 slot.
-	static std::string formatValue(int value);
+  // Old localization tokens (PopNumber_O/K/M/B) with the %s1 slot.
+  static std::string formatValue(int value);
 
-	std::vector<Number> Numbers;
-	double ClientTimeNow = 0.0;
+  std::vector<Number> Numbers;
+  double ClientTimeNow = 0.0;
 };
 
-}
+} // namespace panels

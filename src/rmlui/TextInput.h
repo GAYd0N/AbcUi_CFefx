@@ -4,9 +4,9 @@
 // composition adapter (T07).
 //
 // Event source (T07 step 1, evidence in execution/T07.md): the SDL2-based
-// engine forwards raw SDL_Event structs to the BaseUI CallEngineSurfaceAppHandler
-// seam (VGUI2Extension proxy, pre+post dispatch - text events are consumed at
-// pre-dispatch only). The SDL fork delivers:
+// engine forwards raw SDL_Event structs to the BaseUI
+// CallEngineSurfaceAppHandler seam (VGUI2Extension proxy, pre+post dispatch -
+// text events are consumed at pre-dispatch only). The SDL fork delivers:
 // - SDL_EVENT_TEXT_INPUT (0x303): committed text, NUL-terminated UTF-8 in a
 //   32-byte buffer. The engine console eats its own copy behind a
 //   console-mode gate; the original GameUI surface consumes the same events
@@ -49,7 +49,7 @@
 namespace rmlui {
 
 // Production handler instance (also the composition state machine).
-Rml::TextInputHandler& textInput();
+Rml::TextInputHandler &textInput();
 
 // True while a composition is tracked for one of our focused editors.
 bool textComposing();
@@ -57,7 +57,7 @@ bool textComposing();
 // Committed text (SDL_EVENT_TEXT_INPUT payload, UTF-8). During a
 // composition this is the commit; otherwise it is submitted to the focused
 // editor directly (maxlength respected by the pin).
-void feedTextInput(const char* utf8);
+void feedTextInput(const char *utf8);
 
 // T16 console-toggle seam: the backquote key both toggles the console and
 // delivers an SDL text event ("`" / "~" depending on shift). The character
@@ -69,7 +69,7 @@ void swallowToggleKeyText();
 
 // Composition update (SDL_EVENT_TEXT_EDITING payload). `startBytes` is the
 // byte offset of the cursor inside the composition string.
-void feedTextEditing(const char* utf8, int startBytes);
+void feedTextEditing(const char *utf8, int startBytes);
 
 // Drop the running composition: Rml-side purge plus a best-effort platform
 // cancel (ImmNotifyIME) so the next keystroke starts clean. The ESC-first
@@ -84,12 +84,12 @@ void onWindowFocusLost();
 // The pre-dispatch SDL event entry (VGUI2ExtensionImport AppProc forward).
 // Text events are consumed at pre-dispatch only - the extension repeats
 // every event post-dispatch (07 doc item 7).
-void onSurfaceAppEvent(const void* sdlEvent);
+void onSurfaceAppEvent(const void *sdlEvent);
 
 // Surface WndProc seam: capture the real game window handle for the
 // platform composition/candidate positioning (the engine exposes no HWND
 // through the interfaces we bind).
-void noteSurfaceWindow(const void* hwnd);
+void noteSurfaceWindow(const void *hwnd);
 
 // IME placement seam (AbcSystemInterface::ActivateKeyboard): position the
 // platform composition + candidate windows at the editing caret. The caret
@@ -111,9 +111,11 @@ void textInputShutdown();
 // On-machine diagnostics (V07 event-source evidence): counters for the
 // text/IME inputs and the keyboard messages the surface observes.
 void noteWndProcMessage(unsigned msg);
-void eventCounters(unsigned& appProcTotal, unsigned& appProcTextInput, unsigned& appProcTextEditing,
-	unsigned& appProcCandidates, unsigned& wndProcTotal, unsigned& wndProcChar, unsigned& wndProcKey,
-	unsigned& feedCommits, unsigned& feedDrops);
-void messageHistogram(unsigned* wndProcTypes, unsigned* appProcTypes);
+void eventCounters(unsigned &appProcTotal, unsigned &appProcTextInput,
+                   unsigned &appProcTextEditing, unsigned &appProcCandidates,
+                   unsigned &wndProcTotal, unsigned &wndProcChar,
+                   unsigned &wndProcKey, unsigned &feedCommits,
+                   unsigned &feedDrops);
+void messageHistogram(unsigned *wndProcTypes, unsigned *appProcTypes);
 
-}
+} // namespace rmlui

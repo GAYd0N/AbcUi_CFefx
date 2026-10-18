@@ -7,4 +7,4 @@ namespace gameui::engine {
 services::settings::SettingsModel::Seams settingsSeams();
 services::settings::VoiceModel::Seams voiceSeams();
 services::settings::KeyBindModel::Seams bindSeams();
-}
+} // namespace gameui::engine

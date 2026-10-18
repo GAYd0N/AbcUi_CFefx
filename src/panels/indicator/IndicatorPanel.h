@@ -21,32 +21,32 @@ namespace panels {
 namespace indicator {
 // HUD_Init-time cvar registration (plan 08 §4.9).
 void registerCvars();
-}
+} // namespace indicator
 
 class IndicatorPanel : public framework::HudPanel {
 public:
-	IndicatorPanel();
+  IndicatorPanel();
 
-	void reset() override;
+  void reset() override;
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
 
 private:
-	static constexpr int kSlots = 4;
+  static constexpr int kSlots = 4;
 
-	struct Slot {
-		double startTime = -1.0; // <0 = inactive (old m_flAnimationStartTime 0)
-		float hitFrom[3] = {};
-		Rml::String appliedAngle;
-	};
+  struct Slot {
+    double startTime = -1.0; // <0 = inactive (old m_flAnimationStartTime 0)
+    float hitFrom[3] = {};
+    Rml::String appliedAngle;
+  };
 
-	void onHit(const float from[3]);
+  void onHit(const float from[3]);
 
-	Slot Slots[kSlots];
-	int NextSlot = 0;
-	double ClientTimeNow = 0.0;
+  Slot Slots[kSlots];
+  int NextSlot = 0;
+  double ClientTimeNow = 0.0;
 };
 
-}
+} // namespace panels

@@ -14,34 +14,34 @@ namespace netmsg {
 
 #pragma region events (definitions - external linkage, see the header)
 abc::CallbackList<void(int, int)> AmmoX;
-abc::CallbackList<void(const WeaponListData&)> WeaponList;
+abc::CallbackList<void(const WeaponListData &)> WeaponList;
 abc::CallbackList<void()> InitHud;
-abc::CallbackList<void(int, const char*)> CustWeapon;
+abc::CallbackList<void(int, const char *)> CustWeapon;
 abc::CallbackList<void(int, int, int, int)> CurWeapon;
 abc::CallbackList<void(int)> HideWeapon;
 abc::CallbackList<void(int)> HideHud;
-abc::CallbackList<void(int, const char*)> WeaponSpr;
+abc::CallbackList<void(int, const char *)> WeaponSpr;
 abc::CallbackList<void(int)> WeapPickup;
 abc::CallbackList<void(int, int)> AmmoPickup;
-abc::CallbackList<void(const char*)> ItemPickup;
+abc::CallbackList<void(const char *)> ItemPickup;
 abc::CallbackList<void(int)> Battery;
 abc::CallbackList<void(int)> Health;
 abc::CallbackList<void(int, float, int, float, float, int, int, int)> ScoreInfo;
-abc::CallbackList<void(int, int, int, const std::string&)> ShowMenu;
+abc::CallbackList<void(int, int, int, const std::string &)> ShowMenu;
 abc::CallbackList<void(int)> FlashBat;
 abc::CallbackList<void(bool, int)> Flashlight;
 abc::CallbackList<TextMsgCallback> TextMsg;
-abc::CallbackList<void(const DamageData&)> Damage;
-abc::CallbackList<void(const PopNumData&)> PopNum;
+abc::CallbackList<void(const DamageData &)> Damage;
+abc::CallbackList<void(const PopNumData &)> PopNum;
 // Batch C additions.
 abc::CallbackList<void(int, bool)> Spectator;
-abc::CallbackList<void(const char*)> ServerName;
-abc::CallbackList<void(const char*)> NextMap;
+abc::CallbackList<void(const char *)> ServerName;
+abc::CallbackList<void(const char *)> NextMap;
 abc::CallbackList<void(int)> TimeEnd;
-abc::CallbackList<void(int, const char*)> Motd;
-abc::CallbackList<void(const VoteMenuData&)> VoteMenu;
+abc::CallbackList<void(int, const char *)> Motd;
+abc::CallbackList<void(const VoteMenuData &)> VoteMenu;
 abc::CallbackList<void()> EndVote;
-abc::CallbackList<void(const MapListData&)> MapList;
+abc::CallbackList<void(const MapListData &)> MapList;
 abc::CallbackList<void()> ClExtrasInfo;
 #pragma endregion
 
@@ -73,7 +73,7 @@ pfnUserMsgHook original_MetaHook = nullptr;
 // hud_vote gate for the VoteMenu consumer (set by panels/vote at HUD_Init -
 // before any usermsg can arrive, so the null branch is unreachable in
 // practice; null would pass the message straight through, old IsVoteEnable).
-cvar_t* voteEnabled = nullptr;
+cvar_t *voteEnabled = nullptr;
 pfnUserMsgHook original_Spectator = nullptr;
 pfnUserMsgHook original_ServerName = nullptr;
 pfnUserMsgHook original_NextMap = nullptr;
@@ -84,430 +84,435 @@ pfnUserMsgHook original_EndVote = nullptr;
 pfnUserMsgHook original_MapList = nullptr;
 pfnUserMsgHook original_ClExtrasInfo = nullptr;
 
-int __MsgFunc_AmmoX(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int index = msg.readByte();
-	int count = msg.readLong();
-	if (!msg.ok())
-		return original_AmmoX(pszName, iSize, pbuf);
-	AmmoX(index, count);
-	return original_AmmoX(pszName, iSize, pbuf);
+int __MsgFunc_AmmoX(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int index = msg.readByte();
+  int count = msg.readLong();
+  if (!msg.ok())
+    return original_AmmoX(pszName, iSize, pbuf);
+  AmmoX(index, count);
+  return original_AmmoX(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_WeaponList(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	WeaponListData data;
-	data.name = msg.readString();
-	if (data.name.size() >= 128)
-		return original_WeaponList(pszName, iSize, pbuf);
-	data.ammoType = msg.readChar();
-	data.max1 = msg.readLong();
-	if (data.max1 == 255)
-		data.max1 = -1;
-	data.ammo2Type = msg.readChar();
-	data.max2 = msg.readLong();
-	if (data.max2 == 255)
-		data.max2 = -1;
-	data.slot = msg.readChar();
-	data.slotPos = msg.readChar();
-	data.id = msg.readShort();
-	data.flags = msg.readByte();
-	if (!msg.ok())
-		return original_WeaponList(pszName, iSize, pbuf);
-	if (data.id > 0 && data.slot >= 0 && data.slot < 10)
-		WeaponList(data);
-	return original_WeaponList(pszName, iSize, pbuf);
+int __MsgFunc_WeaponList(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  WeaponListData data;
+  data.name = msg.readString();
+  if (data.name.size() >= 128)
+    return original_WeaponList(pszName, iSize, pbuf);
+  data.ammoType = msg.readChar();
+  data.max1 = msg.readLong();
+  if (data.max1 == 255)
+    data.max1 = -1;
+  data.ammo2Type = msg.readChar();
+  data.max2 = msg.readLong();
+  if (data.max2 == 255)
+    data.max2 = -1;
+  data.slot = msg.readChar();
+  data.slotPos = msg.readChar();
+  data.id = msg.readShort();
+  data.flags = msg.readByte();
+  if (!msg.ok())
+    return original_WeaponList(pszName, iSize, pbuf);
+  if (data.id > 0 && data.slot >= 0 && data.slot < 10)
+    WeaponList(data);
+  return original_WeaponList(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_InitHUD(const char* pszName, int iSize, void* pbuf) {
-	InitHud();
-	return original_InitHUD(pszName, iSize, pbuf);
+int __MsgFunc_InitHUD(const char *pszName, int iSize, void *pbuf) {
+  InitHud();
+  return original_InitHUD(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_CustWeapon(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int id = msg.readShort();
-	std::string name = msg.readString();
-	if (!msg.ok())
-		return original_CustWeapon(pszName, iSize, pbuf);
-	if (!name.empty())
-		CustWeapon(id, name.c_str());
-	return original_CustWeapon(pszName, iSize, pbuf);
+int __MsgFunc_CustWeapon(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int id = msg.readShort();
+  std::string name = msg.readString();
+  if (!msg.ok())
+    return original_CustWeapon(pszName, iSize, pbuf);
+  if (!name.empty())
+    CustWeapon(id, name.c_str());
+  return original_CustWeapon(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_CurWeapon(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int state = msg.readByte();
-	int id = msg.readShort();
-	int clip = msg.readLong();
-	int clip2 = msg.readLong();
-	if (!msg.ok())
-		return original_CurWeapon(pszName, iSize, pbuf);
-	CurWeapon(state, id, clip, clip2);
-	return original_CurWeapon(pszName, iSize, pbuf);
+int __MsgFunc_CurWeapon(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int state = msg.readByte();
+  int id = msg.readShort();
+  int clip = msg.readLong();
+  int clip2 = msg.readLong();
+  if (!msg.ok())
+    return original_CurWeapon(pszName, iSize, pbuf);
+  CurWeapon(state, id, clip, clip2);
+  return original_CurWeapon(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_HideWeapon(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int token = msg.readByte();
-	if (!msg.ok())
-		return original_HideWeapon(pszName, iSize, pbuf);
-	HideWeapon(token);
-	return original_HideWeapon(pszName, iSize, pbuf);
+int __MsgFunc_HideWeapon(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int token = msg.readByte();
+  if (!msg.ok())
+    return original_HideWeapon(pszName, iSize, pbuf);
+  HideWeapon(token);
+  return original_HideWeapon(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_HideHUD(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int token = msg.readByte();
-	if (!msg.ok())
-		return original_HideHUD(pszName, iSize, pbuf);
-	HideHud(token);
-	return original_HideHUD(pszName, iSize, pbuf);
+int __MsgFunc_HideHUD(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int token = msg.readByte();
+  if (!msg.ok())
+    return original_HideHUD(pszName, iSize, pbuf);
+  HideHud(token);
+  return original_HideHUD(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_WeaponSpr(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int id = msg.readShort();
-	std::string name = msg.readString();
-	if (!msg.ok())
-		return original_WeaponSpr(pszName, iSize, pbuf);
-	if (!name.empty())
-		WeaponSpr(id, name.c_str());
-	return original_WeaponSpr(pszName, iSize, pbuf);
+int __MsgFunc_WeaponSpr(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int id = msg.readShort();
+  std::string name = msg.readString();
+  if (!msg.ok())
+    return original_WeaponSpr(pszName, iSize, pbuf);
+  if (!name.empty())
+    WeaponSpr(id, name.c_str());
+  return original_WeaponSpr(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_WeapPickup(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int index = msg.readShort();
-	if (!msg.ok())
-		return original_WeapPickup(pszName, iSize, pbuf);
-	WeapPickup(index);
-	return original_WeapPickup(pszName, iSize, pbuf);
+int __MsgFunc_WeapPickup(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int index = msg.readShort();
+  if (!msg.ok())
+    return original_WeapPickup(pszName, iSize, pbuf);
+  WeapPickup(index);
+  return original_WeapPickup(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_AmmoPickup(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int index = msg.readByte();
-	int count = msg.readLong();
-	if (!msg.ok())
-		return original_AmmoPickup(pszName, iSize, pbuf);
-	AmmoPickup(index, count);
-	return original_AmmoPickup(pszName, iSize, pbuf);
+int __MsgFunc_AmmoPickup(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int index = msg.readByte();
+  int count = msg.readLong();
+  if (!msg.ok())
+    return original_AmmoPickup(pszName, iSize, pbuf);
+  AmmoPickup(index, count);
+  return original_AmmoPickup(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_ItemPickup(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	std::string name = msg.readString();
-	if (!msg.ok())
-		return original_ItemPickup(pszName, iSize, pbuf);
-	ItemPickup(name.c_str());
-	return original_ItemPickup(pszName, iSize, pbuf);
+int __MsgFunc_ItemPickup(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  std::string name = msg.readString();
+  if (!msg.ok())
+    return original_ItemPickup(pszName, iSize, pbuf);
+  ItemPickup(name.c_str());
+  return original_ItemPickup(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_Battery(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int armor = msg.readShort();
-	if (!msg.ok())
-		return original_Battery(pszName, iSize, pbuf);
-	Battery(armor);
-	return original_Battery(pszName, iSize, pbuf);
+int __MsgFunc_Battery(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int armor = msg.readShort();
+  if (!msg.ok())
+    return original_Battery(pszName, iSize, pbuf);
+  Battery(armor);
+  return original_Battery(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_Health(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int health = msg.readLong();
-	if (!msg.ok())
-		return original_Health(pszName, iSize, pbuf);
-	Health(health);
-	return original_Health(pszName, iSize, pbuf);
+int __MsgFunc_Health(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int health = msg.readLong();
+  if (!msg.ok())
+    return original_Health(pszName, iSize, pbuf);
+  Health(health);
+  return original_Health(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_ScoreInfo(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int clientIndex = msg.readByte();
-	if (!msg.ok())
-		return original_ScoreInfo(pszName, iSize, pbuf);
-	if (clientIndex >= 1 && clientIndex <= 32) {
-		float frags = msg.readFloat();
-		int deaths = msg.readLong();
-		float health = msg.readFloat();
-		float armor = msg.readFloat();
-		int teamNumber = msg.readByte();
-		int hideExtra = msg.readByte();
-		int isAdmin = msg.readByte();
-		if (!msg.ok())
-			return original_ScoreInfo(pszName, iSize, pbuf);
-		if (std::isfinite(frags) && std::isfinite(health) && std::isfinite(armor) && std::abs(frags) <= 1000000.0f && deaths >= 0 && deaths <= 1000000 && health >= 0 && health <= 1000000000.0f && armor >= 0 && armor <= 1000000000.0f)
-			ScoreInfo(clientIndex, frags, deaths, health, armor, teamNumber, hideExtra, isAdmin);
-	}
-	return original_ScoreInfo(pszName, iSize, pbuf);
+int __MsgFunc_ScoreInfo(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int clientIndex = msg.readByte();
+  if (!msg.ok())
+    return original_ScoreInfo(pszName, iSize, pbuf);
+  if (clientIndex >= 1 && clientIndex <= 32) {
+    float frags = msg.readFloat();
+    int deaths = msg.readLong();
+    float health = msg.readFloat();
+    float armor = msg.readFloat();
+    int teamNumber = msg.readByte();
+    int hideExtra = msg.readByte();
+    int isAdmin = msg.readByte();
+    if (!msg.ok())
+      return original_ScoreInfo(pszName, iSize, pbuf);
+    if (std::isfinite(frags) && std::isfinite(health) && std::isfinite(armor) &&
+        std::abs(frags) <= 1000000.0f && deaths >= 0 && deaths <= 1000000 &&
+        health >= 0 && health <= 1000000000.0f && armor >= 0 &&
+        armor <= 1000000000.0f)
+      ScoreInfo(clientIndex, frags, deaths, health, armor, teamNumber,
+                hideExtra, isAdmin);
+  }
+  return original_ScoreInfo(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_ShowMenu(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int validSlots = msg.readShort();
-	int displaySeconds = msg.readChar();
-	int bits = msg.readByte();
-	std::string text = msg.readString();
-	if (!msg.ok())
-		return original_ShowMenu(pszName, iSize, pbuf);
-	ShowMenu(validSlots, displaySeconds, bits, text);
-	// The old hook unconditionally swallowed ShowMenu so the vanilla VGUI
-	// menu never flashes - the TextMenu panel owns this message.
-	return 1;
+int __MsgFunc_ShowMenu(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int validSlots = msg.readShort();
+  int displaySeconds = msg.readChar();
+  int bits = msg.readByte();
+  std::string text = msg.readString();
+  if (!msg.ok())
+    return original_ShowMenu(pszName, iSize, pbuf);
+  ShowMenu(validSlots, displaySeconds, bits, text);
+  // The old hook unconditionally swallowed ShowMenu so the vanilla VGUI
+  // menu never flashes - the TextMenu panel owns this message.
+  return 1;
 }
 
-int __MsgFunc_FlashBat(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int battery = msg.readByte();
-	if (!msg.ok())
-		return original_FlashBat(pszName, iSize, pbuf);
-	FlashBat(battery);
-	return original_FlashBat(pszName, iSize, pbuf);
+int __MsgFunc_FlashBat(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int battery = msg.readByte();
+  if (!msg.ok())
+    return original_FlashBat(pszName, iSize, pbuf);
+  FlashBat(battery);
+  return original_FlashBat(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_Flashlight(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int on = msg.readByte();
-	int battery = msg.readByte();
-	if (!msg.ok())
-		return original_Flashlight(pszName, iSize, pbuf);
-	Flashlight(on > 0, battery);
-	return original_Flashlight(pszName, iSize, pbuf);
+int __MsgFunc_Flashlight(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int on = msg.readByte();
+  int battery = msg.readByte();
+  if (!msg.ok())
+    return original_Flashlight(pszName, iSize, pbuf);
+  Flashlight(on > 0, battery);
+  return original_Flashlight(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_TextMsg(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	int target = msg.readByte();
-	std::string info = msg.readString();
-	std::string param1 = msg.remaining() > 0 ? msg.readString() : std::string();
-	std::string param2 = msg.remaining() > 0 ? msg.readString() : std::string();
-	std::string param3 = msg.remaining() > 0 ? msg.readString() : std::string();
-	std::string param4 = msg.remaining() > 0 ? msg.readString() : std::string();
-	if (!msg.ok())
-		return original_TextMsg(pszName, iSize, pbuf);
-	// Every subscriber runs; a single false swallows the vanilla handler
-	// (old g_EventTextMsg forEach with ret &=).
-	bool chain = true;
-	TextMsg.forEach([&](const abc::CallbackList<TextMsgCallback>::Handle&,
-						const abc::CallbackList<TextMsgCallback>::Callback& callback) {
-		chain &= callback(target, info.c_str(), param1.c_str(), param2.c_str(),
-			param3.c_str(), param4.c_str());
-	});
-	return chain ? original_TextMsg(pszName, iSize, pbuf) : 1;
+int __MsgFunc_TextMsg(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  int target = msg.readByte();
+  std::string info = msg.readString();
+  std::string param1 = msg.remaining() > 0 ? msg.readString() : std::string();
+  std::string param2 = msg.remaining() > 0 ? msg.readString() : std::string();
+  std::string param3 = msg.remaining() > 0 ? msg.readString() : std::string();
+  std::string param4 = msg.remaining() > 0 ? msg.readString() : std::string();
+  if (!msg.ok())
+    return original_TextMsg(pszName, iSize, pbuf);
+  // Every subscriber runs; a single false swallows the vanilla handler
+  // (old g_EventTextMsg forEach with ret &=).
+  bool chain = true;
+  TextMsg.forEach(
+      [&](const abc::CallbackList<TextMsgCallback>::Handle &,
+          const abc::CallbackList<TextMsgCallback>::Callback &callback) {
+        chain &= callback(target, info.c_str(), param1.c_str(), param2.c_str(),
+                          param3.c_str(), param4.c_str());
+      });
+  return chain ? original_TextMsg(pszName, iSize, pbuf) : 1;
 }
 
-int __MsgFunc_Damage(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	DamageData data;
-	data.armor = msg.readByte();
-	data.damage = msg.readByte();
-	data.tiles = msg.readLong();
-	if (!msg.ok())
-		return original_Damage(pszName, iSize, pbuf);
-	// Old CHECK_MSG_OK shortcut: an all-zero damage report carries no origin.
-	if (data.armor + data.damage + data.tiles == 0)
-		return original_Damage(pszName, iSize, pbuf);
-	for (int i = 0; i < 3; i++)
-		data.from[i] = msg.readCoord();
-	if (!msg.ok())
-		return original_Damage(pszName, iSize, pbuf);
-	Damage(data);
-	return original_Damage(pszName, iSize, pbuf);
+int __MsgFunc_Damage(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  DamageData data;
+  data.armor = msg.readByte();
+  data.damage = msg.readByte();
+  data.tiles = msg.readLong();
+  if (!msg.ok())
+    return original_Damage(pszName, iSize, pbuf);
+  // Old CHECK_MSG_OK shortcut: an all-zero damage report carries no origin.
+  if (data.armor + data.damage + data.tiles == 0)
+    return original_Damage(pszName, iSize, pbuf);
+  for (int i = 0; i < 3; i++)
+    data.from[i] = msg.readCoord();
+  if (!msg.ok())
+    return original_Damage(pszName, iSize, pbuf);
+  Damage(data);
+  return original_Damage(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_Spectator(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	const int index = msg.readByte();
-	if (!msg.ok())
-		return original_Spectator(pszName, iSize, pbuf);
-	if (index <= 0 || index > 32)
-		return original_Spectator(pszName, iSize, pbuf);
-	const int spectating = msg.readByte();
-	if (!msg.ok())
-		return original_Spectator(pszName, iSize, pbuf);
-	Spectator(index, spectating != 0);
-	return original_Spectator(pszName, iSize, pbuf);
+int __MsgFunc_Spectator(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  const int index = msg.readByte();
+  if (!msg.ok())
+    return original_Spectator(pszName, iSize, pbuf);
+  if (index <= 0 || index > 32)
+    return original_Spectator(pszName, iSize, pbuf);
+  const int spectating = msg.readByte();
+  if (!msg.ok())
+    return original_Spectator(pszName, iSize, pbuf);
+  Spectator(index, spectating != 0);
+  return original_Spectator(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_ServerName(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	const std::string name = msg.readString();
-	if (!msg.ok())
-		return original_ServerName(pszName, iSize, pbuf);
-	ServerName(name.c_str());
-	return original_ServerName(pszName, iSize, pbuf);
+int __MsgFunc_ServerName(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  const std::string name = msg.readString();
+  if (!msg.ok())
+    return original_ServerName(pszName, iSize, pbuf);
+  ServerName(name.c_str());
+  return original_ServerName(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_NextMap(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	const std::string map = msg.readString();
-	if (!msg.ok())
-		return original_NextMap(pszName, iSize, pbuf);
-	NextMap(map.c_str());
-	return original_NextMap(pszName, iSize, pbuf);
+int __MsgFunc_NextMap(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  const std::string map = msg.readString();
+  if (!msg.ok())
+    return original_NextMap(pszName, iSize, pbuf);
+  NextMap(map.c_str());
+  return original_NextMap(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_TimeEnd(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	const int time = msg.readLong();
-	if (!msg.ok())
-		return original_TimeEnd(pszName, iSize, pbuf);
-	TimeEnd(time);
-	return original_TimeEnd(pszName, iSize, pbuf);
+int __MsgFunc_TimeEnd(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  const int time = msg.readLong();
+  if (!msg.ok())
+    return original_TimeEnd(pszName, iSize, pbuf);
+  TimeEnd(time);
+  return original_TimeEnd(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_MOTD(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	const int code = msg.readByte();
-	const std::string info = msg.readString();
-	if (!msg.ok())
-		return original_MOTD(pszName, iSize, pbuf);
-	Motd(code, info.c_str());
-	return original_MOTD(pszName, iSize, pbuf);
+int __MsgFunc_MOTD(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  const int code = msg.readByte();
+  const std::string info = msg.readString();
+  if (!msg.ok())
+    return original_MOTD(pszName, iSize, pbuf);
+  Motd(code, info.c_str());
+  return original_MOTD(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_VoteMenu(const char* pszName, int iSize, void* pbuf) {
-	// Old gate: hud_vote off passes the message straight through (no event,
-	// no swallow); on, it consumes the message like ShowMenu.
-	if (!voteEnabled || voteEnabled->value <= 0)
-		return original_VoteMenu(pszName, iSize, pbuf);
-	abc::MsgReader msg(pbuf, iSize);
-	VoteMenuData data;
-	data.type = msg.readByte();
-	data.content = msg.readString();
-	data.yes = msg.readString();
-	data.no = msg.readString();
-	if (!msg.ok())
-		return original_VoteMenu(pszName, iSize, pbuf);
-	VoteMenu(data);
-	return 1;
+int __MsgFunc_VoteMenu(const char *pszName, int iSize, void *pbuf) {
+  // Old gate: hud_vote off passes the message straight through (no event,
+  // no swallow); on, it consumes the message like ShowMenu.
+  if (!voteEnabled || voteEnabled->value <= 0)
+    return original_VoteMenu(pszName, iSize, pbuf);
+  abc::MsgReader msg(pbuf, iSize);
+  VoteMenuData data;
+  data.type = msg.readByte();
+  data.content = msg.readString();
+  data.yes = msg.readString();
+  data.no = msg.readString();
+  if (!msg.ok())
+    return original_VoteMenu(pszName, iSize, pbuf);
+  VoteMenu(data);
+  return 1;
 }
 
-int __MsgFunc_EndVote(const char* pszName, int iSize, void* pbuf) {
-	EndVote();
-	return original_EndVote(pszName, iSize, pbuf);
+int __MsgFunc_EndVote(const char *pszName, int iSize, void *pbuf) {
+  EndVote();
+  return original_EndVote(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_MapList(const char* pszName, int iSize, void* pbuf) {
-	abc::MsgReader msg(pbuf, iSize);
-	MapListData data;
-	data.clearAll = msg.readByte();
-	if (!msg.ok())
-		return original_MapList(pszName, iSize, pbuf);
-	if (data.clearAll == 0) {
-		data.allCount = msg.readShort();
-		if (!msg.ok())
-			return original_MapList(pszName, iSize, pbuf);
-	} else {
-		data.start = msg.readShort();
-		data.end = msg.readShort();
-		if (!msg.ok() || data.start < 0 || data.end < data.start)
-			return original_MapList(pszName, iSize, pbuf);
-		const int count = data.end - data.start;
-		// Bound the allocation against both the protocol's practical
-		// capacity and the bytes actually left in the message.
-		if (count > 4096 || count > msg.remaining())
-			return original_MapList(pszName, iSize, pbuf);
-		data.maps.reserve(static_cast<std::size_t>(count));
-		for (int i = 0; i < count; i++)
-			data.maps.push_back(msg.readString());
-		if (!msg.ok())
-			return original_MapList(pszName, iSize, pbuf);
-	}
-	MapList(data);
-	return original_MapList(pszName, iSize, pbuf);
+int __MsgFunc_MapList(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  MapListData data;
+  data.clearAll = msg.readByte();
+  if (!msg.ok())
+    return original_MapList(pszName, iSize, pbuf);
+  if (data.clearAll == 0) {
+    data.allCount = msg.readShort();
+    if (!msg.ok())
+      return original_MapList(pszName, iSize, pbuf);
+  } else {
+    data.start = msg.readShort();
+    data.end = msg.readShort();
+    if (!msg.ok() || data.start < 0 || data.end < data.start)
+      return original_MapList(pszName, iSize, pbuf);
+    const int count = data.end - data.start;
+    // Bound the allocation against both the protocol's practical
+    // capacity and the bytes actually left in the message.
+    if (count > 4096 || count > msg.remaining())
+      return original_MapList(pszName, iSize, pbuf);
+    data.maps.reserve(static_cast<std::size_t>(count));
+    for (int i = 0; i < count; i++)
+      data.maps.push_back(msg.readString());
+    if (!msg.ok())
+      return original_MapList(pszName, iSize, pbuf);
+  }
+  MapList(data);
+  return original_MapList(pszName, iSize, pbuf);
 }
 
-int __MsgFunc_ClExtrasInfo(const char* pszName, int iSize, void* pbuf) {
-	// Old comment: the payload is an obfuscated blob the HUD never parsed -
-	// the event only marks "extra player data changed" (donor flags etc.),
-	// so the port chains the original and fires the refresh event.
-	const int result = original_ClExtrasInfo(pszName, iSize, pbuf);
-	ClExtrasInfo();
-	return result;
+int __MsgFunc_ClExtrasInfo(const char *pszName, int iSize, void *pbuf) {
+  // Old comment: the payload is an obfuscated blob the HUD never parsed -
+  // the event only marks "extra player data changed" (donor flags etc.),
+  // so the port chains the original and fires the refresh event.
+  const int result = original_ClExtrasInfo(pszName, iSize, pbuf);
+  ClExtrasInfo();
+  return result;
 }
 
-int __MsgFunc_MetaHook(const char* pszName, int iSize, void* pbuf) {
-	// The old plugin-to-plugin usermsg carrier (registered by the user's
-	// server-side addon; absent on vanilla servers - original may be null).
-	// Chain note (D-17): the old hook never stored its prior and returned 0
-	// unconditionally, swallowing any earlier plugin's "MetaHook" handler;
-	// this port chains the prior on every path (null original = vanilla
-	// server, nothing to forward).
-	abc::MsgReader msg(pbuf, iSize);
-	const int type = msg.readByte();
-	if (!msg.ok())
-		return original_MetaHook ? original_MetaHook(pszName, iSize, pbuf) : 0;
-	if (type == 77) { // MetaHookMsgType::MHSV_CMD_ABC_CUSTOM
-		const int subtype = msg.readByte();
-		if (!msg.ok())
-			return original_MetaHook ? original_MetaHook(pszName, iSize, pbuf) : 0;
-		if (subtype == 0) { // ABCCustomMsg::POPNUMBER
-			PopNumData data;
-			data.origin[0] = msg.readCoord();
-			data.origin[1] = msg.readCoord();
-			data.origin[2] = msg.readCoord();
-			data.value = msg.readLong();
-			data.color[0] = msg.readByte();
-			data.color[1] = msg.readByte();
-			data.color[2] = msg.readByte();
-			data.color[3] = msg.readByte();
-			if (!msg.ok())
-				return original_MetaHook ? original_MetaHook(pszName, iSize, pbuf) : 0;
-			PopNum(data);
-		}
-	}
-	return original_MetaHook ? original_MetaHook(pszName, iSize, pbuf) : 0;
+int __MsgFunc_MetaHook(const char *pszName, int iSize, void *pbuf) {
+  // The old plugin-to-plugin usermsg carrier (registered by the user's
+  // server-side addon; absent on vanilla servers - original may be null).
+  // Chain note (D-17): the old hook never stored its prior and returned 0
+  // unconditionally, swallowing any earlier plugin's "MetaHook" handler;
+  // this port chains the prior on every path (null original = vanilla
+  // server, nothing to forward).
+  abc::MsgReader msg(pbuf, iSize);
+  const int type = msg.readByte();
+  if (!msg.ok())
+    return original_MetaHook ? original_MetaHook(pszName, iSize, pbuf) : 0;
+  if (type == 77) { // MetaHookMsgType::MHSV_CMD_ABC_CUSTOM
+    const int subtype = msg.readByte();
+    if (!msg.ok())
+      return original_MetaHook ? original_MetaHook(pszName, iSize, pbuf) : 0;
+    if (subtype == 0) { // ABCCustomMsg::POPNUMBER
+      PopNumData data;
+      data.origin[0] = msg.readCoord();
+      data.origin[1] = msg.readCoord();
+      data.origin[2] = msg.readCoord();
+      data.value = msg.readLong();
+      data.color[0] = msg.readByte();
+      data.color[1] = msg.readByte();
+      data.color[2] = msg.readByte();
+      data.color[3] = msg.readByte();
+      if (!msg.ok())
+        return original_MetaHook ? original_MetaHook(pszName, iSize, pbuf) : 0;
+      PopNum(data);
+    }
+  }
+  return original_MetaHook ? original_MetaHook(pszName, iSize, pbuf) : 0;
 }
 #pragma endregion
 
 } // namespace
 
 void init() {
-	static bool registered = false;
-	if (registered)
-		return;
-	registered = true;
-	// HOOK_MESSAGE per message (g_pMetaHookAPI->HookUserMsg): returns the
-	// previous handler, forming the multi-plugin chain (AbcEssential
-	// registers its own links at its HUD_Init).
-	original_AmmoX = HOOK_MESSAGE(AmmoX);
-	original_WeaponList = HOOK_MESSAGE(WeaponList);
-	original_InitHUD = HOOK_MESSAGE(InitHUD);
-	original_CustWeapon = HOOK_MESSAGE(CustWeapon);
-	original_CurWeapon = HOOK_MESSAGE(CurWeapon);
-	original_HideWeapon = HOOK_MESSAGE(HideWeapon);
-	original_HideHUD = HOOK_MESSAGE(HideHUD);
-	original_WeaponSpr = HOOK_MESSAGE(WeaponSpr);
-	original_WeapPickup = HOOK_MESSAGE(WeapPickup);
-	original_AmmoPickup = HOOK_MESSAGE(AmmoPickup);
-	original_ItemPickup = HOOK_MESSAGE(ItemPickup);
-	original_Battery = HOOK_MESSAGE(Battery);
-	original_Health = HOOK_MESSAGE(Health);
-	original_ScoreInfo = HOOK_MESSAGE(ScoreInfo);
-	original_ShowMenu = HOOK_MESSAGE(ShowMenu);
-	original_FlashBat = HOOK_MESSAGE(FlashBat);
-	original_Flashlight = HOOK_MESSAGE(Flashlight);
-	original_TextMsg = HOOK_MESSAGE(TextMsg);
-	original_Damage = HOOK_MESSAGE(Damage);
-	// The MetaHook carrier is addon-registered; a null chain (vanilla servers)
-	// leaves every read a no-op passthrough (see __MsgFunc_MetaHook).
-	original_MetaHook = HOOK_MESSAGE(MetaHook);
-	// Batch C additions.
-	original_Spectator = HOOK_MESSAGE(Spectator);
-	original_ServerName = HOOK_MESSAGE(ServerName);
-	original_NextMap = HOOK_MESSAGE(NextMap);
-	original_TimeEnd = HOOK_MESSAGE(TimeEnd);
-	original_MOTD = HOOK_MESSAGE(MOTD);
-	original_VoteMenu = HOOK_MESSAGE(VoteMenu);
-	original_EndVote = HOOK_MESSAGE(EndVote);
-	original_MapList = HOOK_MESSAGE(MapList);
-	original_ClExtrasInfo = HOOK_MESSAGE(ClExtrasInfo);
+  static bool registered = false;
+  if (registered)
+    return;
+  registered = true;
+  // HOOK_MESSAGE per message (g_pMetaHookAPI->HookUserMsg): returns the
+  // previous handler, forming the multi-plugin chain (AbcEssential
+  // registers its own links at its HUD_Init).
+  original_AmmoX = HOOK_MESSAGE(AmmoX);
+  original_WeaponList = HOOK_MESSAGE(WeaponList);
+  original_InitHUD = HOOK_MESSAGE(InitHUD);
+  original_CustWeapon = HOOK_MESSAGE(CustWeapon);
+  original_CurWeapon = HOOK_MESSAGE(CurWeapon);
+  original_HideWeapon = HOOK_MESSAGE(HideWeapon);
+  original_HideHUD = HOOK_MESSAGE(HideHUD);
+  original_WeaponSpr = HOOK_MESSAGE(WeaponSpr);
+  original_WeapPickup = HOOK_MESSAGE(WeapPickup);
+  original_AmmoPickup = HOOK_MESSAGE(AmmoPickup);
+  original_ItemPickup = HOOK_MESSAGE(ItemPickup);
+  original_Battery = HOOK_MESSAGE(Battery);
+  original_Health = HOOK_MESSAGE(Health);
+  original_ScoreInfo = HOOK_MESSAGE(ScoreInfo);
+  original_ShowMenu = HOOK_MESSAGE(ShowMenu);
+  original_FlashBat = HOOK_MESSAGE(FlashBat);
+  original_Flashlight = HOOK_MESSAGE(Flashlight);
+  original_TextMsg = HOOK_MESSAGE(TextMsg);
+  original_Damage = HOOK_MESSAGE(Damage);
+  // The MetaHook carrier is addon-registered; a null chain (vanilla servers)
+  // leaves every read a no-op passthrough (see __MsgFunc_MetaHook).
+  original_MetaHook = HOOK_MESSAGE(MetaHook);
+  // Batch C additions.
+  original_Spectator = HOOK_MESSAGE(Spectator);
+  original_ServerName = HOOK_MESSAGE(ServerName);
+  original_NextMap = HOOK_MESSAGE(NextMap);
+  original_TimeEnd = HOOK_MESSAGE(TimeEnd);
+  original_MOTD = HOOK_MESSAGE(MOTD);
+  original_VoteMenu = HOOK_MESSAGE(VoteMenu);
+  original_EndVote = HOOK_MESSAGE(EndVote);
+  original_MapList = HOOK_MESSAGE(MapList);
+  original_ClExtrasInfo = HOOK_MESSAGE(ClExtrasInfo);
 }
 
-void setVoteGate(cvar_t* cvar) {
-	voteEnabled = cvar;
+void setVoteGate(cvar_t *cvar) {
+  voteEnabled = cvar;
 }
 
-}
+} // namespace netmsg

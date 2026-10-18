@@ -25,6 +25,6 @@ namespace framework {
 
 // reason: plain ASCII description (no external input - call sites are all
 // internal constant strings).
-void fatalExit(const char* reason);
+void fatalExit(const char *reason);
 
-}
+} // namespace framework

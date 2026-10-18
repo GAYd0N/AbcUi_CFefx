@@ -70,62 +70,70 @@ namespace services {
 // at a cvar write (snapshots already restored); `reasonToken` then names the
 // error-overlay token, and the MODULE turns that into the typed
 // kLoadingFinished(kFailed) - never this class.
-using LocalGameLauncher = bool (*)(const char* map, const char** reasonToken);
+using LocalGameLauncher = bool (*)(const char *map, const char **reasonToken);
 
 class EngineUiBackend final : public IGameUiBackend {
 public:
-	// Engine seams. Plain function pointers, no captured state: production
-	// wires thin thunks, the offline test records the calls.
-	struct Seams {
-		void (*clientCmd)(const char* command) = nullptr;  // pfnClientCmd wrapper
-		bool (*hideGameUi)() = nullptr;                    // vgui2ext::hideGameUi
-		int (*maxClients)() = nullptr;                     // live maxplayers (1 = singleplayer)
-		NativeUiBridge* bridge = nullptr;                  // menu-state pre-lower on resume
-	};
+  // Engine seams. Plain function pointers, no captured state: production
+  // wires thin thunks, the offline test records the calls.
+  struct Seams {
+    void (*clientCmd)(const char *command) = nullptr; // pfnClientCmd wrapper
+    bool (*hideGameUi)() = nullptr;                   // vgui2ext::hideGameUi
+    int (*maxClients)() = nullptr;    // live maxplayers (1 = singleplayer)
+    NativeUiBridge *bridge = nullptr; // menu-state pre-lower on resume
+  };
 
-	void setSeams(const Seams& seams) { Seams_ = seams; }
-	// Wired separately because the thunk belongs to the module class (the
-	// request value object is module-held); must be set before the first
-	// local-game intent.
-	void setLocalGameLauncher(LocalGameLauncher launcher) { Launcher = launcher; }
+  void setSeams(const Seams &seams) {
+    Seams_ = seams;
+  }
+  // Wired separately because the thunk belongs to the module class (the
+  // request value object is module-held); must be set before the first
+  // local-game intent.
+  void setLocalGameLauncher(LocalGameLauncher launcher) {
+    Launcher = launcher;
+  }
 
-	// IGameUiBackend (the T04 contract, unchanged).
-	void connect(uint32_t generation, const char* address) override;
-	void startLocalGame(uint32_t generation, const char* map) override;
-	void cancelConnect(uint32_t generation) override;
-	void submitPassword(uint32_t generation, const char* password) override;
-	void disconnectFromGame() override;
-	void quitGame() override;
-	void resumeGame() override;
+  // IGameUiBackend (the T04 contract, unchanged).
+  void connect(uint32_t generation, const char *address) override;
+  void startLocalGame(uint32_t generation, const char *map) override;
+  void cancelConnect(uint32_t generation) override;
+  void submitPassword(uint32_t generation, const char *password) override;
+  void disconnectFromGame() override;
+  void quitGame() override;
+  void resumeGame() override;
 
-	// Single-player pause parity (not part of the T04 interface on purpose:
-	// the frozen contract predates the T09 pause decision). The module calls
-	// these on the controller's in-game menu transitions.
-	void menuShownInGame();
-	void menuHiddenInGame();
+  // Single-player pause parity (not part of the T04 interface on purpose:
+  // the frozen contract predates the T09 pause decision). The module calls
+  // these on the controller's in-game menu transitions.
+  void menuShownInGame();
+  void menuHiddenInGame();
 
-	// The live maxplayers fact (1 = singleplayer), the same source the
-	// pause parity reads; the module feeds the GameMenu.res "notsingle"
-	// entry visibility from it. Defaults to 1 (fail closed: hide the
-	// multiplayer-only entries) while the seam is unwired.
-	int maxClientsFact() const { return Seams_.maxClients ? Seams_.maxClients() : 1; }
+  // The live maxplayers fact (1 = singleplayer), the same source the
+  // pause parity reads; the module feeds the GameMenu.res "notsingle"
+  // entry visibility from it. Defaults to 1 (fail closed: hide the
+  // multiplayer-only entries) while the seam is unwired.
+  int maxClientsFact() const {
+    return Seams_.maxClients ? Seams_.maxClients() : 1;
+  }
 
 private:
-	bool singlePlayer() const;
-	void clientCmd(const char* command);
-	// One cancel per generation: the controller retires the attempt after the
-	// first, this latch is the second guard at the engine edge.
-	bool cancelIssued(uint32_t generation) const { return generation != 0 && generation == CanceledGeneration; }
+  bool singlePlayer() const;
+  void clientCmd(const char *command);
+  // One cancel per generation: the controller retires the attempt after the
+  // first, this latch is the second guard at the engine edge.
+  bool cancelIssued(uint32_t generation) const {
+    return generation != 0 && generation == CanceledGeneration;
+  }
 
-	Seams Seams_;
-	// T19: the create-game launcher thunk (module-held request) and the
-	// one-launch-per-generation latch.
-	LocalGameLauncher Launcher = nullptr;
-	uint32_t LocalGameGeneration = 0;
-	// Terminal latch: once the confirmed quit left, nothing re-executes it.
-	bool QuitIssued = false;
-	// T14: generation of the last issued connect cancel (0 = none).
-	uint32_t CanceledGeneration = 0;
+  Seams Seams_;
+  // T19: the create-game launcher thunk (module-held request) and the
+  // one-launch-per-generation latch.
+  LocalGameLauncher Launcher = nullptr;
+  uint32_t LocalGameGeneration = 0;
+  // Terminal latch: once the confirmed quit left, nothing re-executes it.
+  bool QuitIssued = false;
+  // T14: generation of the last issued connect cancel (0 = none).
+  uint32_t CanceledGeneration = 0;
 };
 
-}
+} // namespace services

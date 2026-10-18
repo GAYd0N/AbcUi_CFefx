@@ -42,13 +42,22 @@
 	position: absolute;
 	left: 0px;
 	top: 0px;
-	/* Size and line-height ride the per-frame marker box (set inline);
-	   RmlUi 6.3 flex containers measure a bare text node as zero-size (the
-	   offline probe evidence), so the vgui Label shape - block +
-	   centered single line - is the port pattern (PlayerBoard name
-	   precedent). */
+	/* The label fills the per-frame marker box (width/height 100% resolve
+	   against the inline px size) so text-align really centers the name in
+	   the 45x45 design box - an auto-width absolute block shrink-fits the
+	   text and pins it to the left edge, which is what left the name off
+	   center. The line-height still rides the box height (set inline) and
+	   the vgui Label shape stays block + one centered line (RmlUi 6.3 flex
+	   containers measure a bare text node as zero-size - the offline probe
+	   evidence; PlayerBoard name precedent). */
+	width: 100%;
+	height: 100%;
 	display: block;
 	text-align: center;
+	/* Old ItemNamePanel Label had wrapping off and the panel clipped the
+	   overhang; keep the name on one line so the vertical centering holds. */
+	white-space: nowrap;
+	overflow: hidden;
 	/* Old ItemNamePanel.res "Text": CompactaBold 20px @1080p -> 8.9 design
 	   units; Verdana bold is the loaded stand-in face. */
 	font-family: Verdana;

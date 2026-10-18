@@ -35,171 +35,183 @@
 namespace Rml {
 class Element;
 class Event;
-}
+} // namespace Rml
 
 namespace services {
 namespace loading {
 class LoadingModel;
 }
-}
+} // namespace services
 
 namespace panels::loading {
 
-using ActionSink = std::function<void(const char* action)>;
+using ActionSink = std::function<void(const char *action)>;
 
 class LoadingPage final : public framework::InteractiveDocument {
 public:
-	LoadingPage();
-	~LoadingPage() override;
+  LoadingPage();
+  ~LoadingPage() override;
 
-	void setActionSink(ActionSink sink) { Sink = std::move(sink); }
-	void setModel(const services::loading::LoadingModel* model) { Model = model; }
+  void setActionSink(ActionSink sink) {
+    Sink = std::move(sink);
+  }
+  void setModel(const services::loading::LoadingModel *model) {
+    Model = model;
+  }
 
-	// T19: the attempt-kind title seam. The local-game start shows the
-	// create-game title instead of the connect one; both are "#tokens"
-	// resolved through the project table at render time (never markup).
-	void setTitleToken(const char* token) { TitleToken = token ? token : ""; }
+  // T19: the attempt-kind title seam. The local-game start shows the
+  // create-game title instead of the connect one; both are "#tokens"
+  // resolved through the project table at render time (never markup).
+  void setTitleToken(const char *token) {
+    TitleToken = token ? token : "";
+  }
 
-	// Projects the model's current values into the document. Called by the
-	// module after each drained engine event and on presentation.
-	void render();
+  // Projects the model's current values into the document. Called by the
+  // module after each drained engine event and on presentation.
+  void render();
 
-	// Re-takes the Cancel focus (module's per-frame focus guard).
-	void refocusDefault();
+  // Re-takes the Cancel focus (module's per-frame focus guard).
+  void refocusDefault();
 
 protected:
-	void onDocumentReady() override;
+  void onDocumentReady() override;
 
 private:
-	class WindowListener final : public Rml::EventListener {
-	public:
-		explicit WindowListener(LoadingPage* owner) : Owner(owner) {}
-		void ProcessEvent(Rml::Event& event) override;
+  class WindowListener final : public Rml::EventListener {
+  public:
+    explicit WindowListener(LoadingPage *owner) : Owner(owner) {}
+    void ProcessEvent(Rml::Event &event) override;
 
-	private:
-		LoadingPage* Owner;
-	};
+  private:
+    LoadingPage *Owner;
+  };
 
-	void handle(Rml::Event& event);
+  void handle(Rml::Event &event);
 
-	WindowListener Listener;
-	ActionSink Sink;
-	const services::loading::LoadingModel* Model = nullptr;
-	// "#token" of the current title (connect vs local-game start; empty = the
-	// shipping connect title).
-	std::string TitleToken;
+  WindowListener Listener;
+  ActionSink Sink;
+  const services::loading::LoadingModel *Model = nullptr;
+  // "#token" of the current title (connect vs local-game start; empty = the
+  // shipping connect title).
+  std::string TitleToken;
 };
 
 class ConnectionErrorOverlay final : public framework::InteractiveDocument {
 public:
-	ConnectionErrorOverlay();
-	~ConnectionErrorOverlay() override;
+  ConnectionErrorOverlay();
+  ~ConnectionErrorOverlay() override;
 
-	void setActionSink(ActionSink sink) { Sink = std::move(sink); }
+  void setActionSink(ActionSink sink) {
+    Sink = std::move(sink);
+  }
 
-	// `reason` is the controller-space plain-text reason; resolved through the
-	// local tables and escaped before it reaches the DOM.
-	void showFor(const char* reason);
-	void refocusDefault();
+  // `reason` is the controller-space plain-text reason; resolved through the
+  // local tables and escaped before it reaches the DOM.
+  void showFor(const char *reason);
+  void refocusDefault();
 
 protected:
-	void onDocumentReady() override;
+  void onDocumentReady() override;
 
 private:
-	class WindowListener final : public Rml::EventListener {
-	public:
-		explicit WindowListener(ConnectionErrorOverlay* owner) : Owner(owner) {}
-		void ProcessEvent(Rml::Event& event) override;
+  class WindowListener final : public Rml::EventListener {
+  public:
+    explicit WindowListener(ConnectionErrorOverlay *owner) : Owner(owner) {}
+    void ProcessEvent(Rml::Event &event) override;
 
-	private:
-		ConnectionErrorOverlay* Owner;
-	};
+  private:
+    ConnectionErrorOverlay *Owner;
+  };
 
-	void handle(Rml::Event& event);
+  void handle(Rml::Event &event);
 
-	WindowListener Listener;
-	ActionSink Sink;
+  WindowListener Listener;
+  ActionSink Sink;
 };
 
 class PasswordOverlay final : public framework::InteractiveDocument {
 public:
-	PasswordOverlay();
-	~PasswordOverlay() override;
+  PasswordOverlay();
+  ~PasswordOverlay() override;
 
-	void setActionSink(ActionSink sink) { Sink = std::move(sink); }
+  void setActionSink(ActionSink sink) {
+    Sink = std::move(sink);
+  }
 
-	// Clears the field and updates the lead line; called once per opening
-	// (`invalid` = the engine asked again after a rejected password).
-	void prepare(bool invalid);
+  // Clears the field and updates the lead line; called once per opening
+  // (`invalid` = the engine asked again after a rejected password).
+  void prepare(bool invalid);
 
-	// The typed password (empty when the field is missing). Not logged.
-	std::string value() const;
+  // The typed password (empty when the field is missing). Not logged.
+  std::string value() const;
 
-	// The password field element - the dialog's keyboard target. The
-	// per-frame focus guard keeps it focused while the overlay is up (a
-	// click on a dialog button would otherwise strand the focus there and
-	// characters typed afterwards would be dropped). Null before load.
-	Rml::Element* editor() const;
+  // The password field element - the dialog's keyboard target. The
+  // per-frame focus guard keeps it focused while the overlay is up (a
+  // click on a dialog button would otherwise strand the focus there and
+  // characters typed afterwards would be dropped). Null before load.
+  Rml::Element *editor() const;
 
-	void refocusDefault();
+  void refocusDefault();
 
 protected:
-	void onDocumentReady() override;
+  void onDocumentReady() override;
 
 private:
-	class WindowListener final : public Rml::EventListener {
-	public:
-		explicit WindowListener(PasswordOverlay* owner) : Owner(owner) {}
-		void ProcessEvent(Rml::Event& event) override;
+  class WindowListener final : public Rml::EventListener {
+  public:
+    explicit WindowListener(PasswordOverlay *owner) : Owner(owner) {}
+    void ProcessEvent(Rml::Event &event) override;
 
-	private:
-		PasswordOverlay* Owner;
-	};
+  private:
+    PasswordOverlay *Owner;
+  };
 
-	void handle(Rml::Event& event);
+  void handle(Rml::Event &event);
 
-	WindowListener Listener;
-	ActionSink Sink;
+  WindowListener Listener;
+  ActionSink Sink;
 };
 
 class DirectConnectOverlay final : public framework::InteractiveDocument {
 public:
-	DirectConnectOverlay();
-	~DirectConnectOverlay() override;
+  DirectConnectOverlay();
+  ~DirectConnectOverlay() override;
 
-	void setActionSink(ActionSink sink) { Sink = std::move(sink); }
+  void setActionSink(ActionSink sink) {
+    Sink = std::move(sink);
+  }
 
-	// Clears the address field for a fresh entry.
-	void prepare();
+  // Clears the address field for a fresh entry.
+  void prepare();
 
-	// The typed address (empty when the field is missing).
-	std::string value() const;
+  // The typed address (empty when the field is missing).
+  std::string value() const;
 
-	// The address field element - the dialog's keyboard target (see
-	// PasswordOverlay::editor). Null before load.
-	Rml::Element* editor() const;
+  // The address field element - the dialog's keyboard target (see
+  // PasswordOverlay::editor). Null before load.
+  Rml::Element *editor() const;
 
-	// Inline feedback for a refused entry (escaped; empty clears the line).
-	void showHint(const char* text);
-	void refocusDefault();
+  // Inline feedback for a refused entry (escaped; empty clears the line).
+  void showHint(const char *text);
+  void refocusDefault();
 
 protected:
-	void onDocumentReady() override;
+  void onDocumentReady() override;
 
 private:
-	class WindowListener final : public Rml::EventListener {
-	public:
-		explicit WindowListener(DirectConnectOverlay* owner) : Owner(owner) {}
-		void ProcessEvent(Rml::Event& event) override;
+  class WindowListener final : public Rml::EventListener {
+  public:
+    explicit WindowListener(DirectConnectOverlay *owner) : Owner(owner) {}
+    void ProcessEvent(Rml::Event &event) override;
 
-	private:
-		DirectConnectOverlay* Owner;
-	};
+  private:
+    DirectConnectOverlay *Owner;
+  };
 
-	void handle(Rml::Event& event);
+  void handle(Rml::Event &event);
 
-	WindowListener Listener;
-	ActionSink Sink;
+  WindowListener Listener;
+  ActionSink Sink;
 };
 
-}
+} // namespace panels::loading

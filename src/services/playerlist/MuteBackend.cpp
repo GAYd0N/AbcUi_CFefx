@@ -21,6 +21,7 @@
 #include <metahook.h>
 
 #include <cstring>
+#include <string>
 
 namespace services {
 namespace playerlist {
@@ -30,104 +31,111 @@ namespace {
 // The interface's exported name and vtable shape. Kept as a minimal
 // local declaration: the shipped header never exposed this interface publicly
 // (it is GameUI-private), and the slots are pinned by the call sites above.
-constexpr const char* kClientExportsInterface = "GameClientExports001";
+constexpr const char *kClientExportsInterface = "GameClientExports001";
 
-using CreateInterfaceFn = void* (*)(const char* name, int* returnCode);
+using CreateInterfaceFn = void *(*)(const char *name, int *returnCode);
 // One resolved probe. `object` null = unavailable.
 struct Probe {
-	bool Done = false;
-	ClientMuteApi Api;
+  bool Done = false;
+  ClientMuteApi Api;
 };
 
-Probe& probe() {
-	static Probe state;
-	return state;
+Probe &probe() {
+  static Probe state;
+  return state;
 }
 
 void resolve() {
-	Probe& state = probe();
-	if (state.Done)
-		return;
-	state.Done = true;
-	if (!g_pMetaHookAPI || !g_pMetaHookAPI->GetClientFactory) {
-		abc::ConsoleWarn("[AbcUi] player mute backend unavailable (no client factory API)\n");
-		return;
-	}
-	CreateInterfaceFn factory = reinterpret_cast<CreateInterfaceFn>(g_pMetaHookAPI->GetClientFactory());
-	if (!factory) {
-		abc::ConsoleWarn("[AbcUi] player mute backend unavailable (client factory not served)\n");
-		return;
-	}
-	int returnCode = 0;
-	void* object = factory(kClientExportsInterface, &returnCode);
-	if (!object) {
-		// The shipped GameUI resolves this interface for its own player list;
-		// an install whose client DLL does not serve the name has no shipped
-		// mute backend either - the correct answer is "unavailable".
-		//
-		// Positive control: the SAME factory is asked for names the client DLL
-		// is known to serve (its own interface strings, see the T20 evidence),
-		// so the log distinguishes "the factory path is broken" from "this one
-		// interface does not exist".
-		static const char* kControlNames[] = {"SCClientDLL001", "VClientVGUI001"};
-		char controls[96] = {};
-		for (const char* control : kControlNames) {
-			int code = 0;
-			const bool served = factory(control, &code) != nullptr;
-			// Keep the line short; missing controls are informational only.
-			char piece[40];
-			_snprintf_s(piece, sizeof(piece), _TRUNCATE, "%s%s=%d", controls[0] ? "," : "",
-				control, served ? 1 : 0);
-			strncat_s(controls, sizeof(controls), piece, _TRUNCATE);
-		}
-		abc::ConsoleWarn("[AbcUi] player mute backend unavailable (client DLL does not serve %s; factory control %s)\n",
-			kClientExportsInterface, controls);
-		return;
-	}
-	// MSVC x86 vtable layout for IGameClientExports : IBaseInterface: slot 0
-	// is the scalar deleting destructor, slot 1 is the first method (the
-	// shipped +4 call returns the game-name string), and the mute methods sit
-	// at slots 2/3/4 = +8/+0xc/+0x10 - exactly the call sites in
-	// CPlayerListDialog (FUN_10015d70). Indices are the shipped +N/4 values.
-	if (!state.Api.attach(object)) {
-		abc::ConsoleWarn("[AbcUi] player mute backend unavailable (incomplete vtable)\n");
-		return;
-	}
-	abc::ConsolePrint("[AbcUi] player mute backend resolved (%s)\n", kClientExportsInterface);
+  Probe &state = probe();
+  if (state.Done)
+    return;
+  state.Done = true;
+  if (!g_pMetaHookAPI || !g_pMetaHookAPI->GetClientFactory) {
+    abc::ConsoleWarn(
+        "[AbcUi] player mute backend unavailable (no client factory API)\n");
+    return;
+  }
+  CreateInterfaceFn factory =
+      reinterpret_cast<CreateInterfaceFn>(g_pMetaHookAPI->GetClientFactory());
+  if (!factory) {
+    abc::ConsoleWarn("[AbcUi] player mute backend unavailable (client factory "
+                     "not served)\n");
+    return;
+  }
+  int returnCode = 0;
+  void *object = factory(kClientExportsInterface, &returnCode);
+  if (!object) {
+    // The shipped GameUI resolves this interface for its own player list;
+    // an install whose client DLL does not serve the name has no shipped
+    // mute backend either - the correct answer is "unavailable".
+    //
+    // Positive control: the SAME factory is asked for names the client DLL
+    // is known to serve (its own interface strings, see the T20 evidence),
+    // so the log distinguishes "the factory path is broken" from "this one
+    // interface does not exist".
+    static const char *kControlNames[] = {"SCClientDLL001", "VClientVGUI001"};
+    std::string controls;
+    for (const char *control : kControlNames) {
+      int code = 0;
+      const bool served = factory(control, &code) != nullptr;
+      if (!controls.empty())
+        controls += ',';
+      controls += control;
+      controls += served ? "=1" : "=0";
+    }
+    abc::ConsoleWarn("[AbcUi] player mute backend unavailable (client DLL does "
+                     "not serve %s; factory control %s)\n",
+                     kClientExportsInterface, controls.c_str());
+    return;
+  }
+  // MSVC x86 vtable layout for IGameClientExports : IBaseInterface: slot 0
+  // is the scalar deleting destructor, slot 1 is the first method (the
+  // shipped +4 call returns the game-name string), and the mute methods sit
+  // at slots 2/3/4 = +8/+0xc/+0x10 - exactly the call sites in
+  // CPlayerListDialog (FUN_10015d70). Indices are the shipped +N/4 values.
+  if (!state.Api.attach(object)) {
+    abc::ConsoleWarn(
+        "[AbcUi] player mute backend unavailable (incomplete vtable)\n");
+    return;
+  }
+  abc::ConsolePrint("[AbcUi] player mute backend resolved (%s)\n",
+                    kClientExportsInterface);
 }
 
 class Backend final : public IMuteBackend {
 public:
-	bool available() const override {
-		const_cast<Backend*>(this)->ensure();
-		return probe().Api.available();
-	}
-	bool isMuted(int index) const override {
-		const_cast<Backend*>(this)->ensure();
-		const Probe& state = probe();
-		return state.Api.isMuted(index);
-	}
-	bool mute(int index) override {
-		ensure();
-		const Probe& state = probe();
-		return state.Api.mute(index);
-	}
-	bool unmute(int index) override {
-		ensure();
-		const Probe& state = probe();
-		return state.Api.unmute(index);
-	}
+  bool available() const override {
+    const_cast<Backend *>(this)->ensure();
+    return probe().Api.available();
+  }
+  bool isMuted(int index) const override {
+    const_cast<Backend *>(this)->ensure();
+    const Probe &state = probe();
+    return state.Api.isMuted(index);
+  }
+  bool mute(int index) override {
+    ensure();
+    const Probe &state = probe();
+    return state.Api.mute(index);
+  }
+  bool unmute(int index) override {
+    ensure();
+    const Probe &state = probe();
+    return state.Api.unmute(index);
+  }
 
 private:
-	void ensure() { resolve(); }
+  void ensure() {
+    resolve();
+  }
 };
 
 } // namespace
 
-IMuteBackend* muteBackend() {
-	static Backend backend;
-	return &backend;
+IMuteBackend *muteBackend() {
+  static Backend backend;
+  return &backend;
 }
 
-}
-}
+} // namespace playerlist
+} // namespace services

@@ -1,91 +1,101 @@
-/* health.rcss - HealthPanel layout. Coordinates from the old
-   abcenchance/res/HealthPanel.res (proportional units -> 1:1 dp). */
+/* health.rcss - HealthPanel layout, HL2-inspired but not a copy: the vital
+   readout is an amber icon plus one large amber number drawn straight on the
+   scene (HL2 has no plate behind the vitals), while the vgui-era meter stays
+   as the bar indicator under each value - the bar fill still animates by
+   value/100 with the old 0.15s linear ramp.
+
+   Geometry (design units, 1dp = one old proportional unit):
+     health group  icon 0,4 20x20   number 26,0 78x28   meter 26,32 92x5
+     armor group   icon 150,4 20x20 number 176,0 78x28  meter 176,32 92x5
+     longjump icon 272,4 (visibility from the suit bit)
+   The number box is 28 tall with a 28 line box, so the glyph band centres on
+   the icon centre (4 + 10 = 14 = box centre). */
 
 #health {
 	position: absolute;
-	left: 0dp;
-	bottom: 0dp;
+	left: 18dp;
+	bottom: 12dp;
 	width: 300dp;
-	height: 30dp;
+	height: 46dp;
 }
 
-#health .bg {
-	position: absolute;
-	left: 0dp;
-	top: 0dp;
-	width: 300dp;
-	height: 30dp;
+/* HL2-style vitals type: one big amber value per group. Verdana Bold stands
+   in for the old CompactaBold; the 1px black outline is what keeps the number
+   readable over bright floors (the additive glyph ink that replaced it read
+   too flat once outlined, so the value went back to type). */
+#health .font-vital {
+	font-family: Verdana;
+	font-weight: bold;
+	font-size: 20dp;
+	letter-spacing: 0.4dp;
+	white-space: nowrap;
+	font-effect: outline(1px #000000b4);
 }
 
-/* Health icon (6, center) 15x15; label (14, center) 48x30; bar (55) 56x11.
-   The armor group mirrors it at +120dp/169dp (old res values). The bar
-   fill clips through the wrapper: its width animates with the value
-   (old AnimationController RunAnimationCommand wide, 0.15s linear). */
 #health-icon, #armor-icon {
 	position: absolute;
-	top: 7.5dp;
-	width: 15dp;
-	height: 15dp;
-	/* Old HealthBar.Health/ArmorIconFgColor = scheme Default (danger rule
-	   overrides). The bar fill rides the same scheme colour. */
-	image-color: #00ff00;
+	top: 4dp;
+	width: 20dp;
+	height: 20dp;
+	/* HUD accent (was scheme Default); applyDanger shifts the hue toward red
+	   below hud_danger_health / hud_danger_armor. Additive texture. */
+	image-color: var(--abc-hud-accent);
+	opacity: var(--abc-hud-icon-opacity);
 }
-#health-icon { left: 6dp; }
-#armor-icon { left: 120dp; }
+#health-icon { left: 0dp; }
+#armor-icon { left: 150dp; }
 
 #health-label, #armor-label {
 	position: absolute;
 	top: 0dp;
-	width: 48dp;
-	height: 30dp;
-	text-align: center;
+	width: 78dp;
+	height: 28dp;
+	text-align: left;
 	/* vgui Labels centre their text vertically; Rml needs the explicit
 	   line box (box height = one line). */
-	line-height: 30dp;
-	/* Old HealthBar.Health/ArmorFgColor = scheme Default; the danger
-	   rule (applyDanger) overrides per value at runtime. */
-	color: #00ff00;
+	line-height: 28dp;
+	/* HUD accent; the danger rule overrides per value at runtime. */
+	color: var(--abc-hud-accent);
+	opacity: var(--abc-hud-value-opacity);
 }
-#health-label { left: 14dp; }
-#armor-label { left: 128dp; }
+#health-label { left: 26dp; }
+#armor-label { left: 176dp; }
 
-#health-bar-wrap, #armor-bar-wrap {
-	position: absolute;
-	top: 9.5dp;
-	width: 56dp;
-	height: 11dp;
-	overflow: hidden;
-	transition: width 0.15s linear-in;
-}
-#health-bar-wrap { left: 55dp; }
-#armor-bar-wrap { left: 169dp; }
-
-/* Old HealthBar/ArmorBar "BarBgColor": white @ 125 alpha. */
+/* Meter well: the black track behind the fill. */
 #health-bar-bg, #armor-bar-bg {
 	position: absolute;
-	top: 9.5dp;
-	width: 56dp;
-	height: 11dp;
-	background-color: #ffffff7d;
+	top: 32dp;
+	width: 92dp;
+	height: 5dp;
+	background-color: var(--abc-hud-track);
+	/* Pill: both ends rounded. */
+	border-radius: 2.5dp;
 }
-#health-bar-bg { left: 55dp; }
-#armor-bar-bg { left: 169dp; }
+#health-bar-bg { left: 26dp; }
+#armor-bar-bg { left: 176dp; }
 
-/* In-flow (display:block) so overflow:hidden on the wrap clips the fill
-   reliably (RmlUi clipping of abs-positioned children is not guaranteed). */
+/* The fill is its own rounded bar (no clipping wrapper): its width is the
+   value, so both ends stay round while it animates. */
 #health-bar, #armor-bar {
-	display: block;
-	width: 56dp;
-	height: 11dp;
-	/* Old HealthBar.Health/ArmorBarFgColor = scheme Default. */
-	image-color: #00ff00;
+	position: absolute;
+	top: 32dp;
+	width: 92dp;
+	height: 5dp;
+	background-color: var(--abc-hud-accent);
+	border-radius: 2.5dp;
+	opacity: var(--abc-hud-meter-opacity);
+	transition: width 0.15s linear-in;
 }
+#health-bar { left: 26dp; }
+#armor-bar { left: 176dp; }
 
 #longjump {
 	position: absolute;
-	left: 248dp;
-	top: 5dp;
+	left: 272dp;
+	top: 4dp;
 	width: 20dp;
 	height: 20dp;
 	visibility: hidden;
+	image-color: var(--abc-hud-accent);
+	opacity: var(--abc-hud-icon-opacity);
 }

@@ -7,4 +7,4 @@ namespace gameui::engine {
 extern bool DeferredVideoRestart;
 extern bool DeferredVideoConfirmRaise;
 services::settings::VideoModeModel::Seams videoSeams();
-}
+} // namespace gameui::engine

@@ -21,14 +21,14 @@ void registerAll();
 
 // The instance for a hooked command ("slot3", "+showscores", ...); nullptr
 // when the name is not on the bus (typo guard).
-abc::CChainedCommand* get(const char* name);
+abc::CChainedCommand *get(const char *name);
 // Convenience: the slotN chain for a zero-based slot index.
-abc::CChainedCommand* slotCommand(int index);
+abc::CChainedCommand *slotCommand(int index);
 
-}
+} // namespace commands
 
 namespace commands {
 // Main-thread interaction state; does not depend on a concrete panel header.
 bool textMenuOpen();
 void setTextMenuOpen(bool open);
-}
+} // namespace commands

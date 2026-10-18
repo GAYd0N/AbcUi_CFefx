@@ -46,48 +46,49 @@ void registerCvars();
 
 // Spine seam (old Viewport::AddEntity -> CItemHighLightPanel::AddEntity):
 // tracks studio-model entities whose modelindex is on the highlight list.
-void onAddEntity(cl_entity_s* ent, const char* modelname);
+void onAddEntity(cl_entity_s *ent, const char *modelname);
 
 #ifndef NDEBUG
 // abc_ui_probe aid: tracked-entity count (the AddEntity chain's ground truth).
 int debugTrackedCount();
 #endif
 
-}
+} // namespace itemhighlight
 
 class ItemHighlightPanel : public framework::HudPanel {
 public:
-	ItemHighlightPanel();
+  ItemHighlightPanel();
 
-	void reset() override;
+  void reset() override;
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
-	void onRedraw(double frameTime) override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
+  void onRedraw(double frameTime) override;
 
 private:
-	framework::DomState AppliedDom;
-	// Per-marker DOM handles (kept from creation - a lookup by entindex would
-	// collide with Rml's document-scoped GetElementById, 08 §4.33).
-	struct Marker {
-		Rml::Element* box = nullptr;
-		Rml::Element* art = nullptr;
-		Rml::Element* artAim = nullptr;
-		Rml::Element* label = nullptr;
-	};
+  framework::DomState AppliedDom;
+  // Per-marker DOM handles (kept from creation - a lookup by entindex would
+  // collide with Rml's document-scoped GetElementById, 08 §4.33).
+  struct Marker {
+    Rml::Element *box = nullptr;
+    Rml::Element *art = nullptr;
+    Rml::Element *artAim = nullptr;
+    Rml::Element *label = nullptr;
+  };
 
-	// Ensures/updates the marker for one tracked entity; returns it (null on
-	// document-element failure). `screen` is the projected world position.
-	Marker* updateMarker(int entindex, int itemIndex, float ratio, const float screen[2]);
-	void removeMarker(int entindex);
-	void clearMarkers();
+  // Ensures/updates the marker for one tracked entity; returns it (null on
+  // document-element failure). `screen` is the projected world position.
+  Marker *updateMarker(int entindex, int itemIndex, float ratio,
+                       const float screen[2]);
+  void removeMarker(int entindex);
+  void clearMarkers();
 
-	// Old CItemPickupPanel::UpdateName: template + USE binding + item name.
-	void updatePromptText(const char* nameToken);
+  // Old CItemPickupPanel::UpdateName: template + USE binding + item name.
+  void updatePromptText(const char *nameToken);
 
-	std::unordered_map<int, Marker> Markers;
-	bool PromptShown = false;
+  std::unordered_map<int, Marker> Markers;
+  bool PromptShown = false;
 };
 
-}
+} // namespace panels

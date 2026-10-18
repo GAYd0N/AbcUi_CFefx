@@ -24,15 +24,15 @@ namespace framework {
 namespace Theme {
 
 // Shared sheet every panel document links (fonts, colours, hud vars).
-constexpr const char* kBaseSheetPath = "abc/abcui/rcss/base.rcss";
+constexpr const char *kBaseSheetPath = "abc/abcui/rcss/base.rcss";
 
 // Context-level density ratio (screenH/480). Call from rmlui init and on
 // every dimension change (HUD_VidInit chain).
-void applyScale(Rml::Context* context);
+void applyScale(Rml::Context *context);
 
 // Current scale factor (screen height over 480); 1 when unscaled.
 float scale();
 
-}
+} // namespace Theme
 
-}
+} // namespace framework

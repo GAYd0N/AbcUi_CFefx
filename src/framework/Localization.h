@@ -16,16 +16,16 @@ namespace framework {
 
 class Localization {
 public:
-	// Loads abc/abcui/lang/<lang>.txt for the detected language. Idempotent:
-	// calling again after a language switch reloads the table.
-	static void load();
+  // Loads abc/abcui/lang/<lang>.txt for the detected language. Idempotent:
+  // calling again after a language switch reloads the table.
+  static void load();
 
-	// True and fills `out` when the token is known; leaves `out` alone and
-	// returns false otherwise.
-	static bool translate(std::string& out, const std::string& token);
+  // True and fills `out` when the token is known; leaves `out` alone and
+  // returns false otherwise.
+  static bool translate(std::string &out, const std::string &token);
 
 private:
-	Localization() = default;
+  Localization() = default;
 };
 
-}
+} // namespace framework

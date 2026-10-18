@@ -36,19 +36,19 @@ namespace playerlist {
 // One resolved mute backend. All methods are safe when unavailable (false).
 class IMuteBackend {
 public:
-	virtual ~IMuteBackend() = default;
-	virtual bool available() const = 0;
-	// 1-based entity slot, exactly the value the shipped row stores as
-	// "index" and hands to the interface.
-	virtual bool isMuted(int index) const = 0;
-	virtual bool mute(int index) = 0;
-	virtual bool unmute(int index) = 0;
+  virtual ~IMuteBackend() = default;
+  virtual bool available() const = 0;
+  // 1-based entity slot, exactly the value the shipped row stores as
+  // "index" and hands to the interface.
+  virtual bool isMuted(int index) const = 0;
+  virtual bool mute(int index) = 0;
+  virtual bool unmute(int index) = 0;
 };
 
 // Process-lifetime singleton; resolves lazily on first use (the client
 // factory is stable from LoadClient on, but staying lazy keeps the probe
 // honest about when the answer was obtained).
-IMuteBackend* muteBackend();
+IMuteBackend *muteBackend();
 
-}
-}
+} // namespace playerlist
+} // namespace services

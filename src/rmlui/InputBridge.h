@@ -41,7 +41,7 @@ namespace rmlui {
 // Production router instance (ownership stack + keyboard state machine).
 // The Sink side effects (Rml key feeds, engine mouse mode, opening-click
 // suppression) are bound to it here.
-framework::uiinput::Router& uiRouter();
+framework::uiinput::Router &uiRouter();
 
 // Kept for the engine-side gates and diagnostics: true while any owner
 // holds UI input (scoreboard pointer mode, menu page, ...).
@@ -70,7 +70,7 @@ bool routeKey(int down, int keynum, bool staticWheelClaim);
 // ESC is excluded - the engine window handler consumes it and its close
 // decision arrives as the single routed close; a second feed would toggle
 // twice per physical press. Wheel pulses ride the same claims as above.
-void onSurfaceMenuKey(const void* sdlEvent);
+void onSurfaceMenuKey(const void *sdlEvent);
 
 // T11 capture clamp: while the key-binding capture session runs, every
 // UI-fed edge is swallowed before the Rml dispatch (no scrolling, no button
@@ -83,25 +83,25 @@ void setKeyCaptureClamp(bool clamp);
 bool keyCaptureClampActive();
 // Diagnostics: how many wheel pulses reached routeKey and how many were
 // handed to Rml's ProcessMouseWheel (T11 live debugging).
-void wheelDiagCounts(unsigned& pulses, unsigned& delivered);
+void wheelDiagCounts(unsigned &pulses, unsigned &delivered);
 // RmlUiModule::onWheel calls this right before the Context dispatch.
 void InputBridge_noteWheelDelivered();
 
 class InputBridge {
 public:
-	// HUD_Frame time, before Context::Update.
-	static void update(Rml::Context* context);
-	// Called once for a fresh context; seed its hover state on the next poll.
-	static void resetPointerState();
+  // HUD_Frame time, before Context::Update.
+  static void update(Rml::Context *context);
+  // Called once for a fresh context; seed its hover state on the next poll.
+  static void resetPointerState();
 
-	// Raw UI-side key feed (also the router Sink body): mouse keys ride the
-	// shared button-dedup state, everything else maps through KeyMap into
-	// ProcessKeyDown/Up. Returns the Rml consume flag (diagnostic only - no
-	// consumption decision may read it, T06 step 3).
-	static bool onKeyEvent(Rml::Context* context, int down, int keynum);
+  // Raw UI-side key feed (also the router Sink body): mouse keys ride the
+  // shared button-dedup state, everything else maps through KeyMap into
+  // ProcessKeyDown/Up. Returns the Rml consume flag (diagnostic only - no
+  // consumption decision may read it, T06 step 3).
+  static bool onKeyEvent(Rml::Context *context, int down, int keynum);
 
 private:
-	static void updateMouse(Rml::Context* context);
+  static void updateMouse(Rml::Context *context);
 };
 
-}
+} // namespace rmlui

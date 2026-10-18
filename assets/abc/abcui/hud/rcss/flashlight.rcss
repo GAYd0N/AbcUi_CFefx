@@ -1,5 +1,8 @@
-/* flashlight.rcss - FlashLightPanel layout, from the old
-   abcenchance/res/FlashLightPanel.res (r55/18 anchor, 50x12). */
+/* flashlight.rcss - FlashLightPanel layout. Anchors from the old
+   abcenchance/res/FlashLightPanel.res (r55/18, 50x12); the lamp art is
+   redrawn (white glyph PNGs tinted with the HUD accent) and the battery
+   gauge now uses the same 23x12dp box as the icon, so the fill sits inside
+   the outline instead of being squashed into an 8dp strip. */
 
 #flashlight {
 	position: absolute;
@@ -18,6 +21,11 @@
 	/* Old FlashLightOn/Off animation sequences: the newly shown icon fades
 	   in over 0.1s. */
 	transition: opacity 0.1s linear-in;
+	/* White lamp glyph tinted by the HUD accent; the readout brightness rides
+	   --abc-hud-flashlight-opacity (0.75 lit / 0.53 off, set by the panel) and
+	   the off art also carries its own lower alpha. */
+	image-color: var(--abc-hud-accent);
+	opacity: var(--abc-hud-flashlight-opacity);
 }
 #on-image { visibility: hidden; }
 
@@ -25,16 +33,26 @@
    overriding the .res box (18dp) - keep the code's value. */
 #power-wrap {
 	position: absolute;
-	left: 28dp;
-	top: 2dp;
+	left: 27dp;
+	top: 0dp;
 	width: 23dp;
-	height: 8dp;
+	height: 12dp;
 	overflow: hidden;
 }
 #power-bar {
 	display: block;
 	width: 23dp;
-	height: 8dp;
+	height: 12dp;
+}
+
+#power-wrap {
+	opacity: var(--abc-hud-flashlight-opacity);
+}
+
+/* The percentage is additive glyph ink (framework::glyphs): the ink and the
+   text fallback both follow the readout brightness. */
+#flashlight #message .glyph-ink {
+	opacity: var(--abc-hud-flashlight-opacity);
 }
 
 #message {
@@ -43,10 +61,15 @@
 	top: 0dp;
 	width: 26dp;
 	height: 12dp;
+	/* The glyph cell is wider than the type advance, so the percentage gets
+	   its own slightly smaller size to keep three digits + % clear of the
+	   box edges. */
+	font-size: 8dp;
 	text-align: center;
 	/* vgui Labels centre their text vertically; Rml needs the explicit
 	   line box (box height = one line). */
 	line-height: 12dp;
 	/* Old FlashLight.TextFgColor = scheme Default. */
-	color: #00ff00;
+	color: var(--abc-hud-accent);
+	opacity: var(--abc-hud-flashlight-opacity);
 }

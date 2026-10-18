@@ -20,49 +20,51 @@
 #include <cstdarg>
 #include <cstdio>
 
-void _SpewInfo(SpewType_t type, const tchar* pFile, int line) {
-	(void)type;
-	(void)pFile;
-	(void)line;
+void _SpewInfo(SpewType_t type, const tchar *pFile, int line) {
+  (void)type;
+  (void)pFile;
+  (void)line;
 }
 
-SpewRetval_t _SpewMessage(const tchar* pMsg, ...) {
-	char buffer[1024];
-	va_list args;
-	va_start(args, pMsg);
-	vsnprintf_s(buffer, sizeof(buffer), _TRUNCATE, pMsg, args);
-	va_end(args);
-	abc::ConsoleError("[SourceAssert] %s\n", buffer);
-	return SPEW_CONTINUE;
+SpewRetval_t _SpewMessage(const tchar *pMsg, ...) {
+  char buffer[1024];
+  va_list args;
+  va_start(args, pMsg);
+  vsnprintf_s(buffer, sizeof(buffer), _TRUNCATE, pMsg, args);
+  va_end(args);
+  abc::ConsoleError("[SourceAssert] %s\n", buffer);
+  return SPEW_CONTINUE;
 }
 
-SpewRetval_t _DSpewMessage(const tchar* pGroupName, int level, const tchar* pMsg, ...) {
-	(void)pGroupName;
-	(void)level;
-	(void)pMsg;
-	return SPEW_CONTINUE;
+SpewRetval_t _DSpewMessage(const tchar *pGroupName, int level,
+                           const tchar *pMsg, ...) {
+  (void)pGroupName;
+  (void)level;
+  (void)pMsg;
+  return SPEW_CONTINUE;
 }
 
-SpewRetval_t ColorSpewMessage(SpewType_t type, const Color* pColor, const tchar* pMsg, ...) {
-	(void)type;
-	(void)pColor;
-	(void)pMsg;
-	return SPEW_CONTINUE;
+SpewRetval_t ColorSpewMessage(SpewType_t type, const Color *pColor,
+                              const tchar *pMsg, ...) {
+  (void)type;
+  (void)pColor;
+  (void)pMsg;
+  return SPEW_CONTINUE;
 }
 
-void _ExitOnFatalAssert(const tchar* pFile, int line) {
-	abc::SysError("[SourceAssert] fatal assert at %s:%d", pFile, line);
+void _ExitOnFatalAssert(const tchar *pFile, int line) {
+  abc::SysError("[SourceAssert] fatal assert at %s:%d", pFile, line);
 }
 
 bool ShouldUseNewAssertDialog() {
-	return false;
+  return false;
 }
 
-bool DoNewAssertDialog(const tchar* pFile, int line, const tchar* pExpression) {
-	(void)pFile;
-	(void)line;
-	(void)pExpression;
-	return false;
+bool DoNewAssertDialog(const tchar *pFile, int line, const tchar *pExpression) {
+  (void)pFile;
+  (void)line;
+  (void)pExpression;
+  return false;
 }
 
 #endif //_DEBUG

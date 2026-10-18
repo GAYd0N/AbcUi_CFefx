@@ -11,12 +11,13 @@
 
 namespace framework::assets {
 
-inline std::string remapLegacyMenuMedia(const std::string& path) {
-	constexpr const char* kLegacyPrefix = "abc/abcui/scence/";
-	constexpr const char* kCurrentPrefix = "abc/abcui/gameui/scence/";
-	if (path.rfind(kLegacyPrefix, 0) != 0)
-		return path;
-	return std::string(kCurrentPrefix) + path.substr(std::char_traits<char>::length(kLegacyPrefix));
+inline std::string remapLegacyMenuMedia(const std::string &path) {
+  constexpr const char *kLegacyPrefix = "abc/abcui/scence/";
+  constexpr const char *kCurrentPrefix = "abc/abcui/gameui/scence/";
+  if (path.rfind(kLegacyPrefix, 0) != 0)
+    return path;
+  return std::string(kCurrentPrefix) +
+         path.substr(std::char_traits<char>::length(kLegacyPrefix));
 }
 
 } // namespace framework::assets

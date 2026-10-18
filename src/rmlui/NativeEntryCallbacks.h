@@ -31,29 +31,29 @@ namespace vgui2ext {
 // before the callbacks are registered, tests wire recording fakes. All are
 // optional: a null seam degrades to a no-op (never a crash).
 struct NativeEntrySeams {
-	// One synthetic ESC press through the input router (route-close path of
-	// HideGameUI, T07 semantics: composition cancel first, close otherwise).
-	void (*routeEscPress)(void) = nullptr;
-	// True while some owner holds UI input (router exclusivity) - the
-	// route-close path falls back to a state-only close without it.
-	bool (*menuOwned)(void) = nullptr;
-	// The console toggle key's committed character swallow (T16).
-	void (*swallowToggleKeyText)(void) = nullptr;
-	// GameUI::Start notification: install the password-prompt slot hook.
-	void (*installPasswordPromptHook)(void) = nullptr;
-	// Teardown: drop the IPanel paint gate (GameUI::Shutdown fallback) and
-	// the password-prompt hook (ClientVGUI Shutdown, GameUI still mapped).
-	void (*detachPaintGate)(void) = nullptr;
-	void (*detachPasswordPromptHook)(void) = nullptr;
-	// Disconnect is a session end, not an engine/plugin shutdown.
-	void (*onDisconnected)(void) = nullptr;
+  // One synthetic ESC press through the input router (route-close path of
+  // HideGameUI, T07 semantics: composition cancel first, close otherwise).
+  void (*routeEscPress)(void) = nullptr;
+  // True while some owner holds UI input (router exclusivity) - the
+  // route-close path falls back to a state-only close without it.
+  bool (*menuOwned)(void) = nullptr;
+  // The console toggle key's committed character swallow (T16).
+  void (*swallowToggleKeyText)(void) = nullptr;
+  // GameUI::Start notification: install the password-prompt slot hook.
+  void (*installPasswordPromptHook)(void) = nullptr;
+  // Teardown: drop the IPanel paint gate (GameUI::Shutdown fallback) and
+  // the password-prompt hook (ClientVGUI Shutdown, GameUI still mapped).
+  void (*detachPaintGate)(void) = nullptr;
+  void (*detachPasswordPromptHook)(void) = nullptr;
+  // Disconnect is a session end, not an engine/plugin shutdown.
+  void (*onDisconnected)(void) = nullptr;
 };
 
-void setNativeEntrySeams(const NativeEntrySeams& seams);
+void setNativeEntrySeams(const NativeEntrySeams &seams);
 
 // The singleton callback instances registered with the extension.
-IVGUI2Extension_GameUICallbacks& gameUICallbacks();
-IVGUI2Extension_GameConsoleCallbacks& gameConsoleCallbacks();
-IVGUI2Extension_ClientVGUICallbacks& clientVGUICallbacks();
+IVGUI2Extension_GameUICallbacks &gameUICallbacks();
+IVGUI2Extension_GameConsoleCallbacks &gameConsoleCallbacks();
+IVGUI2Extension_ClientVGUICallbacks &clientVGUICallbacks();
 
-}
+} // namespace vgui2ext

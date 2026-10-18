@@ -9,3 +9,5 @@ CMakeUserPresets.json
 # The offline verification suite is session-local (see AGENTS.md): the
 # shipped build and release never reference it.
 tests/
+# AGENTS.md: AbcCore is consumed through ABC_CORE_DIR; never vendor it here.
+thirdparty/AbcCore/

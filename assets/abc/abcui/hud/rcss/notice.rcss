@@ -25,5 +25,5 @@
 	display: block;
 	text-align: center;
 	/* Old Notice.TextFgColor = scheme Default. */
-	color: #00ff00;
+	color: var(--abc-hud-accent);
 }

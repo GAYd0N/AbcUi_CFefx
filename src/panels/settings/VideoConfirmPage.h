@@ -32,48 +32,52 @@ namespace services {
 namespace settings {
 class VideoModeModel;
 }
-}
+} // namespace services
 
 namespace panels {
 namespace settings {
 
-using ActionSink = std::function<void(const char* action)>;
+using ActionSink = std::function<void(const char *action)>;
 
 class VideoConfirmPage final : public framework::InteractiveDocument {
 public:
-	VideoConfirmPage();
-	~VideoConfirmPage() override;
+  VideoConfirmPage();
+  ~VideoConfirmPage() override;
 
-	void setActionSink(ActionSink sink) { Sink = std::move(sink); }
-	void setVideoModel(services::settings::VideoModeModel* model) { Model = model; }
+  void setActionSink(ActionSink sink) {
+    Sink = std::move(sink);
+  }
+  void setVideoModel(services::settings::VideoModeModel *model) {
+    Model = model;
+  }
 
-	// Re-projects the model (actual mode, kind, countdown). Called by the
-	// module on show, on second ticks and on outcome changes.
-	void render();
+  // Re-projects the model (actual mode, kind, countdown). Called by the
+  // module on show, on second ticks and on outcome changes.
+  void render();
 
-	// Safe default focus (module's focus guard): the Restore entry.
-	void refocusDefault();
+  // Safe default focus (module's focus guard): the Restore entry.
+  void refocusDefault();
 
 protected:
-	void onDocumentReady() override;
+  void onDocumentReady() override;
 
 private:
-	class PageListener final : public Rml::EventListener {
-	public:
-		explicit PageListener(VideoConfirmPage* owner) : Owner(owner) {}
-		void ProcessEvent(Rml::Event& event) override;
+  class PageListener final : public Rml::EventListener {
+  public:
+    explicit PageListener(VideoConfirmPage *owner) : Owner(owner) {}
+    void ProcessEvent(Rml::Event &event) override;
 
-	private:
-		VideoConfirmPage* Owner;
-	};
+  private:
+    VideoConfirmPage *Owner;
+  };
 
-	void handleClick(Rml::Event& event);
-	void setText(const char* id, const std::string& text);
+  void handleClick(Rml::Event &event);
+  void setText(const char *id, const std::string &text);
 
-	PageListener Listener;
-	ActionSink Sink;
-	services::settings::VideoModeModel* Model = nullptr;
+  PageListener Listener;
+  ActionSink Sink;
+  services::settings::VideoModeModel *Model = nullptr;
 };
 
-}
-}
+} // namespace settings
+} // namespace panels

@@ -28,65 +28,63 @@ namespace panels {
 namespace crosshair {
 
 // Old CCrosshairPanel ctor default (persisted contract - never rename).
-extern cvar_s* Crosshair; // cl_crosshair
+extern cvar_s *Crosshair; // cl_crosshair
 
 void registerCvars();
 
-}
+} // namespace crosshair
 
 class CrosshairPanel : public framework::HudPanel {
 public:
-	CrosshairPanel();
+  CrosshairPanel();
 
-	void reset() override;
+  void reset() override;
 
-	// Last-applied DOM state per part (the old code rewrote SetBounds/
-	// SetBgColor every frame; Rml property sets invalidate style, so the port
-	// writes only on change).
-	struct AppliedPart {
-		Rml::String color;
-		float bounds[4] = {};
-		bool valid = false;
-	};
+  // Last-applied DOM state per part (the old code rewrote SetBounds/
+  // SetBgColor every frame; Rml property sets invalidate style, so the port
+  // writes only on change).
+  struct AppliedPart {
+    Rml::String color;
+    float bounds[4] = {};
+    bool valid = false;
+  };
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
-	void onRedraw(double frameTime) override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
+  void onRedraw(double frameTime) override;
 
 private:
-	struct Part {
-		const char* core;
-		const char* outline;
-	};
-	// DOM order: center, top, bottom, left, right (old m_aryCrosshair order).
-	static constexpr Part Parts[5] = {
-		{"core-center", "outline-center"},
-		{"core-top", "outline-top"},
-		{"core-bottom", "outline-bottom"},
-		{"core-left", "outline-left"},
-		{"core-right", "outline-right"},
-	};
+  struct Part {
+    const char *core;
+    const char *outline;
+  };
+  // DOM order: center, top, bottom, left, right (old m_aryCrosshair order).
+  static constexpr Part Parts[5] = {
+      {"core-center", "outline-center"}, {"core-top", "outline-top"},
+      {"core-bottom", "outline-bottom"}, {"core-left", "outline-left"},
+      {"core-right", "outline-right"},
+  };
 
-	// Hides every dynamic part + the spr img (the gate paths where the old
-	// PaintBackground/OnThink left everything empty).
-	void hideDynamicCrosshair();
-	// Old DrawDefaultCrosshair: pick the weapon's sprite crop by zoom/on-target
-	// state and center it on the crosshair center (old PaintBackground tail -
-	// independent of the dynamic-part throttle).
-	void drawDefaultCrosshair();
-	// Computes CenterX/CenterY (third-person projection vs screen center).
-	void updateCenter();
+  // Hides every dynamic part + the spr img (the gate paths where the old
+  // PaintBackground/OnThink left everything empty).
+  void hideDynamicCrosshair();
+  // Old DrawDefaultCrosshair: pick the weapon's sprite crop by zoom/on-target
+  // state and center it on the crosshair center (old PaintBackground tail -
+  // independent of the dynamic-part throttle).
+  void drawDefaultCrosshair();
+  // Computes CenterX/CenterY (third-person projection vs screen center).
+  void updateCenter();
 
-	float CenterX = 0.0f;
-	float CenterY = 0.0f;
-	float PreOffset = 0.0f;
-	float AnimTime = 0.0f;
-	AppliedPart Core[5];
-	AppliedPart Outline[5];
-	int CurrentWeaponId = 0;
-	// Current spr uri (avoids re-assigning src every frame - texture churn).
-	Rml::String SprUri;
+  float CenterX = 0.0f;
+  float CenterY = 0.0f;
+  float PreOffset = 0.0f;
+  float AnimTime = 0.0f;
+  AppliedPart Core[5];
+  AppliedPart Outline[5];
+  int CurrentWeaponId = 0;
+  // Current spr uri (avoids re-assigning src every frame - texture churn).
+  Rml::String SprUri;
 };
 
-}
+} // namespace panels

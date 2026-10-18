@@ -8,14 +8,14 @@ Attacher Current = nullptr;
 }
 
 void setAttacher(Attacher attacher) {
-	Current = attacher;
+  Current = attacher;
 }
 
-bool attach(Rml::ElementDocument* document) {
-	if (!Current || !document)
-		return false;
-	Current(document);
-	return true;
+bool attach(Rml::ElementDocument *document) {
+  if (!Current || !document)
+    return false;
+  Current(document);
+  return true;
 }
 
 } // namespace framework::menubackdrop

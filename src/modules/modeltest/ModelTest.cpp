@@ -4,6 +4,7 @@
 #include <metahook.h>
 #include "../Module.h"
 #include "../../rmlui/model/ElementModel.h"
+#include "../../rmlui/modelpreview/Target.h"
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <abc/Console.h>
@@ -12,18 +13,20 @@
 
 namespace modeltest {
 namespace {
-Rml::Context* Context = nullptr;
-Rml::ElementDocument* Document = nullptr;
+Rml::Context *Context = nullptr;
+Rml::ElementDocument *Document = nullptr;
 
 void close() {
-	if (Document) Document->Close();
-	Document = nullptr;
+  if (Document)
+    Document->Close();
+  Document = nullptr;
 }
 
 void show() {
-	if (!Context) return;
-	close();
-	Document = Context->LoadDocumentFromMemory(R"(
+  if (!Context)
+    return;
+  close();
+  Document = Context->LoadDocumentFromMemory(R"(
 <rml><head><style>
 body { position:absolute; left:30px; top:55px; width:720px; height:520px;
  background-color:#18202a; color:#ffffff; font-family:Verdana; font-size:16px;
@@ -40,45 +43,61 @@ div { display:block; }
 </div>
 <div>abc_ui_model_test hide | status | set front/side attribute value</div>
 </body></rml>)");
-	if (Document) Document->Show();
+  if (Document)
+    Document->Show();
 }
 
 void command() {
-	const std::string Action = gEngfuncs.Cmd_Argc() > 1 ? gEngfuncs.Cmd_Argv(1) : "show";
-	if (Action == "show") show();
-	else if (Action == "hide") close();
-	else if (Action == "set" && Document && gEngfuncs.Cmd_Argc() >= 5) {
-		if (auto* Element = Document->GetElementById(gEngfuncs.Cmd_Argv(2))) {
-			std::string Value = gEngfuncs.Cmd_Argv(4);
-			for (int i = 5; i < gEngfuncs.Cmd_Argc(); ++i)
-				Value += std::string(" ") + gEngfuncs.Cmd_Argv(i);
-			Element->SetAttribute(gEngfuncs.Cmd_Argv(3), Value);
-		}
-	}
-	else if (Action == "remove" && Document && gEngfuncs.Cmd_Argc() == 4) {
-		if (auto* Element = Document->GetElementById(gEngfuncs.Cmd_Argv(2)))
-			Element->RemoveAttribute(gEngfuncs.Cmd_Argv(3));
-	}
-	abc::ConsolePrint("[AbcUi model] world=%d window=%d\n", modelpreview::hasWorld(), Document != nullptr);
-	if (Document) {
-		for (const char* Id : {"front", "side"}) {
-			auto* Element = static_cast<rmlui::model::ElementModel*>(Document->GetElementById(Id));
-			if (Element)
-				abc::ConsolePrint("[AbcUi model] %s texture=%u frames=%u\n",
-					Id, Element->texture(), Element->frames());
-		}
-	}
+  const std::string Action =
+      gEngfuncs.Cmd_Argc() > 1 ? gEngfuncs.Cmd_Argv(1) : "show";
+  if (Action == "show")
+    show();
+  else if (Action == "hide")
+    close();
+  else if (Action == "set" && Document && gEngfuncs.Cmd_Argc() >= 5) {
+    if (auto *Element = Document->GetElementById(gEngfuncs.Cmd_Argv(2))) {
+      std::string Value = gEngfuncs.Cmd_Argv(4);
+      for (int i = 5; i < gEngfuncs.Cmd_Argc(); ++i)
+        Value += std::string(" ") + gEngfuncs.Cmd_Argv(i);
+      Element->SetAttribute(gEngfuncs.Cmd_Argv(3), Value);
+    }
+  } else if (Action == "remove" && Document && gEngfuncs.Cmd_Argc() == 4) {
+    if (auto *Element = Document->GetElementById(gEngfuncs.Cmd_Argv(2)))
+      Element->RemoveAttribute(gEngfuncs.Cmd_Argv(3));
+  }
+  abc::ConsolePrint("[AbcUi model] world=%d window=%d\n",
+                    modelpreview::hasWorld(), Document != nullptr);
+  if (Document) {
+    for (const char *Id : {"front", "side"}) {
+      auto *Element = static_cast<rmlui::model::ElementModel *>(
+          Document->GetElementById(Id));
+      if (Element)
+        abc::ConsolePrint("[AbcUi model] %s texture=%u frames=%u\n", Id,
+                          Element->texture(), Element->frames());
+    }
+  }
 }
 
 class Module : public modules::IUiModule {
 public:
-	Module() { modules::registry().add(this); }
-	const char* name() const override { return "modeltest"; }
-	void onInit() override { abc::ADD_COMMAND("abc_ui_model_test", command); }
-	void onContextReady(Rml::Context* Value) override { Context = Value; }
-	void onShutdown() override { close(); Context = nullptr; }
+  Module() {
+    modules::registry().add(this);
+  }
+  const char *name() const override {
+    return "modeltest";
+  }
+  void onInit() override {
+    abc::ADD_COMMAND("abc_ui_model_test", command);
+  }
+  void onContextReady(Rml::Context *Value) override {
+    Context = Value;
+  }
+  void onShutdown() override {
+    close();
+    Context = nullptr;
+  }
 };
 Module Instance;
-}
-}
+} // namespace
+} // namespace modeltest
 #endif

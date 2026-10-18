@@ -13,6 +13,8 @@
 // micro-adjustment" the plan anticipated vs OnPostRenderView: the latter
 // fires per view render (water portals/mirrors would double-draw the UI).
 
+#include <functional>
+
 namespace Rml {
 class Context;
 }
@@ -20,6 +22,17 @@ class Context;
 namespace rmlui {
 
 class AbcRenderInterface;
+
+// Lifecycle callbacks supplied by the composition root (GameUiModule). The
+// RmlUi layer owns the context, but it must not include modules/Module.h and
+// walk the module registry itself: that made rmlui depend on the top layer.
+struct LifecycleSink {
+  std::function<void(Rml::Context *)> contextReady;
+  std::function<void()> shutdown;
+  std::function<void(double)> frame;
+  std::function<void()> vidInit;
+};
+void SetLifecycleSink(LifecycleSink sink);
 
 // Deferred assembly: the first HUD_Frame builds the Rml context (one-shot).
 // LoadClient only grabs the renderer/VGUI2 interfaces (both proven safe
@@ -36,11 +49,11 @@ void registerCommands();
 
 // Live Rml context, null before init()/after shutdown() - Debug probe
 // tooling only (ProbeCommand.cpp).
-Rml::Context* context();
+Rml::Context *context();
 
 // Live render interface, null before init()/after shutdown(). The radar
 // panel registers its FBO as an external masked texture through it (batch D).
-AbcRenderInterface* renderInterface();
+AbcRenderInterface *renderInterface();
 
 // T21: how many font faces the last init() loaded (0 means text cannot render
 // anywhere). Surfaced for the fault diagnostics; the 0 case is a fatal exit
@@ -53,9 +66,9 @@ int loadedFontCount();
 // per HUD_Frame and onRedraw, Render() per OnRenderEndFrame. Accumulates a
 // rolling window; the command prints avg/max over the window and resets.
 struct PerfSnapshot {
-	int Frames = 0;
-	double UpdateAvgMs = 0.0, UpdateMaxMs = 0.0;
-	double RenderAvgMs = 0.0, RenderMaxMs = 0.0;
+  int Frames = 0;
+  double UpdateAvgMs = 0.0, UpdateMaxMs = 0.0;
+  double RenderAvgMs = 0.0, RenderMaxMs = 0.0;
 };
 PerfSnapshot perfSnapshot();
 #endif
@@ -74,11 +87,12 @@ void onWheel(int down, int keynum);
 // UI-level mouse motion/buttons for the Rml context, plus focus-loss
 // observation (T06). Observation-only - the message result is never set.
 // The hwnd operand feeds the T07 IME window cache.
-void onSurfaceWndProc(const void* hwnd, unsigned int msg, unsigned int wparam, long lparam);
+void onSurfaceWndProc(const void *hwnd, unsigned int msg, unsigned int wparam,
+                      long lparam);
 // True while any owner holds UI input (rmlui::uiRouter exclusivity): the
 // engine-side gates in hooks.cpp read this (T06 ownership stack).
 bool uiMouseOwner();
 // HUD_Shutdown: full teardown (context/docs die with the client state).
 void onHudShutdown();
 
-}
+} // namespace rmlui

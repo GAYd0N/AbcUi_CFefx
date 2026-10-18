@@ -25,7 +25,7 @@ struct engine_studio_api_s;
 namespace hooks {
 
 // LoadClient time: chain our HUD_XXX implementations into the export table.
-void attachExports(cl_exportfuncs_t* pExportFuncs);
+void attachExports(cl_exportfuncs_t *pExportFuncs);
 // LoadClient time: locate the client's vanilla HUD list (gamedata; fatal on
 // miss like the old Sig_NotFound). See the suppression note in hooks.cpp.
 void locateVanillaHudList();
@@ -43,11 +43,11 @@ void hookVanillaMenuRoute();
 void unhookVanillaMenuRoute();
 
 // Direct-call captures (09 §3.4): data-layer read-only access.
-extern engine_studio_api_s* EngineStudioApi;
+extern engine_studio_api_s *EngineStudioApi;
 extern NativePlayerInfoView NativeHudPanelInfo;
 // Client dll's GetClientColor(index) - the per-player tint (float[3] 0..1).
 // Gamedata-resolved; null = engineless gray.
-using GetClientColorFn = float* (*)(int index);
+using GetClientColorFn = float *(*)(int index);
 extern GetClientColorFn GetClientColor;
 
-}
+} // namespace hooks

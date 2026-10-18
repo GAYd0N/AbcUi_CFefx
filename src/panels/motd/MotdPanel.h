@@ -27,40 +27,40 @@ bool blocksVanillaWindow();
 // under the hud_motd >= 1 gate. Null-panel safe (blocks silently, like the
 // old viewport call into a not-yet-built page).
 void showMotd();
-}
+} // namespace motd
 
 class MotdPanel : public framework::HudPanel {
 public:
-	MotdPanel();
-	~MotdPanel() override;
+  MotdPanel();
+  ~MotdPanel() override;
 
-	void reset() override;
+  void reset() override;
 
-	// Old ShowMotd: the missionbriefing command chain and the
-	// ShowVGUIMenu(MOTD) hook both land here (hud_motd >= 1 gated).
-	void showMotd();
+  // Old ShowMotd: the missionbriefing command chain and the
+  // ShowVGUIMenu(MOTD) hook both land here (hud_motd >= 1 gated).
+  void showMotd();
 
 protected:
-	void onDocumentReady() override;
-	void onData(double frameTime) override;
+  void onDocumentReady() override;
+  void onData(double frameTime) override;
 
 private:
-	// Old AppendMotd / FinishSendMOTD (build only - the old finish never
-	// showed the window; display waits for missionbriefing).
-	void append(const char* message);
-	void finishSend();
-	void loadMissionBrief();
-	void startCountdown();
+  // Old AppendMotd / FinishSendMOTD (build only - the old finish never
+  // showed the window; display waits for missionbriefing).
+  void append(const char *message);
+  void finishSend();
+  void loadMissionBrief();
+  void startCountdown();
 
-	std::string Buffer;
-	std::string Page;
-	bool LoadedMissionBrief = false;
-	bool HasContent = false;
-	double ShowTime = 0.0;
-	double KeepTime = 5.0;
-	double FadeTime = 1.0;
-	double ClientTimeNow = 0.0;
-	bool Fading = false;
+  std::string Buffer;
+  std::string Page;
+  bool LoadedMissionBrief = false;
+  bool HasContent = false;
+  double ShowTime = 0.0;
+  double KeepTime = 5.0;
+  double FadeTime = 1.0;
+  double ClientTimeNow = 0.0;
+  bool Fading = false;
 };
 
-}
+} // namespace panels
