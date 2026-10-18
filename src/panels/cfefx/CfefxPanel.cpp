@@ -61,17 +61,21 @@ constexpr const char* kStarIds[9] = {
 constexpr float kPipTop[9] = {142.0f, 166.0f, 190.0f, 214.0f, 118.0f,
 	142.0f, 166.0f, 190.0f, 214.0f};
 
+// Document-relative, exactly like the rml's own src attributes: RmlUi joins a
+// src against the document directory, so a mod-root path ("abc/abcui/...")
+// resolves to abc/abcui/hud/rml/abc/... and the <img> falls back to the
+// renderer's white placeholder quad while the geometry keeps animating.
 constexpr const char* kScoreImages[10] = {
-	"abc/abcui/hud/img/cfefx/NanoDamege1.png",
-	"abc/abcui/hud/img/cfefx/NanoDamege2.png",
-	"abc/abcui/hud/img/cfefx/NanoDamege3.png",
-	"abc/abcui/hud/img/cfefx/NanoDamege4.png",
-	"abc/abcui/hud/img/cfefx/NanoDamege5.png",
-	"abc/abcui/hud/img/cfefx/NanoDamege6.png",
-	"abc/abcui/hud/img/cfefx/NanoDamege7.png",
-	"abc/abcui/hud/img/cfefx/NanoDamege8.png",
-	"abc/abcui/hud/img/cfefx/NanoDamege9.png",
-	"abc/abcui/hud/img/cfefx/NanoDamege10.png",
+	"../img/cfefx/NanoDamege1.png",
+	"../img/cfefx/NanoDamege2.png",
+	"../img/cfefx/NanoDamege3.png",
+	"../img/cfefx/NanoDamege4.png",
+	"../img/cfefx/NanoDamege5.png",
+	"../img/cfefx/NanoDamege6.png",
+	"../img/cfefx/NanoDamege7.png",
+	"../img/cfefx/NanoDamege8.png",
+	"../img/cfefx/NanoDamege9.png",
+	"../img/cfefx/NanoDamege10.png",
 };
 
 // Engine sound path (relative to the mod's sound/ directory).
