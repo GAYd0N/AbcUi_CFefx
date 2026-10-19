@@ -83,7 +83,7 @@ std::string percentText(float fraction) {
 
 LoadingPage::LoadingPage()
     : InteractiveDocument("menuloading", "abc/abcui/gameui/rml/loading.rml",
-                          true),
+                          true, kLoadingZIndex),
       Listener(this) {}
 
 LoadingPage::~LoadingPage() {
@@ -178,7 +178,8 @@ void LoadingPage::refocusDefault() {
 
 ConnectionErrorOverlay::ConnectionErrorOverlay()
     : InteractiveDocument("menuconnerror",
-                          "abc/abcui/gameui/rml/connerror.rml"),
+                          "abc/abcui/gameui/rml/connerror.rml", false,
+                          kConnectionDialogZIndex),
       Listener(this) {}
 
 ConnectionErrorOverlay::~ConnectionErrorOverlay() {
@@ -224,7 +225,8 @@ void ConnectionErrorOverlay::refocusDefault() {
 }
 
 PasswordOverlay::PasswordOverlay()
-    : InteractiveDocument("menupassword", "abc/abcui/gameui/rml/password.rml"),
+    : InteractiveDocument("menupassword", "abc/abcui/gameui/rml/password.rml",
+                          false, kConnectionDialogZIndex),
       Listener(this) {}
 
 PasswordOverlay::~PasswordOverlay() {
@@ -298,7 +300,8 @@ void PasswordOverlay::refocusDefault() {
 
 DirectConnectOverlay::DirectConnectOverlay()
     : InteractiveDocument("menudirectconnect",
-                          "abc/abcui/gameui/rml/directconnect.rml"),
+                          "abc/abcui/gameui/rml/directconnect.rml", false,
+                          kConnectionDialogZIndex),
       Listener(this) {}
 
 DirectConnectOverlay::~DirectConnectOverlay() {

@@ -146,7 +146,12 @@ void GameUiModule::syncMenuPresentation() {
     Command->hide();
 
   // Overlay layer, top-most last (each show pulls to the context
-  // front); idempotent shows neither re-focus nor re-order.
+  // front); idempotent shows neither re-focus nor re-order. The loading
+  // page (shown in the page switch above) is NOT ordered by this block:
+  // its document z-index tier (InteractiveDocument::kLoadingZIndex) keeps
+  // it above the page shells and the console even though the console
+  // shows later, while the connection dialogs and the quit confirmation
+  // carry higher tiers of their own (#4).
   // T16 replacement console: fresh projection on every sync (the
   // page appends only new lines; showLinesForTest analog = render).
   if (state.overlays.contains(MenuOverlay::kConsole) && Console) {

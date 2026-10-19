@@ -237,10 +237,13 @@ int __MsgFunc_ScoreInfo(const char *pszName, int iSize, void *pbuf) {
     int isAdmin = msg.readByte();
     if (!msg.ok())
       return original_ScoreInfo(pszName, iSize, pbuf);
+    // Health/armor may go negative on overkill (GoldSrc reports the raw
+    // value); both are accepted as long as they are finite. The magnitude
+    // bound only keeps the later int display casts in range; panels clamp
+    // for display (bars) or render the dead/N/A tag.
     if (std::isfinite(frags) && std::isfinite(health) && std::isfinite(armor) &&
         std::abs(frags) <= 1000000.0f && deaths >= 0 && deaths <= 1000000 &&
-        health >= 0 && health <= 1000000000.0f && armor >= 0 &&
-        armor <= 1000000000.0f)
+        std::abs(health) <= 1000000000.0f && std::abs(armor) <= 1000000000.0f)
       ScoreInfo(clientIndex, frags, deaths, health, armor, teamNumber,
                 hideExtra, isAdmin);
   }

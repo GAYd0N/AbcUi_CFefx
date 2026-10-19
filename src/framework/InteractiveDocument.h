@@ -50,13 +50,37 @@ public:
                         // caller escalates, nothing is loaded
   };
 
+  // Cross-document z-order tiers. Every menu surface is one document on the
+  // shared context, and RmlUi sorts the context root's stacking context by
+  // z-index first: any explicit positive z-index paints (and hit-tests)
+  // above every default document, whose auto z-index leaves it in tree
+  // order. Only a layer that must outrank a peer needs a tier - the same
+  // mechanism HudPanel uses for the HUD plates (-1 radar):
+  //   default documents (page shells, console)
+  //     < kLoadingZIndex
+  //     < kConnectionDialogZIndex (connection error / password / direct
+  //       connect)
+  //     < kConfirmQuitZIndex.
+  // Loading covers the page and console layers (issue #4); the three
+  // connection dialogs stay above it because they share loading's dialog
+  // slot (loading.rcss gives every one of the four boxes the same geometry)
+  // and the password/direct-connect ones are only actionable through their
+  // own buttons. The property is set once at load and never toggled; a
+  // hidden document leaves the stacking context entirely, so a hidden
+  // loading page leaves no z-order residue.
+  static constexpr int kLoadingZIndex = 500;
+  static constexpr int kConnectionDialogZIndex = 550;
+  static constexpr int kConfirmQuitZIndex = 600;
+
   // `withBackdrop`: the page is a full-window menu surface and wants the
   // shared blurred backdrop inserted behind its own content (see
   // framework/MenuBackdrop.h; a no-op until the rmlui layer installs the
   // implementation). Overlays that must keep the world visible (the console)
   // leave it false.
+  // `zIndex`: the document's tier in the cross-document order above (0 =
+  // default, ordered with every other default document by show order).
   InteractiveDocument(const char *name, const char *documentPath,
-                      bool withBackdrop = false);
+                      bool withBackdrop = false, int zIndex = 0);
   // Subclasses with member listeners MUST call close() in their destructor
   // body, before those members die. The base destructor is only a fallback.
   virtual ~InteractiveDocument();
@@ -142,6 +166,10 @@ protected:
   Rml::Element *element(const char *id);
 
 private:
+  // Applies the constructor's z-index to whichever document load() ended up
+  // with (main or emergency); no-op for a default document.
+  void applyZIndex();
+
   struct ListenerBinding {
     Rml::ObserverPtr<Rml::Element> Target;
     std::string Event;
@@ -167,6 +195,7 @@ private:
   const std::string Name;
   const std::string DocumentPath;
   const bool WithBackdrop;
+  const int ZIndex;
   Rml::ElementDocument *Document = nullptr;
   bool Degraded = false;
   bool RetryRequested = false;

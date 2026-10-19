@@ -70,8 +70,9 @@ constexpr char kEmergencyRml[] =
 
 InteractiveDocument::InteractiveDocument(const char *name,
                                          const char *documentPath,
-                                         bool withBackdrop)
-    : Name(name), DocumentPath(documentPath), WithBackdrop(withBackdrop) {}
+                                         bool withBackdrop, int zIndex)
+    : Name(name), DocumentPath(documentPath), WithBackdrop(withBackdrop),
+      ZIndex(zIndex) {}
 
 InteractiveDocument::~InteractiveDocument() {
   close();
@@ -114,6 +115,7 @@ InteractiveDocument::load(Rml::Context *context) {
   }
   if (Document) {
     Degraded = false;
+    applyZIndex();
     // Backdrop before the page's own setup: the page's onDocumentReady may
     // resolve or reorder nodes, and the backdrop must already sit behind
     // them (paint order is DOM order).
@@ -134,6 +136,7 @@ InteractiveDocument::load(Rml::Context *context) {
     return LoadOutcome::kFailed;
   Degraded = true;
   RetryRequested = false;
+  applyZIndex();
   // The recovery affordances: bound through the owner-tracked attach so
   // close() detaches them before the DOM dies.
   if (Rml::Element *retry = Document->GetElementById("emergency-retry"))
@@ -191,6 +194,16 @@ void InteractiveDocument::close() {
 
 bool InteractiveDocument::isVisible() const {
   return Document && Document->IsVisible();
+}
+
+void InteractiveDocument::applyZIndex() {
+  // Cross-document order only (see the tier constants in the header): RmlUi
+  // paints and hit-tests the context root's stacking context by z-index
+  // first, so a positive tier covers every default document. Set once at
+  // load, never toggled - a hidden document is not in the stacking context,
+  // so the visible order returns on its own when the layer hides.
+  if (Document && ZIndex != 0)
+    Document->SetProperty("z-index", std::to_string(ZIndex));
 }
 
 void InteractiveDocument::addListener(Rml::Element *target, const char *event,

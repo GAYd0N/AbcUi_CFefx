@@ -64,6 +64,10 @@ void PlayerInfo::update() {
   connected = info && info->name[0];
   if (connected && steamId64 && info->m_nSteamID &&
       steamId64 != info->m_nSteamID) {
+    // New occupant in this slot: drop the previous player's record. The
+    // ScoreInfo handler refreshes the identity first and applies its wire
+    // values afterwards, so this reset cannot discard the stats from the
+    // same message (issue #3).
     reset();
     connected = true;
   }
@@ -145,6 +149,11 @@ void init() {
     PlayerInfo *info = getPlayerInfo(index);
     if (!info)
       return;
+    // Refresh the engine identity first: update() resets the record when
+    // the slot now belongs to a different player (SteamID change). Apply
+    // the wire values after that reset so the same ScoreInfo's fresh
+    // health/armor/team are not discarded (issue #3).
+    info->update();
     info->frags = frag;
     info->deaths = death;
     info->health = health;
@@ -152,7 +161,6 @@ void init() {
     info->team = static_cast<teamres::TeamId>(team);
     info->hideExtra = static_cast<HideExtra>(extra);
     info->admin = static_cast<Admin>(admin);
-    info->update();
   });
   netmsg::Spectator.append([](int index, bool spectate) {
     PlayerInfo *info = getPlayerInfo(index);

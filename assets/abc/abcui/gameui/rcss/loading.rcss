@@ -2,6 +2,13 @@
    password, direct connect). All units dp; the context density ratio does
    the scaling (framework::Theme::applyScale). */
 
+/* The four boxes share one slot, but they are four documents: the
+   cross-document order lives in C++ (framework::InteractiveDocument's
+   z-index tiers, issue #4) - loading covers the page shells and the
+   console, while the error/password/direct-connect dialogs stay above
+   loading (a live password prompt is only actionable through its own
+   buttons, so it must not be hidden behind the loading box). */
+
 #loading-box, #connerror-box, #password-box, #directconnect-box {
 	position: absolute;
 	left: 48dp;

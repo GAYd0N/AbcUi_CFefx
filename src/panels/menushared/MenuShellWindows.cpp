@@ -29,7 +29,8 @@ Rml::Element *actionNode(Rml::Element *node) {
 
 ConfirmQuitOverlay::ConfirmQuitOverlay()
     : InteractiveDocument("menuconfirm",
-                          "abc/abcui/gameui/rml/confirmquit.rml"),
+                          "abc/abcui/gameui/rml/confirmquit.rml", false,
+                          kConfirmQuitZIndex),
       Listener(this) {}
 
 ConfirmQuitOverlay::~ConfirmQuitOverlay() {

@@ -53,6 +53,9 @@ constexpr float kMaxDistance = 1024.0f;
 constexpr float kMinViewDot = 0.5f;
 // Old SetPos centered the tile on the projection (x - GetWide()/2, wide 80).
 constexpr float kTileHalfWidth = 40.0f;
+// Old fill = BackGroundImage wide (67 in PlayerBoardPanel.res; the
+// HealthImage 38 was only the initial value, overwritten per Think).
+constexpr float kBarWidth = 67.0f;
 
 // Per-tile inner-element lookup. The 32 tiles intentionally repeat the same
 // inner ids ("name", "bar-health", ...) in one document, so the lookup MUST
@@ -75,15 +78,6 @@ const char *tileId(int index) {
     TileIdsReady = true;
   }
   return TileIds[index].c_str();
-}
-
-void setBarWidth(Rml::Element *bar, float ratio) {
-  if (!bar)
-    return;
-  // Old fill = BackGroundImage wide (67 in PlayerBoardPanel.res; the
-  // HealthImage 38 was only the initial value, overwritten per Think).
-  const float width = 67.0f * std::clamp(ratio, 0.0f, 1.0f);
-  bar->SetProperty("width", std::to_string(width) + "dp");
 }
 
 } // namespace
@@ -114,8 +108,14 @@ bool PlayerBoardPanel::updateClientInfo(Rml::Element *tile, int entindex) {
   }
 
   const float health = info->health;
-  const float armorRatio = std::clamp(info->armor / 100.0f, 0.0f, 1.0f);
-  const float healthRatio = std::clamp(health / 100.0f, 0.0f, 1.0f);
+  const bool dead = health <= 0.0f;
+  // Health/armor clamp for display: negative overkill and >100 values are
+  // wire-legal. A dead player's residual armor is not meaningful on the
+  // overhead tile, so both bars read 0 while the dead icon shows.
+  const float armorRatio =
+      dead ? 0.0f : std::clamp(info->armor / 100.0f, 0.0f, 1.0f);
+  const float healthRatio =
+      dead ? 0.0f : std::clamp(health / 100.0f, 0.0f, 1.0f);
 
   Rml::Element *name = child(tile, "name");
   if (name) {
@@ -134,9 +134,9 @@ bool PlayerBoardPanel::updateClientInfo(Rml::Element *tile, int entindex) {
     }
   }
   AppliedDom.property(child(tile, "bar-health"), "width",
-                      std::to_string(67.0f * healthRatio) + "dp");
+                      std::to_string(kBarWidth * healthRatio) + "dp");
   AppliedDom.property(child(tile, "bar-armor"), "width",
-                      std::to_string(67.0f * armorRatio) + "dp");
+                      std::to_string(kBarWidth * armorRatio) + "dp");
 
   // Danger band icons: below hud_playerinfo_danger - dead -> skull, hurt
   // -> medkit; otherwise the crouch icon rides the hull height (old
@@ -147,9 +147,10 @@ bool PlayerBoardPanel::updateClientInfo(Rml::Element *tile, int entindex) {
                            ? playerboard::PlayerInfoDanger->value
                            : 30.0f;
   // Old icon band: medkit under the danger line (but alive), dead -> skull
-  // only (the two never showed together at health==0).
-  const bool showMedkit = health > 0.0f && health < danger;
-  const bool showDead = health <= 0.0f;
+  // only (the two never showed together at health==0). Priority is
+  // dead > medkit > crouch; an unusual health value never hides the tile.
+  const bool showMedkit = !dead && health < danger;
+  const bool showDead = dead;
   const bool showCrouch =
       !showMedkit && !showDead && ent &&
       std::fabs(ent->curstate.maxs[2] - ent->curstate.mins[2]) < 64.0f;

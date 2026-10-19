@@ -2,7 +2,10 @@
    abcenchance/res/PlayerBoardPanel.res (80x16 proportional panel; background
    67x17 at 0,0; name label 12,7 38x11 autowidetocontents; health bar 12,0
    38x3; armor bar 12,4 38x3; icons 12-14px at 0,0). Bars clip their width
-   through overflow:hidden + a px width driven per frame (vgui SetWide). */
+   through overflow:hidden + clip:always and a dp width driven per frame
+   (vgui SetWide); clip:always is required because RmlUi only scissors an
+   overflow box when its client size is smaller than its scroll size, and the
+   absolutely positioned fill image never contributes scroll overflow. */
 
 #playerboard {
 	position: absolute;
@@ -24,6 +27,12 @@
 
 .tile img {
 	position: absolute;
+}
+
+/* Force the overflow scissor even though the 67dp fill image does not add
+   scroll overflow: the per-frame width on the bar must visibly crop it. */
+.tile .bar {
+	clip: always;
 }
 
 .tile .background {
