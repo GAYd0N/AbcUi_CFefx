@@ -60,10 +60,16 @@ public:
   }
 
   // T19: the attempt-kind title seam. The local-game start shows the
-  // create-game title instead of the connect one; both are "#tokens"
-  // resolved through the project table at render time (never markup).
+  // create-game title, a map change the map-load title, and a connect the
+  // shipping connect title. All are "#tokens" resolved through the project
+  // table at render time (never markup).
   void setTitleToken(const char *token) {
     TitleToken = token ? token : "";
+  }
+  // Fallback status while the engine has not streamed one yet. The connect
+  // wording ("Contacting the server...") would be wrong during a changelevel.
+  void setStatusToken(const char *token) {
+    StatusToken = token ? token : "";
   }
 
   // Projects the model's current values into the document. Called by the
@@ -94,6 +100,9 @@ private:
   // "#token" of the current title (connect vs local-game start; empty = the
   // shipping connect title).
   std::string TitleToken;
+  // Fallback status token used until the engine streams status text; empty =
+  // the shipping connect status.
+  std::string StatusToken;
 };
 
 class ConnectionErrorOverlay final : public framework::InteractiveDocument {

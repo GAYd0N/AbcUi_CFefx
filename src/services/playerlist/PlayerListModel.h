@@ -44,10 +44,12 @@
 //     ("Muted"), and FUN_10015e30 enables the button only when the interface
 //     exists and the slot is neither local nor a bot.
 //   - That interface is resolved in CGameUI::Initialize (FUN_10006480) as
-//     "GameClientExports001" from the client factory passed to GameUI. The
-//     runtime availability of that factory on THIS install is probed by
-//     services::playerlist::muteBackend() - its absence is reported as
-//     "mute unavailable", never papered over.
+//     "GameClientExports001" from the client factory passed to GameUI.
+//     Issue 17: the backend behind this model is now the ported legacy
+//     voice service (services::voice, the persisted vban mute list) - the
+//     client-factory probe died with it; the reference install never
+//     served that interface anyway, so the read-back rules here are
+//     unchanged and the mute surface finally works.
 
 #include <cstdint>
 #include <string>

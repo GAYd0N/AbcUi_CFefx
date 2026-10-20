@@ -14,6 +14,7 @@
 
 #include "../../framework/Localization.h"
 #include "../../framework/TextUtil.h"
+#include "../../rmlui/TextInput.h"
 #include "../../services/console/ConsoleBackend.h"
 #include "../../services/console/ConsoleBuffer.h"
 
@@ -148,6 +149,14 @@ void parkCaretAtEnd(Rml::Element *editor) {
   input->SetSelectionRange(end, end);
 }
 
+// Issue #6: a completion replaces the editor text wholesale, so a live IME
+// composition must be dropped first - its commit would otherwise be
+// appended to the completed candidate instead of replacing the prefix.
+void endEditorComposition() {
+  if (rmlui::textComposing())
+    rmlui::cancelComposition();
+}
+
 // Splits a confirmed multi-line text into executable command lines: CR is
 // dropped, empty/whitespace-only lines are skipped (the T15 backend refuses
 // embedded newlines, so each line is its own validated submission).
@@ -208,6 +217,11 @@ void ConsolePage::onDocumentReady() {
     // the editor and refreshes the list (the edit keydown is consumed
     // before the widget applies it, so the value is only current here).
     addListener(doc, "keyup", &Keys, true);
+    // Issue #7: a focus loss ends the Tab completion session (the caret is
+    // gone, so cycling has no anchor). Attached to the editor itself: the
+    // blur event does not bubble.
+    if (Rml::Element *editor = doc->GetElementById("console-input"))
+      addListener(editor, "blur", &Keys);
   }
   // A document (re)build re-seeds the projection from the buffer; the
   // buffer itself survives document rebuilds (T15 process-scoped cache).
@@ -745,6 +759,12 @@ void ConsolePage::handleKey(Rml::Event &event) {
         released == Rml::Input::KI_TAB || released == Rml::Input::KI_ESCAPE;
     if (navigation || !PendingText.empty())
       return;
+    // Issue #7: a Tab session's editor text is a completed CANDIDATE, not a
+    // fresh prefix - re-filtering on it would collapse the list to that one
+    // entry. Only a real edit (a non-navigation key) ends the session; the
+    // rebuild below then lists the candidates of the edited text again.
+    if (CompletionSession)
+      endCompletionSession();
     refreshSuggestions();
     return;
   }
@@ -773,6 +793,16 @@ void ConsolePage::handleKey(Rml::Event &event) {
       refocusDefault();
       return;
     }
+    if (!Suggestions.empty()) {
+      // Issue #7: the completion list is a layer as well - one press closes
+      // only it, and the claim keeps that press from also closing the
+      // console (the same rule as the two panes above).
+      event.StopPropagation();
+      EscapeClaimed = true;
+      hideCompletion();
+      refocusDefault();
+      return;
+    }
     return; // the overlay close is the owner's routed ESC, not ours
   }
   if (key == Rml::Input::KI_C && ctrl && !Selection.empty()) {
@@ -788,6 +818,15 @@ void ConsolePage::handleKey(Rml::Event &event) {
   if ((key == Rml::Input::KI_RETURN || key == Rml::Input::KI_NUMPADENTER) &&
       !ctrl) {
     event.StopPropagation();
+    // Issue #7: Enter inside a Tab session runs the HIGHLIGHTED candidate
+    // (the shell menu-completion contract). A list that only the live
+    // typing refresh opened keeps the plain submit of the typed text - the
+    // pre-existing Enter behaviour.
+    if (CompletionSession && SuggestionIndex >= 0 &&
+        SuggestionIndex < static_cast<int>(Suggestions.size())) {
+      applyCompletion(SuggestionIndex, /*submit=*/true);
+      return;
+    }
     submitFromEditor();
     return;
   }
@@ -814,13 +853,13 @@ void ConsolePage::handleKey(Rml::Event &event) {
   }
   if (key == Rml::Input::KI_TAB) {
     event.StopPropagation(); // never the document's focus navigation
-    const std::string value = controlValue(doc, "console-input");
-    if (!Suggestions.empty()) {
-      const int index = SuggestionIndex < 0 ? 0 : SuggestionIndex;
-      applyCompletion(index);
+    // Issue #7: an open session cycles; it never re-filters (see the keyup
+    // rule above). A fresh Tab opens the session on the typed prefix.
+    if (CompletionSession && !Suggestions.empty()) {
+      cycleCompletion();
       return;
     }
-    openCompletionFor(value);
+    openCompletionFor(controlValue(doc, "console-input"));
     return;
   }
   if (key == Rml::Input::KI_V && ctrl) {
@@ -905,6 +944,9 @@ void ConsolePage::rebuildCompletion(const std::string &prefix, bool apply) {
   Rml::ElementDocument *doc = documentOrNull();
   Suggestions.clear();
   SuggestionIndex = -1;
+  // Any rebuild invalidates a session: only the Tab path below opens one
+  // (a live refresh already means the editor text changed).
+  CompletionSession = false;
   if (!doc || !Backend || prefix.empty()) {
     hideCompletion();
     return;
@@ -923,8 +965,12 @@ void ConsolePage::rebuildCompletion(const std::string &prefix, bool apply) {
     return;
   }
   if (apply && Suggestions.size() == 1) {
-    // Unique match: complete in place, no list.
+    // Unique match: complete in place, no list. Issue #6: the caret must
+    // follow the completed text (SetValue writes the attribute only, so
+    // typing would otherwise resume behind the typed prefix).
+    endEditorComposition();
     setControlValue(doc, "console-input", Suggestions[0]);
+    parkCaretAtEnd(doc->GetElementById("console-input"));
     Suggestions.clear();
     hideCompletion();
     return;
@@ -939,8 +985,16 @@ void ConsolePage::rebuildCompletion(const std::string &prefix, bool apply) {
       ++length;
     common.resize(length);
   }
-  if (apply && common.size() > prefix.size())
+  if (apply && common.size() > prefix.size()) {
+    endEditorComposition();
     setControlValue(doc, "console-input", common);
+    parkCaretAtEnd(doc->GetElementById("console-input"));
+  } else if (apply) {
+    // The common prefix did not grow: the editor already holds it, but a
+    // completion is still an edit boundary (issue #6 - completion always
+    // leaves the caret behind the text).
+    parkCaretAtEnd(doc->GetElementById("console-input"));
+  }
   Rml::Element *list = doc->GetElementById("console-suggestions");
   if (!list)
     return;
@@ -964,6 +1018,14 @@ void ConsolePage::rebuildCompletion(const std::string &prefix, bool apply) {
       list->AppendChild(std::move(row));
     }
   }
+  // Issue #7: the first Tab OPENS the cycle session - the list stays up with
+  // index 0 highlighted, and every later Tab advances it.
+  if (apply) {
+    CompletionSession = true;
+    SuggestionIndex = 0;
+    for (int i = 0; i < list->GetNumChildren(); ++i)
+      list->GetChild(i)->SetClass("selected", i == 0);
+  }
   setVisible(doc, "console-suggestions", true);
 }
 
@@ -971,7 +1033,36 @@ void ConsolePage::hideCompletion() {
   Rml::ElementDocument *doc = documentOrNull();
   Suggestions.clear();
   SuggestionIndex = -1;
+  CompletionSession = false;
   setVisible(doc, "console-suggestions", false);
+}
+
+void ConsolePage::endCompletionSession() {
+  // Ends the Tab CYCLE only: the candidate list stays rendered so a click
+  // can still apply a row (the session invariant is "Tab advances it").
+  CompletionSession = false;
+}
+
+// Issue #7: Tab inside an open session advances the highlight and drops that
+// candidate into the editor. The list keeps showing the SAME match set (a
+// re-filter on the completed text would collapse it to one row) and the
+// caret follows so typing continues from the end.
+void ConsolePage::cycleCompletion() {
+  Rml::ElementDocument *doc = documentOrNull();
+  if (!doc || Suggestions.empty())
+    return;
+  const int count = static_cast<int>(Suggestions.size());
+  SuggestionIndex = SuggestionIndex < 0 ? 0 : (SuggestionIndex + 1) % count;
+  endEditorComposition();
+  setControlValue(doc, "console-input", Suggestions[SuggestionIndex]);
+  parkCaretAtEnd(doc->GetElementById("console-input"));
+  Rml::Element *list = doc->GetElementById("console-suggestions");
+  if (list) {
+    for (int i = 0; i < list->GetNumChildren(); ++i)
+      list->GetChild(i)->SetClass("selected", i == SuggestionIndex);
+  }
+  setVisible(doc, "console-suggestions", true);
+  refocusDefault();
 }
 
 #ifndef NDEBUG
@@ -987,13 +1078,22 @@ void ConsolePage::debugType(const char *text) {
 }
 #endif
 
-void ConsolePage::applyCompletion(int index) {
+void ConsolePage::applyCompletion(int index, bool submit) {
   Rml::ElementDocument *doc = documentOrNull();
   if (!doc || index < 0 || index >= static_cast<int>(Suggestions.size()))
     return;
+  endEditorComposition();
   setControlValue(doc, "console-input", Suggestions[index]);
+  // Issue #6: SetValue() only writes the value attribute; the widget's
+  // caret stays where the typed prefix left it. Park it behind the
+  // completed text so typing continues from the end (the same rule the
+  // history recall follows).
+  parkCaretAtEnd(doc->GetElementById("console-input"));
   hideCompletion();
   refocusDefault();
+  // The Enter path of a Tab session runs the candidate it just completed.
+  if (submit)
+    submitFromEditor();
 }
 
 void ConsolePage::openConfirm(const std::string &text, bool fromPaste) {
@@ -1083,6 +1183,10 @@ void ConsolePage::WindowListener::ProcessEvent(Rml::Event &event) {
 }
 
 void ConsolePage::KeyListener::ProcessEvent(Rml::Event &event) {
+  if (event.GetId() == Rml::EventId::Blur) {
+    Owner->endCompletionSession();
+    return;
+  }
   Owner->handleKey(event);
 }
 

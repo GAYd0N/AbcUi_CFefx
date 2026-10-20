@@ -24,7 +24,15 @@ void GameUiModule::onFrame(double FrameTime) {
       music.setSource(source->string);
   }
   const auto &bridge = services::nativeUiBridge();
-  music.update(bridge.pageShown() && !bridge.hasLevel());
+  // A changelevel has no level fact for a few frames (DisconnectFromServer
+  // clears it before the new map loads), which would otherwise start the
+  // menu track over the Loading page and read as "the server is gone". The
+  // map-load attempt suppresses it until LoadingFinished restores the level.
+  const auto &state = Controller.state();
+  const bool mapLoading =
+      state.phase == menu::BackendPhase::kLoading &&
+      state.attemptKind == menu::AttemptKind::kMapLoad;
+  music.update(bridge.pageShown() && !bridge.hasLevel() && !mapLoading);
   // Friends board: the throttle lives in the model, the projection is
   // change-gated on its generation (a steady list writes no DOM).
   if (Shell && Context && Shell->isVisible()) {

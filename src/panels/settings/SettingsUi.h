@@ -38,6 +38,11 @@ inline constexpr const char *kActionSprayUp = "spray-file-up";
 inline constexpr const char *kActionSprayRoot = "spray-file-root";
 inline constexpr const char *kActionSprayConfirm = "spray-file-confirm";
 inline constexpr const char *kActionSprayCancel = "spray-file-cancel";
+inline constexpr const char *kActionModelPick = "model-picker-pick";
+inline constexpr const char *kActionModelFav = "model-picker-fav";
+inline constexpr const char *kActionModelFavOnly = "model-picker-favonly";
+inline constexpr const char *kActionModelContextFav =
+    "model-picker-context-fav";
 inline constexpr const char *kLayerReset = "reset-confirm";
 inline constexpr const char *kLayerLeave = "leave-confirm";
 inline constexpr const char *kLayerBindConflict = "bind-conflict";
@@ -62,13 +67,18 @@ std::string logoColorName(const std::string &value);
 // settings.rml: component name -> block element id. Each claimed block is
 // moved into the card of the section that declares it; an unclaimed block
 // waits hidden in the widget host. user-script is a page behaviour and has
-// no block. `Preview` selects the placement: a preview is a narrow box in the
-// card's right column (the rows keep a 232dp column beside it), anything else
-// is a full-width block above the rows.
+// no block. The placement selects the column: a preview is a narrow box in
+// the card's right column (the rows keep a 232dp column beside it), a
+// plain block is a full-width band above the rows (or, on a card that
+// already has a preview, a second widget stacked under it in the same
+// column), and a row-flow block joins the rows column itself (appended
+// after the last row - the I16 model picker rides below the color rows
+// while the model preview keeps its full column).
 struct WidgetBlock {
   const char *Component;
   const char *Element;
   bool Preview;
+  bool RowFlow;
 };
 extern const WidgetBlock kWidgetBlocks[];
 extern const int kWidgetBlockCount;

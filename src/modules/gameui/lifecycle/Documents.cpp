@@ -68,6 +68,7 @@ void GameUiModule::onContextReady(Rml::Context *context) {
   Settings->setBindModel(&BindModel);
   Settings->setVideoModel(&VideoModel);
   Settings->setVoiceModel(&VoiceModel);
+  Settings->setFavorites(&ModelFavorites);
   SettingsView->setPage(Settings.get());
   Settings->setSpraySink([this](const std::string &path) { Spray->run(path); });
   // T18: the server browser page (was the kServers stub). The query is

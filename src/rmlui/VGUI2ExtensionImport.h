@@ -132,4 +132,15 @@ bool nativeCallbacksRegistered();
 // unavailable (logged once; the callers still lower their own state).
 bool hideGameUi();
 
+// Issue #5: the engine-facing console-close seam - the `hideconsole` the
+// suppressed inner CGameUI::HideGameUI used to issue (outer IBaseUI::
+// HideConsole, the same hook the toggle-console chain runs through). It
+// clears the engine's own console-toggle flag and forwards to the proxied
+// IGameConsole; without it a UI-side console close left that flag set and a
+// later ActivateGameUI re-entered the console. Returns false only when the
+// engine interface is unavailable. Callers must have lowered the
+// replacement console's own truth first: the proxied IGameConsole::Hide
+// callback re-enters the bridge and must find the console already down.
+bool hideConsole();
+
 } // namespace vgui2ext

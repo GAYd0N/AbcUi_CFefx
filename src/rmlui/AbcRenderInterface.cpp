@@ -293,8 +293,18 @@ void AbcRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry,
                                                        : kProgramAlphaBlend;
     if (!record->second.ExternalPrefix.empty()) {
       const auto live = ExternalTextures.find(record->second.ExternalPrefix);
-      if (live != ExternalTextures.end() && live->second.Premultiplied)
-        program = DRAW_TEXTURED_RECT_PREMULTIPLIED_ALPHA_ENABLED;
+      if (live != ExternalTextures.end()) {
+        switch (live->second.Blend) {
+        case TextureBlend::Additive:
+          program = kProgramSpriteAdditive;
+          break;
+        case TextureBlend::PremultipliedAlpha:
+          program = DRAW_TEXTURED_RECT_PREMULTIPLIED_ALPHA_ENABLED;
+          break;
+        case TextureBlend::StraightAlpha:
+          break;
+        }
+      }
     }
     // External masked textures (radar map): the mask id rides the registered
     // slot, read live so a shape toggle needs no texture reload (the Rml
@@ -325,7 +335,7 @@ void AbcRenderInterface::registerExternalTexture(const Rml::String &uriPrefix,
                                                  Rml::TextureHandle texture,
                                                  int width, int height,
                                                  const int *maskSlot,
-                                                 bool premultiplied) {
+                                                 TextureBlend blend) {
   if (uriPrefix.empty() || texture == 0)
     return;
   ExternalTexture entry;
@@ -333,7 +343,7 @@ void AbcRenderInterface::registerExternalTexture(const Rml::String &uriPrefix,
   entry.Width = width;
   entry.Height = height;
   entry.MaskSlot = maskSlot;
-  entry.Premultiplied = premultiplied;
+  entry.Blend = blend;
   ExternalTextures[uriPrefix] = entry;
   // A recycled handle must not stay marked as owned (a second
   // registration of the same GL id after a frame-buffer regen).
@@ -387,9 +397,9 @@ Rml::TextureHandle AbcRenderInterface::LoadTexture(Rml::Vector2i &dimensions,
     return retainTexture(static_cast<int>(external.Texture), false, prefix);
   }
   // Sprite URIs ("spr://<hud.txt name>", "spricon://<atlas>/<l>,<t>,<r>,<b>",
-  // "spralpha://...", "sprframe://...") resolve through the sprite data
-  // layer, never the file interface (the scheme prefix also keeps Rml from
-  // joining the document directory).
+  // "spralpha://...") resolve through the sprite data layer, never the file
+  // interface (the scheme prefix also keeps Rml from joining the document
+  // directory).
   if (source.rfind("spr://", 0) == 0 || source.rfind("spricon://", 0) == 0) {
     int width = 0, height = 0;
     const Rml::TextureHandle handle =
@@ -417,18 +427,14 @@ Rml::TextureHandle AbcRenderInterface::LoadTexture(Rml::Vector2i &dimensions,
     }
     return handle;
   }
-  if (source.rfind("spralpha://", 0) == 0 ||
-      source.rfind("sprframe://", 0) == 0) {
+  if (source.rfind("spralpha://", 0) == 0) {
     int width = 0, height = 0;
     const Rml::TextureHandle handle =
         retainTexture(sprites::textureForUri(source, width, height), false);
     if (handle) {
       dimensions.x = width;
       dimensions.y = height;
-      // spralpha:// is the straight-alpha crop flavor; sprframe:// files
-      // (water splash) are kRenderTransAdd like every HUD sprite.
-      if (source.rfind("sprframe://", 0) == 0)
-        AdditiveTextures.insert(handle);
+      // spralpha:// is the straight-alpha crop flavor.
     }
     return handle;
   }

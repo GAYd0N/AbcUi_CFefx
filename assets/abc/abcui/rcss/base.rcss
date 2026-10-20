@@ -41,6 +41,9 @@ body {
 	--abc-hud-accent: #ffb000;
 	--abc-hud-accent-dim: #ffb0007d;
 	--abc-hud-accent-faint: #ffb0004d;
+	/* Reserve-ammo ink: the accent at 90%, i.e. only a step below the clip
+	   value. The shared dim (49%) made the small 13dp reserve unreadable. */
+	--abc-hud-accent-reserve: #ffb000e6;
 	--abc-hud-danger: #ff0000;
 	/* Meter well behind an additive fill. */
 	--abc-hud-track: #000000a0;

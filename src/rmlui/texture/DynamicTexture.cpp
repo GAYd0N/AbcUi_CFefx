@@ -8,8 +8,8 @@
 
 namespace services::texture {
 
-DynamicTexture::DynamicTexture(std::string prefix)
-    : Prefix(std::move(prefix)), Uri() {
+DynamicTexture::DynamicTexture(std::string prefix, rmlui::TextureBlend blend)
+    : Blend(blend), Prefix(std::move(prefix)), Uri() {
   Uri = Prefix + "0";
 }
 
@@ -58,7 +58,7 @@ bool DynamicTexture::upload(const unsigned char *rgba, int width, int height) {
   if (auto *Interface = rmlui::renderInterface())
     Interface->registerExternalTexture(
         Prefix, static_cast<Rml::TextureHandle>(TextureId), Width, Height,
-        nullptr);
+        nullptr, Blend);
   return true;
 }
 

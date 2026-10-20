@@ -23,9 +23,10 @@
 //     (0x100061d0/0x10006420, Hide connected-only) - the takeover suppresses
 //     that inner layer, so the equivalent lives here: menuShownInGame/
 //     menuHiddenInGame keep the parity for singleplayer only (maxclients==1;
-//     T09 forbids an unconditional pause in multiplayer). hideconsole is not
-//     replicated: the legacy console it targets is fully suppressed by the
-//     takeover and the replacement console is T16.
+//     T09 forbids an unconditional pause in multiplayer). The inner body's
+//     third side effect, `hideconsole`, is hideConsole() below: T16's
+//     replacement console made it observable, because the engine's own
+//     console flag survives a UI-side close (issue #5).
 //
 // T14 wires the connect chain (all verified against the installed binaries):
 //   - connect(generation, address): "connect <address>\n" - the engine's own
@@ -79,6 +80,10 @@ public:
   struct Seams {
     void (*clientCmd)(const char *command) = nullptr; // pfnClientCmd wrapper
     bool (*hideGameUi)() = nullptr;                   // vgui2ext::hideGameUi
+    // Issue #5: the console counterpart (vgui2ext::hideConsole, the outer
+    // IBaseUI::HideConsole body). The suppressed inner CGameUI::HideGameUI
+    // used to reach it through the `hideconsole` command.
+    bool (*hideConsole)() = nullptr;
     int (*maxClients)() = nullptr;    // live maxplayers (1 = singleplayer)
     NativeUiBridge *bridge = nullptr; // menu-state pre-lower on resume
   };
@@ -107,6 +112,18 @@ public:
   // these on the controller's in-game menu transitions.
   void menuShownInGame();
   void menuHiddenInGame();
+
+  // Issue #5: the vanilla CGameUI::HideGameUI side effect the inner-layer
+  // suppression removed - `hideconsole` (outer IBaseUI::HideConsole). The
+  // engine keeps its own console-toggle flag, and only that call clears it;
+  // a UI-side console close or a menu hide that skipped it left the flag set,
+  // so the next ActivateGameUI re-entered the console. The module calls this
+  // whenever the projection drops the console and whenever the menu goes
+  // down. Idempotent and re-entrancy safe: the replacement console's
+  // presentation truth is lowered BEFORE the engine call, so the proxied
+  // IGameConsole::Hide callback that the outer body forwards to finds the
+  // console already down and cannot toggle it twice.
+  void hideConsole();
 
   // The live maxplayers fact (1 = singleplayer), the same source the
   // pause parity reads; the module feeds the GameMenu.res "notsingle"

@@ -9,6 +9,7 @@
 #include "../panels/ammobar/AmmoBarPanel.h"
 #include "../panels/ammostack/AmmoStackPanel.h"
 #include "../panels/cfefx/CfefxPanel.h"
+#include "../panels/chat/ChatPanel.h"
 #include "../panels/crosshair/CrosshairPanel.h"
 #include "../panels/deadmsg/DeadMsgPanel.h"
 #include "../panels/dmgtiles/DmgTilesPanel.h"
@@ -70,7 +71,9 @@ std::vector<std::unique_ptr<framework::HudPanel>> buildPanels() {
   // Batch D (render depth).
   panels.push_back(std::make_unique<panels::ItemHighlightPanel>());
   panels.push_back(std::make_unique<panels::RadarPanel>());
-  // Cfefx is last so its damage/score feedback stacks above the HUD
+  // Issue 13: chat after the readouts, so its log/input paints over them.
+  panels.push_back(std::make_unique<panels::ChatPanel>());
+  // Cfefx stays last so its damage/score feedback stacks above the HUD
   // panels (old CfefxPanel zpos 998/999).
   panels.push_back(std::make_unique<panels::CfefxPanel>());
   return panels;
@@ -104,6 +107,9 @@ void registerHudPanelCvars() {
   panels::itemhighlight::registerCvars();
   panels::radar::registerCvars();
   panels::radar::registerCommands();
+  // Issue 13: after the client's HUD_Init ran (the hud_saytext_* pointers
+  // are the client's own cvars).
+  panels::chat::registerCvars();
   panels::cfefx::registerCvars();
 }
 

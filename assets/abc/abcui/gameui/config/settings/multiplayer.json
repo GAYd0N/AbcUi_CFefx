@@ -9,7 +9,8 @@
       "id": "player",
       "label": "#Settings_SecPlayer",
       "components": [
-        "model-preview"
+        "model-preview",
+        "model-picker"
       ]
     },
     {

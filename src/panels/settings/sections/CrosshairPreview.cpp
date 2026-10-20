@@ -7,9 +7,9 @@
 // spread (punch drift) is a runtime fact, not a configuration value.
 //
 // from: ABCEnchance vgui_controls/CrossHairDisplay.* (the original options
-// dialog's preview panel, GBK->UTF-8): same Switches (dot/T/outline) and the
-// same eight sliders, but sharing the production geometry instead of
-// duplicating it.
+// dialog's preview panel, GBK->UTF-8): same switches (dot/T/outline) and the
+// same colour/geometry channels (the RGBA pickers edit the colours now), but
+// sharing the production geometry instead of duplicating it.
 
 #include "panels/settings/SettingsPage.h"
 #include "panels/settings/sections/CrosshairPreview.h"

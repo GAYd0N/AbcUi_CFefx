@@ -94,13 +94,15 @@ const char *safeFocusForLayer(const char *id) {
 // The same names the definition parser accepts; a name without a block here
 // would be a schema/asset mismatch the page test catches.
 const WidgetBlock kWidgetBlocks[] = {
-    {"model-preview", "widget-model-preview", true},
-    {"spray-preview", "widget-spray-preview", true},
-    {"crosshair-preview", "widget-crosshair-preview", true},
-    {"spray-maker", "widget-spray-maker", true},
-    {"bindings", "widget-bindings", false},
-    {"video", "widget-video", false},
-    {"voice", "widget-voice", false},
+    {"model-preview", "widget-model-preview", true, false},
+    {"model-picker", "widget-model-picker", false, true},
+    {"spray-preview", "widget-spray-preview", true, false},
+    {"crosshair-preview", "widget-crosshair-preview", true, false},
+    {"crosshair-color", "widget-crosshair-color", false, false},
+    {"spray-maker", "widget-spray-maker", true, false},
+    {"bindings", "widget-bindings", false, false},
+    {"video", "widget-video", false, false},
+    {"voice", "widget-voice", false, false},
 };
 const int kWidgetBlockCount =
     static_cast<int>(sizeof(kWidgetBlocks) / sizeof(kWidgetBlocks[0]));

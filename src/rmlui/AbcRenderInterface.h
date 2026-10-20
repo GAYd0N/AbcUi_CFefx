@@ -56,6 +56,8 @@
 #include <RmlUi/Core/RenderInterface.h>
 #include <RmlUi/Core/Types.h>
 
+#include "TextureBlend.h"
+
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -104,11 +106,13 @@ public:
   // (radar shape select) - the old CRadarMapImage::Paint semantics. The
   // query suffix on the URI is a cache-bust only (the FBO texture id
   // changes when the engine regenerates frame buffers; the owner bumps the
-  // suffix and re-registers).
-  void registerExternalTexture(const Rml::String &uriPrefix,
-                               Rml::TextureHandle texture, int width,
-                               int height, const int *maskSlot,
-                               bool premultiplied = false);
+  // suffix and re-registers). `blend` selects the draw program: the animated
+  // image element registers its frames additive (old kRenderTransAdd
+  // sprites), everything else keeps the straight-alpha default.
+  void registerExternalTexture(
+      const Rml::String &uriPrefix, Rml::TextureHandle texture, int width,
+      int height, const int *maskSlot,
+      TextureBlend blend = TextureBlend::StraightAlpha);
   void unregisterExternalTexture(const Rml::String &uriPrefix);
 
 private:
@@ -159,7 +163,7 @@ private:
     int Width = 0;
     int Height = 0;
     const int *MaskSlot = nullptr;
-    bool Premultiplied = false;
+    TextureBlend Blend = TextureBlend::StraightAlpha;
   };
   std::unordered_map<Rml::String, ExternalTexture> ExternalTextures;
   struct TextureRecord {

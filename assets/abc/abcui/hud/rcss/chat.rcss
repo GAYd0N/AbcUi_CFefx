@@ -1,0 +1,100 @@
+/* chat.rcss - the RmlUi chat log and message-mode input line (issue 13).
+   Position: bottom-left, sitting on the HUD's own band (the ammo readout
+   owns bottom-right). The document is anchored by its BOTTOM edge and sized
+   by its content, so the log grows upward from the input row and the newest
+   line always ends up closest to where the player is typing - the native
+   say-text order.
+
+   Style: the same HUD language as the killfeed/notice panels - a soft
+   translucent row plate (deadmsg's #7d7d7d7d idea, darker because chat
+   carries full sentences), the amber --abc-hud-accent for the channel
+   decoration, and the HUD text colour for the message body. The input line
+   is the accent-barred field (left rule + track fill, like the console's
+   prompt row) so it reads as a HUD surface and not as a menu dialog. */
+
+#chat {
+	position: absolute;
+	left: 16dp;
+	bottom: 88dp;
+	width: 340dp;
+	height: auto;
+}
+
+/* Rows stack in arrival order; the panel appends and trims DOM rows itself
+   (the line-count cvar), so the log is a plain block. */
+#chat-log {
+	display: block;
+	width: 100%;
+}
+
+.chat-line {
+	display: block;
+	width: auto;
+	max-width: 100%;
+	margin-top: 1dp;
+	padding: 1dp 6dp;
+	background-color: #0000005e;
+	border-radius: 3dp;
+	font-size: 10dp;
+	line-height: 14dp;
+	color: #e8e8e8;
+	white-space: normal;
+	word-break: break-word;
+}
+
+/* Sender name: bold in the engine's per-player tint (set inline by the
+   panel); the sheet value is the engine-less fallback. */
+.chat-name {
+	font-weight: bold;
+	color: var(--abc-hud-accent);
+}
+
+/* "(TEAM) " / "*DEAD* " decorations: dim amber, the HUD's secondary ink. */
+.chat-prefix {
+	color: var(--abc-hud-accent-dim);
+}
+
+.chat-location {
+	color: var(--abc-hud-accent);
+}
+
+/* Message-mode input line: one accent-barred row under the log. */
+#chat-input-row {
+	display: flex;
+	flex-flow: row;
+	align-items: center;
+	width: 100%;
+	height: 18dp;
+	margin-top: 2dp;
+	background-color: #000000a0;
+	border-left: 2dp var(--abc-hud-accent);
+	padding-left: 6dp;
+	padding-right: 8dp;
+}
+
+#chat-prompt {
+	flex-basis: auto;
+	flex-grow: 0;
+	flex-shrink: 0;
+	margin-right: 6dp;
+	font-size: 10dp;
+	font-weight: bold;
+	line-height: 18dp;
+	white-space: nowrap;
+	color: var(--abc-hud-accent);
+}
+
+/* The editor is only the ink: the row above is the plate. */
+#chat-input {
+	flex-basis: auto;
+	flex-grow: 1;
+	flex-shrink: 1;
+	height: 16dp;
+	padding: 0dp;
+	font-size: 10dp;
+	line-height: 16dp;
+	color: #ffffff;
+	background-color: transparent;
+	border-width: 0dp;
+	caret-color: var(--abc-hud-accent);
+}

@@ -159,6 +159,8 @@ ToggleError PlayerListModel::toggleMuted(bool &mutedAfter) {
     return ToggleError::kIdentityChanged;
   if (entry->bot)
     return ToggleError::kIdentityChanged; // shipped rule: bots are not mutable
+  if (entry->local)
+    return ToggleError::kLocalPlayer; // issue 17: muting yourself is refused
   const bool wasMuted = Seams_.isMuted ? Seams_.isMuted(*entry) : false;
   const bool accepted = wasMuted
                             ? (Seams_.unmute ? Seams_.unmute(*entry) : false)

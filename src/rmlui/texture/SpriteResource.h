@@ -26,9 +26,6 @@
 //   spralpha://<atlas>/<l>,<t>,<r>,<b>
 //                      -> same crop, drawn straight-alpha (old
 //                         kRenderTransTexture sprites: weapon crosshairs)
-//   sprframe://<path>|<frame>
-//                      -> frame <frame> of a standalone .spr file
-//                         (batch B: Effect water splash, 256x512 additive)
 // Textures are VGUI2 surface texture ids (the IMetaRenderer draw namespace),
 // created lazily and cached per URI. Atlas frames decode once.
 //
@@ -63,14 +60,9 @@ int croppedTexture(const std::string &atlasFile, const wrect_t &rect,
                    bool straightAlpha = false);
 
 // URI front-end for AbcRenderInterface::LoadTexture. Accepts "spr://name",
-// "spricon://atlas/l,t,r,b", "spralpha://atlas/l,t,r,b" and
-// "sprframe://path|frame". Returns the texture id and fills width/height with
-// the crop/frame size; 0 on unknown URIs.
+// "spricon://atlas/l,t,r,b" and "spralpha://atlas/l,t,r,b". Returns the
+// texture id and fills width/height with the crop size; 0 on unknown URIs.
 int textureForUri(const std::string &uri, int &width, int &height);
-
-// Number of frames in a standalone .spr file (0 when it cannot be read) - the
-// Effect panel drives its animation loop with it.
-int standaloneFrameCount(const std::string &relativePath);
 
 #ifndef NDEBUG
 // Debug probes (abc_ui_sprprobe): trace each resolution stage of one atlas /

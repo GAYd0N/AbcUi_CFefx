@@ -30,7 +30,9 @@
 #include "backdrop/Backdrop.h"
 #include "modelpreview/Target.h"
 #include "model/ElementModel.h"
+#include "colorpicker/ElementColorPicker.h"
 #include "video/ElementVideo.h"
+#include "animated/ElementAnimatedImage.h"
 #include "AbcSystemInterface.h"
 #include "InputBridge.h"
 #include "PaintGate.h"
@@ -361,7 +363,9 @@ void init() {
   if (!Rml::Initialise())
     framework::fatalExit("Rml::Initialise failed (Rml core unavailable)");
   model::registerElement();
+  colorpicker::registerElement();
   video::registerElement();
+  animated::registerElement();
   backdrop::registerElement();
 
   const auto width = static_cast<int>(abc::MetaRenderer()->GetSwapChainWidth());
@@ -524,6 +528,7 @@ void onRedraw(double frameTime) {
 void onVidInit() {
   modelpreview::invalidateAll();
   video::invalidateAll();
+  animated::invalidateAll();
   backdrop::invalidateTargets();
   sprites::vidInit();
   if (Initialised)

@@ -181,11 +181,19 @@ private:
   // editor content without ever applying a completion (Tab/Enter do that).
   void refreshSuggestions();
   // Shared dropdown builder. `apply` = the Tab path (unique match completes
-  // in place, multiple matches extend to the common prefix); the live path
-  // only presents.
+  // in place, multiple matches extend to the common prefix AND open the
+  // cycle session of issue #7); the live path only presents.
   void rebuildCompletion(const std::string &prefix, bool apply);
   void hideCompletion();
-  void applyCompletion(int index);
+  // Tab cycling of an open completion session: advance the highlight, drop
+  // that candidate into the editor, keep the list up. Never re-filters.
+  void cycleCompletion();
+  // Blur (focus loss) ends a cycle session: Tab has no anchor without the
+  // caret. The list itself stays - a click on a row must still land.
+  void endCompletionSession();
+  // Applies a candidate to the editor and closes the list. `submit` runs it
+  // (the Tab-session Enter path); a click only completes the text.
+  void applyCompletion(int index, bool submit = false);
   void openConfirm(const std::string &text, bool fromPaste);
   void closeConfirm();
   void executeConfirmed();
@@ -213,6 +221,12 @@ private:
   // Completion state for the current editor content.
   std::vector<std::string> Suggestions;
   int SuggestionIndex = -1;
+  // Issue #7: an OPEN Tab completion session. The first Tab lists the
+  // candidates (index 0 highlighted, editor extended to the common prefix);
+  // every later Tab cycles index and drops that candidate into the editor.
+  // A session is never re-filtered from its own completed text - only a real
+  // edit, Esc, Enter/click or a blur ends it (see cycleCompletion).
+  bool CompletionSession = false;
   // History walk cursor: -1 = live editing, else an offset from the tail
   // of the backend history; the draft restores on the way back down.
   int HistoryCursor = -1;

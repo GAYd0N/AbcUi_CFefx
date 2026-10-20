@@ -43,6 +43,21 @@
 					<div id="model-preview-hint">#Settings_PlayerModelHint</div>
 				</div>
 			</div>
+			<div class="settings-widget" id="widget-model-picker">
+				<!-- I16 model picker: the models/player list with favorites and
+				     text filtering (legacy ABCEnchance parity). Rows are
+				     injected by sections::ModelPicker; a click selects and
+				     writes the `model` cvar (the preview follows), the star
+				     toggles the favorite. The section renderer keeps the
+				     current engine model selected. -->
+				<div id="model-picker">
+					<div class="model-picker-label">#Settings_ModelFilter</div>
+					<input class="row-input model-picker-filter" id="model-picker-filter" type="text"/>
+					<button class="row-toggle model-picker-favonly" id="model-picker-favonly" data-action="model-picker-favonly">#Settings_ModelFavOnly</button>
+					<div id="model-picker-list"></div>
+					<div id="model-picker-status"></div>
+				</div>
+			</div>
 			<div class="settings-widget" id="widget-spray-preview">
 				<div class="preview-box preview-box-square">
 					<img id="spray-preview"/>
@@ -81,6 +96,20 @@
 						<div id="cx-core-right" class="cx-core"></div>
 					</div>
 					<div id="crosshair-preview-hint">#Settings_CrosshairPreviewHint</div>
+				</div>
+			</div>
+			<div class="settings-widget" id="widget-crosshair-color">
+				<!-- RGBA pickers: one element per colour edits all four channels
+				     (the eight per-channel rows stay declared in JSON as the
+				     transaction backbone but are not drawn as sliders). The
+				     widget stacks under the preview in the same column. -->
+				<div class="color-row">
+					<div class="row-label">#Settings_CrosshairColor</div>
+					<colorpicker id="crosshair-color" value="#32fa32c8"/>
+				</div>
+				<div class="color-row">
+					<div class="row-label">#Settings_CrosshairOutlineColor</div>
+					<colorpicker id="crosshair-outline-color" value="#000000ff"/>
 				</div>
 			</div>
 			<div class="settings-widget" id="widget-bindings">
@@ -181,6 +210,12 @@
 			<button id="spray-file-up" data-action="spray-file-up">#Settings_SprayMakerUp</button>
 			<button id="spray-file-cancel" data-action="spray-file-cancel" autofocus="autofocus">#Settings_Cancel</button>
 		</div>
+	</div>
+	<!-- I16 model picker favorite menu: opened by right-click on a picker
+	     row, anchored to the pointer like the console's copy menu (outside
+	     the scroll container, so it never scrolls away with the rows). -->
+	<div id="model-picker-context-menu">
+		<div id="model-picker-context-fav" class="model-picker-context-item" data-action="model-picker-context-fav"></div>
 	</div>
 </body>
 </rml>

@@ -496,6 +496,56 @@ void SettingsModel::cancel() {
   }
 }
 
+services::settings::ApplyResult SettingsModel::applyRow(RowRuntime &entry) {
+  ApplyResult result{entry.row->Cvar, ApplyOutcome::kApplied};
+  if (rowUsesString(entry.row)) {
+    if (!Seams_.writeString ||
+        !Seams_.writeString(entry.row->Cvar, entry.draftText.c_str())) {
+      result.outcome = ApplyOutcome::kWriteFailed;
+    } else {
+      const char *readback =
+          Seams_.readString ? Seams_.readString(entry.row->Cvar) : nullptr;
+      if (!readback || entry.draftText != readback)
+        result.outcome = ApplyOutcome::kReadbackMismatch;
+    }
+  } else if (entry.row->Kind == SettingKind::kCommandToggle) {
+    const char *command =
+        entry.draftValue > 0.5f ? entry.row->OnCommand : entry.row->OffCommand;
+    if (!Seams_.clientCmd || !command || !Seams_.clientCmd(command)) {
+      result.outcome = ApplyOutcome::kWriteFailed;
+    } else {
+      result.outcome = ApplyOutcome::kQueued;
+    }
+  } else {
+    if (!Seams_.writeFloat ||
+        !Seams_.writeFloat(entry.row->Cvar, entry.draftValue)) {
+      result.outcome = ApplyOutcome::kWriteFailed;
+    } else {
+      const float readback = Seams_.readFloat
+                                 ? Seams_.readFloat(entry.row->Cvar)
+                                 : entry.draftValue;
+      if (!sameValue(readback, entry.draftValue))
+        result.outcome = ApplyOutcome::kReadbackMismatch;
+    }
+  }
+  if (result.outcome == ApplyOutcome::kApplied) {
+    if (rowUsesString(entry.row))
+      adoptEngineTextLocked(entry, entry.draftText);
+    else
+      adoptEngineLocked(entry, entry.draftValue);
+  } else if (result.outcome == ApplyOutcome::kQueued) {
+    // Deferred: keep the draft, wait for the flush on the frame beat.
+    entry.state = RowState::kQueued;
+    entry.queuedTicks = 0;
+  } else {
+    // The engine state is unknown/mixed here: keep the draft and the
+    // dirty flag so the row stays visible and retryable. The next
+    // snapshot() decides conflict-vs-dirty from the real engine.
+    entry.state = RowState::kApplyFailed;
+  }
+  return result;
+}
+
 std::vector<ApplyResult> SettingsModel::apply() {
   std::vector<ApplyResult> results;
   for (auto &entry : Rows_) {
@@ -506,55 +556,19 @@ std::vector<ApplyResult> SettingsModel::apply() {
       results.push_back({entry.row->Cvar, ApplyOutcome::kInvalidRefused});
       continue;
     }
-    ApplyResult result{entry.row->Cvar, ApplyOutcome::kApplied};
-    if (rowUsesString(entry.row)) {
-      if (!Seams_.writeString ||
-          !Seams_.writeString(entry.row->Cvar, entry.draftText.c_str())) {
-        result.outcome = ApplyOutcome::kWriteFailed;
-      } else {
-        const char *readback =
-            Seams_.readString ? Seams_.readString(entry.row->Cvar) : nullptr;
-        if (!readback || entry.draftText != readback)
-          result.outcome = ApplyOutcome::kReadbackMismatch;
-      }
-    } else if (entry.row->Kind == SettingKind::kCommandToggle) {
-      const char *command = entry.draftValue > 0.5f ? entry.row->OnCommand
-                                                    : entry.row->OffCommand;
-      if (!Seams_.clientCmd || !command || !Seams_.clientCmd(command)) {
-        result.outcome = ApplyOutcome::kWriteFailed;
-      } else {
-        result.outcome = ApplyOutcome::kQueued;
-      }
-    } else {
-      if (!Seams_.writeFloat ||
-          !Seams_.writeFloat(entry.row->Cvar, entry.draftValue)) {
-        result.outcome = ApplyOutcome::kWriteFailed;
-      } else {
-        const float readback = Seams_.readFloat
-                                   ? Seams_.readFloat(entry.row->Cvar)
-                                   : entry.draftValue;
-        if (!sameValue(readback, entry.draftValue))
-          result.outcome = ApplyOutcome::kReadbackMismatch;
-      }
-    }
-    if (result.outcome == ApplyOutcome::kApplied) {
-      if (rowUsesString(entry.row))
-        adoptEngineTextLocked(entry, entry.draftText);
-      else
-        adoptEngineLocked(entry, entry.draftValue);
-    } else if (result.outcome == ApplyOutcome::kQueued) {
-      // Deferred: keep the draft, wait for the flush on the frame beat.
-      entry.state = RowState::kQueued;
-      entry.queuedTicks = 0;
-    } else {
-      // The engine state is unknown/mixed here: keep the draft and the
-      // dirty flag so the row stays visible and retryable. The next
-      // snapshot() decides conflict-vs-dirty from the real engine.
-      entry.state = RowState::kApplyFailed;
-    }
-    results.push_back(std::move(result));
+    results.push_back(applyRow(entry));
   }
   return results;
+}
+
+std::optional<ApplyResult> SettingsModel::applyOne(const char *cvar) {
+  RowRuntime *entry = runtime(cvar);
+  if (!entry || !editable(cvar) || entry->state == RowState::kClean ||
+      entry->state == RowState::kQueued)
+    return std::nullopt;
+  if (entry->state == RowState::kInvalid)
+    return ApplyResult{entry->row->Cvar, ApplyOutcome::kInvalidRefused};
+  return applyRow(*entry);
 }
 
 std::vector<RowView> SettingsModel::rows() const {

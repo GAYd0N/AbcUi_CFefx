@@ -144,10 +144,29 @@ void EngineUiBackend::menuShownInGame() {
 }
 
 void EngineUiBackend::menuHiddenInGame() {
-  // Vanilla HideGameUI inner body minus hideconsole (0x10006420; the legacy
-  // console it targets stays suppressed until T16 replaces it).
+  // Vanilla HideGameUI inner body minus hideconsole (0x10006420): the
+  // console half rides hideConsole(), which the module drives from every
+  // menu-down and console-drop transition, not from the pause decision here
+  // (the engine's hideconsole was not connected- or singleplayer-gated).
   if (singlePlayer())
     clientCmd("unpause\n");
+}
+
+void EngineUiBackend::hideConsole() {
+  // Lower the replacement's presentation truth FIRST: the outer
+  // IBaseUI::HideConsole flips the engine flag and forwards to the proxied
+  // IGameConsole::Hide, whose callback re-enters requestConsoleClose. With
+  // the truth already down that call is a no-op (no second sink
+  // notification, no toggle back), which is what keeps this idempotent
+  // however many times a close is observed.
+  if (Seams_.bridge)
+    Seams_.bridge->noteConsoleDismissed();
+  if (!Seams_.hideConsole) {
+    abc::ConsoleWarn("[AbcUi] hideConsole seam missing - the engine-side "
+                     "console close is skipped\n");
+    return;
+  }
+  Seams_.hideConsole();
 }
 
 bool EngineUiBackend::singlePlayer() const {

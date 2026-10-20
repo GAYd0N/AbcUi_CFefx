@@ -115,6 +115,9 @@ enum class EventKind {
   kPhaseChanged,    // session-tagged backend phase; stale sessions dropped
   kLoadingStarted,  // generation-tagged
   kLoadingFinished, // generation-tagged: cancel/success/failure race-safe
+  kMapLoadStarted,  // the engine began a level load that no connect attempt
+                    // owns (a server changelevel): the Loading page takes the
+                    // screen instead of the no-map Main page
   kFatal,           // engine/renderer fatal; Emergency overlay takes over
   kShutdown,        // terminal latch; afterwards no action is ever emitted
 };
@@ -126,13 +129,14 @@ enum class LoadingOutcome {
 };
 
 // T19: which kind of attempt owns the live generation. The phase/loading
-// machinery is shared (both attempts own the screen, stream the engine loading
-// events and cancel through the proven disconnect), only the retry path and
-// the loading title presentation differ.
+// machinery is shared (every attempt owns the screen, streams the engine
+// loading events and cancels through the proven disconnect); only the retry
+// path and the loading title presentation differ.
 enum class AttemptKind {
   kNone = 0,
   kConnect,   // remote connect (T14/T18): retry replays the address
   kLocalGame, // local server start (T19): retry replays the kept request
+  kMapLoad,   // engine-initiated changelevel (no backend action, no retry)
 };
 
 enum class PointerTarget {
@@ -226,6 +230,12 @@ inline MenuEvent makeLoadingFinished(uint32_t generation,
   event.outcome = outcome;
   event.text = reason ? reason : "";
   return event;
+}
+// Engine-initiated map load (changelevel). Carries no target/generation: the
+// controller allocates the generation and the module starts the loading model
+// from `state().connectGeneration` after the dispatch.
+inline MenuEvent makeMapLoadStarted() {
+  return MenuEvent{EventKind::kMapLoadStarted};
 }
 inline MenuEvent makeFatal(const char *reason) {
   MenuEvent event{EventKind::kFatal};

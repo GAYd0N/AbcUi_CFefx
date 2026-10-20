@@ -159,8 +159,23 @@
 	text-align: center;
 }
 
-#table .c-avatar {
+/* line-height 0 removes the row-height line box from both icon cells: with
+   it, the image sat on the text baseline while the tall line box pushed the
+   whole line above the cell centre (issue #8 for the donor icon; the avatar
+   cell has always done this). vertical-align: middle then centres the
+   inline-block box in whatever height the row ended up with. */
+#table .c-avatar,
+#table .c-donor {
 	line-height: 0dp;
+	vertical-align: middle;
+}
+
+/* The donor icon is centred by the cell's text-align, like the avatar
+   frame: the runtime sizes it (18dp clamped to the row height) and the
+   auto margins below keep a block-level image centred as well. */
+#table .c-donor img {
+	display: inline-block;
+	margin: 0 auto;
 	vertical-align: middle;
 }
 

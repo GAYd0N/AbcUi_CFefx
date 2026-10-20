@@ -82,6 +82,8 @@ Scores_MenuCopyName = 复制Steam名称
 Scores_MenuCopyNameRaw = 复制游戏名称
 Scores_MenuCopySteamID = 复制SteamID
 Scores_MenuCopySteamID64 = 复制64位SteamID
+Scores_MenuMute = 屏蔽语音
+Scores_MenuUnmute = 取消屏蔽
 
 # Item highlight (P7 itemhighlight panel); token names are the old
 # ABCEnchance localize keys (byte-matched against the old schinese.txt).
@@ -306,9 +308,20 @@ Settings_PrimaryColor = 主颜色
 Settings_SecondaryColor = 副颜色
 Settings_Spraypaint = 喷漆图案
 Settings_PlayerModelHint = 拖动可旋转模型
+Settings_ModelFilter = 筛选
+Settings_ModelFavOnly = 仅显示喜爱
+Settings_ModelStar = 喜爱
+Settings_ModelFavAdd = 添加喜爱
+Settings_ModelFavRemove = 取消喜爱
+Settings_ModelPickerModels = 个模型
+Settings_ModelPickerEmpty = 未找到玩家模型
+Settings_ModelPickerNoMatch = 没有符合筛选的模型
+Settings_ModelFavLocked = 喜爱列表只读(存储损坏)
 Settings_SpraypaintColor = 喷漆颜色
 Settings_SprayPreviewHint = 所选图案与颜色的预览
 Settings_CrosshairPreviewHint = 所选准星设置的预览
+Settings_CrosshairColor = 准星颜色
+Settings_CrosshairOutlineColor = 准星描边颜色
 Settings_SprayMakerTitle = 喷漆制作器
 Settings_SprayMakerHintTitle = 自制喷漆
 Settings_SprayMakerChoose = 选择图片…
@@ -388,6 +401,8 @@ Settings_Unset = （未设置）
 # T14 connection surfaces (loading page / error / password / direct connect)
 Loading_Title = 正在连接
 Loading_Connecting = 正在联系服务器……
+Loading_MapTitle = 正在加载
+Loading_MapStatus = 正在加载地图……
 Loading_Cancel = 取消
 Loading_Return = 返回
 Loading_Retry = 重试
@@ -705,6 +720,10 @@ Settings_SecScripted=更多设置
 # 游戏内指令菜单
 CommandMenu_Title=指令菜单
 CommandMenu_Empty=当前地图没有可用指令。
+
+# 聊天（issue 13）：RmlUi 聊天输入行的频道提示
+Chat_Say = 说：
+Chat_Team = 队伍：
 
 # 指令菜单条目
 0=0

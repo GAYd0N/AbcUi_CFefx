@@ -257,8 +257,9 @@ bool Target::render(const Options &Config, int Width, int Height) {
   Views->EndView();
   ++Data->Frames;
   if (auto *Interface = rmlui::renderInterface())
-    Interface->registerExternalTexture(Data->Uri, Data->Fbo.s_hBackBufferTex,
-                                       Width, Height, nullptr, true);
+    Interface->registerExternalTexture(
+        Data->Uri, Data->Fbo.s_hBackBufferTex, Width, Height, nullptr,
+        rmlui::TextureBlend::PremultipliedAlpha);
   return true;
 }
 

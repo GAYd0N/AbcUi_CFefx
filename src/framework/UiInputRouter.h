@@ -143,14 +143,20 @@ public:
   // cleared as stale. Idempotent (the surface WndProc dispatches twice).
   void onFocusLost();
   // HUD_Shutdown/ExitGame teardown: same ownership cleanup as focus loss
-  // (tokens force-released, owners notified, held keys paired), but the
-  // sink's exclusive-change notification is NOT delivered. Teardown runs
-  // inside HUD_Shutdown, which the engine reaches only after it unloaded
-  // the VGUI modules the sink's engine-side effects call into
+  // (tokens force-released, owners notified, held keys paired), but no
+  // engine-side effect is delivered - neither the sink's exclusive-change
+  // notification nor an engine seam an owner runs from its force-release.
+  // Teardown runs inside HUD_Shutdown, which the engine reaches only after
+  // it unloaded the VGUI modules those effects call into
   // (vgui2ext::lockCursor -> ISurface::CalculateMouseVisible -> the engine
-  // CBaseUI over a freed vgui2 IPanel): running them there faults the exit
-  // instead of restoring a cursor that no longer exists.
+  // CBaseUI over a freed vgui2 IPanel; the menu-down console seam ->
+  // IBaseUI::HideConsole -> the released engine console object): running
+  // them there faults the exit instead of restoring a cursor that no longer
+  // exists. Engine-facing seams read tearingDown().
   void reset();
+  // True for the whole reset() teardown drain (owners notified, none of
+  // their engine-side seams may run - see reset()).
+  bool tearingDown() const;
 
   // Inspection (tests and diagnostics).
   size_t ownerCount() const;
@@ -184,6 +190,7 @@ private:
   Entry Stack[kMaxOwners] = {};
   size_t Count = 0;
   uint32_t NextGeneration = 1;
+  bool Teardown_ = false;               // reset() drain in progress
   bool EngineDown[kMaxKeynum + 1] = {}; // keys the binding chain holds
   bool UiHeld[kMaxKeynum + 1] = {};     // edges fed to the UI, up pending
   bool PreHeld[kMaxKeynum + 1] = {};    // EngineDown snapshot at first acquire

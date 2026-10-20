@@ -5,10 +5,13 @@
 </head>
 <body id="effect">
 	<!-- Old CEffectPanel (fullscreen): two ImageSprPanel water splashes
-	     (kRenderTransAdd, framerate 10, sprframe:// URIs driven from onData),
+	     (kRenderTransAdd, framerate 10) - now one animated WebP each, played by
+	     the <animimg> element (10 fps from the container, additive blend);
 	     the underwater tint and the danger vignette (efx_darkround.png). -->
-	<img id="left-water" src="sprframe://abc/abcui/hud/spr/face_rainleft.spr|0"/>
-	<img id="right-water" src="sprframe://abc/abcui/hud/spr/face_rainright.spr|0"/>
+	<animimg id="left-water" src="abc/abcui/hud/img/water/face_rainleft.webp"
+	         blend="add" loop="false" autoplay="false"/>
+	<animimg id="right-water" src="abc/abcui/hud/img/water/face_rainright.webp"
+	         blend="add" loop="false" autoplay="false"/>
 	<img id="under-water" src="../img/efx_darkround.png"/>
 	<img id="danger" src="../img/efx_darkround.png"/>
 </body>

@@ -2,7 +2,7 @@
    abcenchance/res/EffectPanel.res:
      LeftWater/RightWater: ImageSprPanel, wide o0.5 (= 0.5 x own tall, tall
        f0 = full screen -> 240dp wide in the 480dp design space), rendermode 5
-       (kRenderTransAdd - additive via the sprframe:// mark), framerate 10;
+       (kRenderTransAdd - the <animimg> blend="add" attribute), framerate 10;
        RightWater xpos rs1.0 hugs the right edge.
      UnderWater/Danger: fullscreen ImagePanel (efx_darkround.png).
    Colours: EffectPanel.UnderWaterColor = 80 80 80 255,
@@ -22,6 +22,8 @@
 	width: 240dp;
 	height: 100%;
 	display: none;
+	/* The inner frame <img> fills this box; opacity set here is inherited,
+	   so the panel's per-frame fade still drives the animation. */
 }
 #effect #left-water { left: 0dp; }
 #effect #right-water { right: 0dp; }

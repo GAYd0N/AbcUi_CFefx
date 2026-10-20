@@ -88,7 +88,7 @@ GameUiModule::GameUiModule()
   // same shape the Debug diagnostics use.
   menuBackend().setLocalGameLauncher(&GameUiModule::launchLocalGame);
   // T20: the player-list model's roster/mute seams (playerres + the
-  // shipped GameClientExports001 probe).
+  // voice service adapter, issue 17).
   PlayerList.setSeams(playerListSeams());
   // Vote creation menu: the live player roster comes from the same
   // playerres mirror; maps arrive through the MapList user message.
@@ -283,6 +283,18 @@ void GameUiModule::onInit() {
   // the system time on its own.
   Blacklist.setClock(&services::serverbrowser::ServerBlacklist::nowSeconds);
   ServerBrowser.setBlacklist(&Blacklist);
+  // I16 model favorites (issue 16): the player-model picker's persisted
+  // star list. Missing file is the first run; an unreadable one keeps the
+  // picker working read-only (the store refuses to overwrite it).
+  switch (ModelFavorites.load()) {
+  case services::settings::ModelFavorites::LoadStatus::kUnreadable:
+    abc::ConsoleWarn("[AbcUi] model favorites store damaged; favorites are "
+                     "read-only this session\n");
+    break;
+  case services::settings::ModelFavorites::LoadStatus::kMissing:
+  case services::settings::ModelFavorites::LoadStatus::kLoaded:
+    break;
+  }
   // Startup catalog owns the strings backing the model's row views.
   // A live user.scr overrides the JSON fallback on its declared page.
   // Parsing/loading finishes before any document or transaction observes it.

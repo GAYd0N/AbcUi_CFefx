@@ -8,9 +8,10 @@
 // table; MOUSE2 while visible unlocks the OS cursor (centered, old
 // EnableMousePointer) and Rml receives mouse input through the normal
 // InputBridge gate; right-click on a row opens the context menu (steam
-// profile / copy actions - the voice-mute entries died with voice_status,
-// D-04; the friend-icon overlay needs the steamapi backend's Friends
-// surface, deferred with it).
+// profile / copy actions and, since issue 17, the voice mute toggle - the
+// legacy entry died with voice_status, D-04, and is restored over
+// services::voice; the friend-icon overlay needs the steamapi backend's
+// Friends surface, still deferred).
 //
 // Ownership (T06): pointer mode is a router token at the interactive-HUD
 // tier - the panel implements framework::uiinput::Owner and the router is
@@ -44,6 +45,11 @@ void setPointerMode(bool enabled);
 // ShowPanel(intermission > 0)) and mutes +/-showscores (old !m_iInterMission
 // guards).
 void setIntermission(bool intermission);
+// Old CViewport::IsInScore - true while the +/-showscores state is held.
+// CL_CreateMove turns this into usercmd IN_SCORE, the only reliable way to
+// make the server stream every player's ping/loss (issue #9: the engine
+// player tables stay 0/0 the whole session otherwise).
+bool inScore();
 } // namespace scoreboard
 
 // Context-menu intents. The RML data-action attribute still carries the
@@ -55,6 +61,7 @@ enum class ScoreboardAction : int {
   kCopyGameName,
   kCopySteamId,
   kCopySteamId64,
+  kMute,
 };
 
 class ScoreboardPanel : public framework::HudPanel,
@@ -74,6 +81,7 @@ private:
   friend void scoreboard::setIntermission(bool intermission);
   friend bool scoreboard::wantsWheel();
   friend void scoreboard::setPointerMode(bool enabled);
+  friend bool scoreboard::inScore();
   friend class TableListener;
   class TableListener;
 
@@ -117,6 +125,9 @@ private:
   bool Visible = false;
   bool MouseMode = false;
   bool Intermission = false;
+  // Old CViewport::m_bInScore: the +/-showscores latch (intermission does
+  // not set it); CL_CreateMove rides it into usercmd IN_SCORE.
+  bool InScore = false;
   long DataVersion = 0;
   long AppliedVersion = -1;
   int MenuClient = 0;

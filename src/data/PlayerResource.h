@@ -87,6 +87,13 @@ struct PlayerInfo {
   bool isThisPlayer() const;
   // Re-reads the engine mirror (studio PlayerInfo) + native donor/admin.
   void update();
+  // Issue #9: the periodic scoreboard path. Reads ONLY ping/packet_loss from
+  // the same engine mirror - the full update() may reset identity/SteamID
+  // state, which a 0.5 s refresh must never do. Null mirror / invalid slot
+  // keep the last known values; a negative engine value clamps to 0. The
+  // mirror carries non-zero pings only while the client reports the score
+  // state (ScoreboardPanel's usercmd IN_SCORE).
+  void refreshPingLoss();
   void reset();
 };
 
@@ -96,6 +103,10 @@ void init();
 void resetAll();
 // ClExtras / periodic refresh: re-reads every engine mirror.
 void updateAll();
+// Issue #9: the cheap periodic variant of updateAll() - every valid slot's
+// ping/packet_loss only (identity, SteamID, avatar and donor state must
+// survive a refresh). Used by the scoreboard's 0.5 s rebuild.
+void refreshPingLossAll();
 
 // idx is the entindex 0..32 (0/null -> nullptr), old GetPlayerInfo.
 PlayerInfo *getPlayerInfo(int idx);

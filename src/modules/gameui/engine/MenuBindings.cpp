@@ -1,6 +1,7 @@
 // Engine seams extracted from GameUiModule.cpp; no page ownership.
 #include <abc/CvarCmd.h>
 #include <abc/Plugin.h>
+#include "rmlui/InputBridge.h"
 #include "rmlui/VGUI2ExtensionImport.h"
 #include "data/PlayerResource.h"
 #include "rmlui/modelpreview/Options.h"
@@ -51,7 +52,19 @@ services::EngineUiBackend &menuBackend() {
     seams.clientCmd = [](const char *command) {
       abc::EngineClientCmd(command);
     };
-    seams.hideGameUi = []() { return vgui2ext::hideGameUi(); };
+    // Both engine-UI seams call into the engine's IBaseUI, which is not
+    // usable during HUD_Shutdown/ExitGame teardown: the engine unloaded the
+    // VGUI modules those outer bodies dereference, and HideConsole forwards
+    // to a console object that is already released (NULL dereference - the
+    // exit fault UiInputRouter::reset documents). The teardown force-release
+    // still lowers every AbcUi truth; only the engine half is skipped, so a
+    // live dismissal keeps the vanilla `hideconsole` parity.
+    seams.hideGameUi = []() {
+      return !rmlui::uiRouter().tearingDown() && vgui2ext::hideGameUi();
+    };
+    seams.hideConsole = []() {
+      return !rmlui::uiRouter().tearingDown() && vgui2ext::hideConsole();
+    };
     seams.maxClients = []() { return gEngfuncs.GetMaxClients(); };
     seams.bridge = &services::nativeUiBridge();
     created.setSeams(seams);

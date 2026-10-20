@@ -19,6 +19,7 @@
 #include "../../framework/PanelManager.h"
 #include "../../framework/ShellActions.h"
 #include "../../framework/Theme.h"
+#include "../../services/voice/VoiceStatus.h"
 
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/Element.h>
@@ -112,6 +113,11 @@ void setIntermission(bool intermission) {
   panel->setVisible(intermission);
   // The pointer never auto-engages on the intermission board (old code kept
   // +/-showscores dead there; MOUSE2 stays live for players who want it).
+}
+
+bool inScore() {
+  ScoreboardPanel *panel = instance();
+  return panel && panel->InScore;
 }
 
 bool wantsWheel() {
@@ -287,6 +293,7 @@ ScoreboardPanel::~ScoreboardPanel() {
 
 void ScoreboardPanel::reset() {
   Intermission = false;
+  InScore = false;
   setVisible(false);
   ServerName.clear();
   NextMap.clear();
@@ -375,8 +382,13 @@ void ScoreboardPanel::onDocumentReady() {
   TimeEndBase = ClientTimeNow;
   if (abc::CChainedCommand *open = commands::get("+showscores")) {
     subscribe(open->Event(), [this]() {
-      if (!Intermission)
+      if (!Intermission) {
         setVisible(true);
+        // Old Viewport m_bInScore: the button state the usercmd stream
+        // reports (IN_SCORE) - the server streams ping/loss only to
+        // clients it believes hold the scoreboard (issue #9).
+        InScore = true;
+      }
       return false;
     });
   }
@@ -386,6 +398,7 @@ void ScoreboardPanel::onDocumentReady() {
         setVisible(false);
         setMouseMode(false);
       }
+      InScore = false;
       return false;
     });
   }
@@ -645,6 +658,10 @@ void ScoreboardPanel::rebuildTable() {
       rml += "<img class='admin' src='../img/admin_icon32.png'/>";
     else if (info.admin == playerres::Admin::ServerOwner)
       rml += "<img class='admin' src='../img/serverowner_icon32.png'/>";
+    // Issue 17: the muted badge (old SetMuted overlay) reads the voice
+    // service's ban state - the same truth the context menu toggles.
+    if (services::voice::status().isPlayerBlocked(info.index))
+      rml += "<img class='mute' src='../img/mute_icon32.png'/>";
     rml += "</div></div>";
   };
 
@@ -674,6 +691,12 @@ void ScoreboardPanel::rebuildTable() {
 
     for (const RowRef &row : rows) {
       const playerres::PlayerInfo &info = *row.info;
+      // Issue #9: ping/loss are a live engine mirror and are NOT carried by
+      // the ScoreInfo wire - re-read them for this row right before it is
+      // formatted (the legacy per-row UpdatePing). The 0.5 s rebuild is the
+      // only periodic read; without it the column kept whatever value the
+      // last ScoreInfo/Spectator/ClExtras event left behind.
+      row.info->refreshPingLoss();
       // Row fg/bg ride the client's per-player tint (old SetItemFgColor
       // GetPlayerColor; bg = same tint at alpha 80 unless this player).
       std::string rowOpen = "<div class='row";
@@ -817,6 +840,8 @@ void ScoreboardPanel::openContextMenu(int clientIndex,
     return;
 
   const bool hasSteamId = info->steamId64 != 0;
+  const bool mutablePlayer = hasSteamId && !info->isThisPlayer() &&
+                             services::voice::status().available();
   struct Entry {
     const char *id;
     ScoreboardAction action;
@@ -849,6 +874,23 @@ void ScoreboardPanel::openContextMenu(int clientIndex,
     item->SetProperty("display", hasSteamId ? "block" : "none");
   if (Rml::Element *item = element("menu-copy-name"))
     item->SetProperty("display", info->realName.empty() ? "none" : "block");
+  if (Rml::Element *item = element("menu-mute")) {
+    if (mutablePlayer) {
+      // The label follows the backend's current truth (the legacy menu
+      // flipped the entry with IsPlayerBlocked) - never the last click.
+      const bool blocked =
+          services::voice::status().isPlayerBlocked(MenuClient);
+      item->SetInnerRML(framework::TextUtil::escapeRml(
+          localized(blocked ? "Scores_MenuUnmute" : "Scores_MenuMute",
+                    blocked ? "Unmute Voice" : "Mute Voice")));
+      item->SetAttribute("data-action", std::to_string(static_cast<int>(
+                                            ScoreboardAction::kMute)));
+      item->SetProperty("display", "block");
+    } else {
+      // Bots, the local player and SteamID-less rows have nothing to mute.
+      item->SetProperty("display", "none");
+    }
+  }
 
   // Position at the pointer, clamped into the window (old
   // PositionRelativeToPanel CURSOR mode). #menu sits inside #box (a
@@ -926,6 +968,15 @@ void ScoreboardPanel::menuAction(ScoreboardAction action) {
   }
   case ScoreboardAction::kCopySteamId64:
     copy(std::to_string(info->steamId64));
+    break;
+  case ScoreboardAction::kMute:
+    // Issue 17: the toggle goes through the voice service (persisted ban +
+    // server sync). Read-back discipline: the rebuild only moves when the
+    // service accepted - a refused toggle keeps the row and the menu label
+    // exactly as they were.
+    if (services::voice::status().setPlayerBlockedState(
+            MenuClient, !services::voice::status().isPlayerBlocked(MenuClient)))
+      ++DataVersion;
     break;
   }
 }

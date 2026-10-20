@@ -11,8 +11,6 @@
 
 #include <wrect.h>
 
-#include <cctype>
-#include <cstdio>
 #include <cstring>
 #include <vector>
 
@@ -47,28 +45,9 @@ struct DecodedAtlas {
   std::vector<unsigned char> rgba; // top-down RGBA8888
 };
 
-// A standalone .spr file kept byte-resident; frames decode + upload lazily
-// (batch B water splash: 33-38 frames of 256x512 - keeping every decoded
-// frame resident would hold ~40MB of RGBA for two sprites).
-// Per-frame dimensions: the .spr frame table allows frames of different
-// sizes (header MaxWidth/MaxHeight exist for exactly that), so allocation
-// and upload must ride each frame's own geometry.
-struct StandaloneSpr {
-  std::vector<unsigned char> file;
-  std::vector<size_t> frameOffsets;
-  std::vector<size_t> framePixelCounts; // pixels per frame (w*h)
-  std::vector<int> frameWidths;
-  std::vector<int> frameHeights;
-  int width = 0;
-  int height = 0;
-  int format = 0;
-};
-
 std::unordered_map<std::string, HudEntry> HudEntries;
 std::unordered_map<std::string, DecodedAtlas> Atlases;
 std::unordered_map<std::string, int> CropTextures;
-std::unordered_map<std::string, StandaloneSpr> Standalone;
-std::unordered_map<std::string, int> FrameTextures;
 bool ChannelWarned = false;
 int HudResolution = 0;
 
@@ -99,10 +78,6 @@ bool readSpriteFile(const std::string &atlasFile,
   return framework::ResourceFile::read(normalized, bytes,
                                        framework::ResourceLimits::MaxFileBytes);
 }
-
-// Forward decl: standalone frame uploads share the atlas upload helper
-// (defined below the loaders).
-int createTexture(const DecodedAtlas &atlas);
 
 void decodeFramePixels(const unsigned char *indexed, int pixelCount,
                        const unsigned char *palette, int paletteSize,
@@ -230,150 +205,6 @@ bool loadSpr(const std::string &atlasFile, DecodedAtlas &out) {
   return true;
 }
 
-// Parses a standalone .spr (mod-relative path, no sprites/ prefix) into the
-// resident frame table: header + per-frame offsets, pixels decoded lazily.
-// Sequence (type 0) frames only - group frames are an engine angle-picker
-// feature the HUD never used (warn + stop on first group entry).
-StandaloneSpr *ensureStandalone(const std::string &relativePath) {
-  const auto itor = Standalone.find(relativePath);
-  if (itor != Standalone.end())
-    return &itor->second;
-
-  // Negative-result marker: a failed parse is remembered as an empty entry
-  // (no re-parse per frame) that does NOT retain the file bytes - a
-  // corrupt/huge file must not squat in memory until shutdown.
-  const auto fail = [&relativePath]() {
-    Standalone.emplace(relativePath, StandaloneSpr{});
-    return static_cast<StandaloneSpr *>(nullptr);
-  };
-
-  StandaloneSpr spr;
-  if (!framework::ResourceFile::read(relativePath, spr.file,
-                                     framework::ResourceLimits::MaxFileBytes)) {
-    abc::ConsoleWarn("[AbcUi] sprite not found: %s\n", relativePath.c_str());
-    return fail();
-  }
-
-  const auto readInt = [&spr](size_t offset, int &value) {
-    if (!framework::ResourceLimits::span(offset, 4, spr.file.size()))
-      return false;
-    value = static_cast<int>(spr.file[offset]) |
-            (static_cast<int>(spr.file[offset + 1]) << 8) |
-            (static_cast<int>(spr.file[offset + 2]) << 16) |
-            (static_cast<int>(spr.file[offset + 3]) << 24);
-    return true;
-  };
-
-  int signature = 0, version = 0;
-  if (!readInt(0, signature) || signature != kSprSignature ||
-      !readInt(4, version) || version != kSprVersion ||
-      !readInt(12, spr.format) || spr.format < 0 || spr.format > 3) {
-    abc::ConsoleWarn("[AbcUi] unsupported sprite format: %s\n",
-                     relativePath.c_str());
-    return fail();
-  }
-  int frameCount = 0;
-  if (!readInt(28, frameCount) || frameCount <= 0 || frameCount > 4096) {
-    abc::ConsoleWarn("[AbcUi] sprite declares no frames: %s\n",
-                     relativePath.c_str());
-    return fail();
-  }
-
-  size_t offset = 40;
-  if (offset + 2 > spr.file.size())
-    return fail();
-  int paletteSize = static_cast<int>(spr.file[offset]) |
-                    (static_cast<int>(spr.file[offset + 1]) << 8);
-  offset += 2 + static_cast<size_t>(paletteSize) * 3;
-  if (paletteSize <= 0 || paletteSize > 256 || offset > spr.file.size()) {
-    abc::ConsoleWarn("[AbcUi] sprite palette corrupt: %s\n",
-                     relativePath.c_str());
-    return fail();
-  }
-
-  bool usable = false;
-  for (int i = 0; i < frameCount; i++) {
-    int fields[5];
-    bool truncated = false;
-    for (int f = 0; f < 5; f++) {
-      if (!readInt(offset + f * 4, fields[f])) {
-        truncated = true;
-        break;
-      }
-    }
-    if (truncated)
-      break; // malformed tail: end the table (SPRView rule)
-    if (fields[0] != 0) {
-      abc::ConsoleWarn("[AbcUi] group frame unsupported, stopping at %d: %s\n",
-                       i, relativePath.c_str());
-      break;
-    }
-    const int frameW = fields[3];
-    const int frameH = fields[4];
-    size_t byteCount;
-    if (!framework::ResourceLimits::imageBytes(frameW, frameH, byteCount))
-      break;
-    const size_t pixelCount = byteCount / 4;
-    if (!framework::ResourceLimits::span(offset, 20, spr.file.size()) ||
-        !framework::ResourceLimits::span(offset + 20, pixelCount,
-                                         spr.file.size()))
-      break;
-    spr.frameOffsets.push_back(offset + 20);
-    spr.framePixelCounts.push_back(pixelCount);
-    spr.frameWidths.push_back(frameW);
-    spr.frameHeights.push_back(frameH);
-    if (!usable) {
-      spr.width = frameW;
-      spr.height = frameH;
-      usable = true;
-    }
-    offset += 20 + pixelCount;
-  }
-  if (!usable) {
-    abc::ConsoleWarn("[AbcUi] sprite has no readable frame: %s\n",
-                     relativePath.c_str());
-    return fail();
-  }
-  return &Standalone.emplace(relativePath, std::move(spr)).first->second;
-}
-
-// Decodes + uploads one frame of a standalone sprite (id cached per URI key).
-// Dimensions come from the frame's own entry - a later frame may legitimately
-// differ from the first one (F audit: allocating by frame 0 while writing by
-// the requested frame's pixel count overflowed the buffer).
-int standaloneFrameTexture(const std::string &relativePath, int frame,
-                           int &width, int &height) {
-  const StandaloneSpr *spr = ensureStandalone(relativePath);
-  if (!spr || frame < 0 || frame >= static_cast<int>(spr->frameOffsets.size()))
-    return 0;
-  width = spr->frameWidths[frame];
-  height = spr->frameHeights[frame];
-
-  const std::string key = relativePath + "|" + std::to_string(frame);
-  const auto cached = FrameTextures.find(key);
-  if (cached != FrameTextures.end())
-    return cached->second;
-
-  std::vector<unsigned char> rgba(static_cast<size_t>(width) * height * 4);
-  // Palette follows the 40-byte header (fixed layout, see decodeFramePixels
-  // callers); re-read its size from the same spot every frame.
-  const int paletteSize =
-      static_cast<int>(spr->file[40]) | (static_cast<int>(spr->file[41]) << 8);
-  decodeFramePixels(spr->file.data() + spr->frameOffsets[frame],
-                    static_cast<int>(spr->framePixelCounts[frame]),
-                    spr->file.data() + 42, paletteSize, spr->format,
-                    rgba.data());
-
-  DecodedAtlas atlas;
-  atlas.width = width;
-  atlas.height = height;
-  atlas.rgba = std::move(rgba);
-  const int id = createTexture(atlas);
-  if (id)
-    FrameTextures[key] = id;
-  return id;
-}
-
 int createTexture(const DecodedAtlas &atlas) {
   if (!framework::texture::available()) {
     if (!ChannelWarned) {
@@ -434,8 +265,6 @@ void shutdown() {
   std::unordered_set<int> ids;
   for (const auto &[key, id] : CropTextures)
     ids.insert(id);
-  for (const auto &[key, id] : FrameTextures)
-    ids.insert(id);
   for (int id : ids)
     if (id)
       framework::texture::release(id);
@@ -443,8 +272,6 @@ void shutdown() {
   Atlases.clear();
   HudEntries.clear();
   HudResolution = 0;
-  Standalone.clear();
-  FrameTextures.clear();
 }
 
 bool findHudSprite(const char *name, std::string &atlasFile, wrect_t &rect) {
@@ -552,21 +379,7 @@ int textureForUri(const std::string &uri, int &width, int &height) {
       return 0;
     return croppedTexture(atlasFile, rect, true);
   }
-  if (uri.rfind("sprframe://", 0) == 0) {
-    // sprframe://<path>|<frame>
-    const size_t pipe = uri.rfind('|');
-    if (pipe == std::string::npos)
-      return 0;
-    const std::string path = uri.substr(11, pipe - 11);
-    const int frame = atoi(uri.c_str() + pipe + 1);
-    return standaloneFrameTexture(path, frame, width, height);
-  }
   return 0;
-}
-
-int standaloneFrameCount(const std::string &relativePath) {
-  const StandaloneSpr *spr = ensureStandalone(relativePath);
-  return spr ? static_cast<int>(spr->frameOffsets.size()) : 0;
 }
 
 #ifndef NDEBUG

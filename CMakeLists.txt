@@ -70,6 +70,43 @@ add_subdirectory(thirdparty/RmlUi EXCLUDE_FROM_ALL)
 # resolves the Renderer-provided DLL at runtime.
 add_subdirectory(thirdparty/FreeImage EXCLUDE_FROM_ALL)
 
+# --- Animated WebP decode backend -------------------------------------------
+# FreeImage (like every still-image decoder behind it) only returns the first
+# frame of an animated WebP, so the <animimg> element needs libwebp's demux +
+# animation decoder. FreeImage's CMake builds its own LibWebP target with the
+# static CRT (it switches the whole subtree to /MT) and does not export those
+# symbols from FreeImage.dll, so the plugin compiles the decode half of the
+# same pinned sources as its own /MD static library: one shared heap with
+# AbcCore.dll, no second runtime DLL to ship. Only the decode side is linked:
+# the linker pulls the archive members it needs and drops the encoder ones.
+set(ABCUI_WEBP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/FreeImage/Source/LibWebP")
+if(NOT EXISTS "${ABCUI_WEBP_DIR}/src/webp/demux.h")
+    message(FATAL_ERROR
+        "LibWebP sources missing at ${ABCUI_WEBP_DIR}; initialize thirdparty/FreeImage with git submodule update --init")
+endif()
+file(GLOB ABCUI_WEBP_SOURCES CONFIGURE_DEPENDS
+    "${ABCUI_WEBP_DIR}/src/dec/*.c"
+    "${ABCUI_WEBP_DIR}/src/demux/*.c"
+    "${ABCUI_WEBP_DIR}/src/dsp/*.c"
+    "${ABCUI_WEBP_DIR}/src/utils/*.c")
+# Non-x86 SIMD variants compile to nothing under MSVC but only add build noise.
+list(FILTER ABCUI_WEBP_SOURCES EXCLUDE REGEX "_(mips|mips_dsp_r2|neon|msa|dspr2)\\.c$")
+add_library(abcui_webp STATIC ${ABCUI_WEBP_SOURCES})
+# libwebp sources include each other from the LibWebP root ("src/dec/...").
+target_include_directories(abcui_webp PUBLIC
+    "${ABCUI_WEBP_DIR}" "${ABCUI_WEBP_DIR}/src")
+target_compile_definitions(abcui_webp PRIVATE WIN32_LEAN_AND_MEAN WIN32 _WINDOWS)
+set_target_properties(abcui_webp PROPERTIES
+    C_STANDARD 99
+    C_STANDARD_REQUIRED ON
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+# The VS generator leaves RuntimeLibrary empty for a C-only static library
+# (the property alone does not reach the compiler here), which would make cl
+# default to the static CRT. Pass the shared runtime explicitly.
+target_compile_options(abcui_webp PRIVATE
+    $<$<CONFIG:Debug>:/MDd>
+    $<$<NOT:$<CONFIG:Debug>>:/MD>)
+
 add_library(abc_ui_config STATIC
     src/services/uiconfig/UiDefinitions.cpp
     src/services/uiconfig/ConfigRepository.cpp
@@ -88,8 +125,12 @@ add_library(AbcUi MODULE
     src/render/ScreenMetrics.cpp
     src/rmlui/AbcRenderInterface.cpp
     src/rmlui/model/ElementModel.cpp
+    src/rmlui/colorpicker/ElementColorPicker.cpp
     src/rmlui/backdrop/ElementBackdrop.cpp
     src/rmlui/video/ElementVideo.cpp
+    src/rmlui/animated/AnimatedImage.cpp
+    src/rmlui/animated/WebPDecoder.cpp
+    src/rmlui/animated/ElementAnimatedImage.cpp
     src/rmlui/backdrop/Backdrop.cpp
     src/services/menumusic/MenuMusic.cpp
     src/services/friends/FriendsModel.cpp
@@ -193,16 +234,18 @@ add_library(AbcUi MODULE
     src/services/creategame/ServerOptions.cpp
     src/services/playerlist/PlayerListModel.cpp
     src/services/playerlist/MuteBackend.cpp
-    src/services/playerlist/ClientMuteApi.cpp
     src/services/votemenu/VoteMenuModel.cpp
     src/services/loading/LoadingModel.cpp
     src/services/loading/AutoRetryGate.cpp
     src/services/settings/SettingsModel.cpp
     src/services/settings/UserScrParser.cpp
+    src/services/settings/ModelFavorites.cpp
     src/services/settings/KeyBindModel.cpp
     src/services/settings/VideoModeModel.cpp
     src/services/settings/VideoPendingStore.cpp
     src/services/settings/VoiceModel.cpp
+    src/services/voice/VoiceBanStore.cpp
+    src/services/voice/VoiceStatus.cpp
     src/services/crosshair/Geometry.cpp
     src/framework/PanelManager.cpp
     src/framework/PanelManagerLifecycle.cpp
@@ -212,6 +255,8 @@ add_library(AbcUi MODULE
     src/framework/Projection.cpp
     src/panels/ammostack/AmmoStackPanel.cpp
     src/panels/ammobar/AmmoBarPanel.cpp
+    src/panels/chat/ChatMessage.cpp
+    src/panels/chat/ChatPanel.cpp
     src/panels/crosshair/CrosshairPanel.cpp
     src/panels/deadmsg/DeadMsgPanel.cpp
     src/panels/dmgtiles/DmgTilesPanel.cpp
@@ -245,6 +290,8 @@ add_library(AbcUi MODULE
     src/panels/settings/SettingsNavigation.cpp
     src/panels/settings/SettingsEvents.cpp
     src/panels/settings/sections/CvarRows.cpp
+    src/panels/settings/sections/ModelPicker.cpp
+    src/panels/settings/sections/ColorRows.cpp
     src/panels/settings/sections/BindingRows.cpp
     src/panels/settings/VideoConfirmPage.cpp
     src/panels/scoreboard/ScoreboardPanel.cpp
@@ -266,7 +313,8 @@ target_compile_options(AbcUi PRIVATE /W4)
 target_compile_options(AbcUi PRIVATE /FIabc/ForceImport.h)
 # imm32: T07 IME placement/cancel (ImmSetCompositionWindow / ImmNotifyIME).
 target_compile_definitions(AbcUi PRIVATE ABC_CORE_STATIC)
-target_link_libraries(AbcUi PRIVATE Abc::Core RmlUi::RmlUi FreeImage imm32 abc_ui_config)
+target_link_libraries(AbcUi PRIVATE Abc::Core RmlUi::RmlUi FreeImage abcui_webp
+    imm32 abc_ui_config)
 
 # Renderer's gl_common constants are the source of truth for the render vertex
 # layouts. Fail the build when AbcUi's copied table drifts from the pin.

@@ -1,6 +1,7 @@
 // Extracted from SettingsPage.cpp (UTF-8). Responsibility: SettingsPage.
 #include "panels/settings/SettingsUi.h"
 #include "panels/settings/SettingsPage.h"
+#include "panels/settings/sections/ColorRows.h"
 #include "panels/settings/sections/VoiceSection.h"
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
@@ -32,9 +33,12 @@ void SettingsPage::onDocumentReady() {
     // Document-level delegation for both: row text fields commit through
     // the data-row ancestor lookup, the T12 resolution select through its
     // id (a #rows-scoped change listener never sees the video section -
-    // live-caught by the offline page test).
+    // live-caught by the offline page test). The I16 model picker adds
+    // the double-click and right-press surfaces.
     addListener(doc, "click", &Listener);
     addListener(doc, "change", &Listener);
+    addListener(doc, "dblclick", &Listener);
+    addListener(doc, "mousedown", &Listener);
     // The legacy all-in-one projection (no page definitions - the model
     // fixtures) has no cards to claim widgets: show the parking host so
     // the bind list and hardware blocks stay reachable.
@@ -70,6 +74,8 @@ void SettingsPage::render(const char *skipInputRow) {
   renderPreviews();
   renderCrosshairPreview();
   renderSprayMaker();
+  ModelPicker.render(document(), Model);
+  sections::renderColorRows(document(), Model);
   setStatusSummary();
   setBindStatusSummary();
   InRender_ = false;
@@ -155,6 +161,12 @@ bool SettingsPage::isDirty() const {
 void SettingsPage::requestLeave() {
   if (!Model)
     return;
+  // The picker's right-click menu consumes the leave intent like the spray
+  // browser layer: ESC/return closes the menu first, never the page.
+  if (ModelPicker.contextOpen()) {
+    ModelPicker.closeContextMenu(document());
+    return;
+  }
   // A picker in flight consumes the leave intent: ESC/return closes the
   // browser, never the whole page (the layer is the top-most surface).
   if (Spray.browsing()) {
@@ -265,9 +277,26 @@ void SettingsPage::refocusDefault() {
 }
 
 void SettingsPage::PageListener::ProcessEvent(Rml::Event &event) {
-  if (event.GetType() == "change")
+  const Rml::String type = event.GetType();
+  if (type == "change")
     Owner->handleChange(event);
+  else if (type == "dblclick")
+    Owner->handleDblClick(event);
+  else if (type == "mousedown")
+    Owner->handlePointerDown(event);
   else
     Owner->handleClick(event);
+}
+
+void SettingsPage::handleDblClick(Rml::Event &event) {
+  // I16: the model picker owns the double-click (a favorite toggle).
+  if (ModelPicker.handleDblClick(event) && !InRender_)
+    render();
+}
+
+void SettingsPage::handlePointerDown(Rml::Event &event) {
+  // I16: right press on a picker row opens its favorite menu; any other
+  // press first closes an open menu.
+  ModelPicker.handlePointerDown(event, document());
 }
 } // namespace panels::settings

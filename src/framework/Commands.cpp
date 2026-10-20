@@ -32,12 +32,15 @@ void registerAll() {
   // AbcUi game-menu vote page; the wire VoteMenu message still drives the
   // separate yes/no HUD panel. `+commandmenu`/`-commandmenu` feed the Rml
   // command page and keep the native VGUI command menu fully suppressed.
+  // `messagemode`/`messagemode2` belong to the chat panel (issue 13): the
+  // bare invocation opens the Rml input line, an argumented one chains.
   constexpr const char *kHooked[] = {
-      "slot1",   "slot2",        "slot3",           "slot4",
-      "slot5",   "slot6",        "slot7",           "slot8",
-      "slot9",   "slot10",       "missionbriefing", "invnext",
-      "invprev", "+showscores",  "-showscores",     "votemenu",
-      "+attack", "+commandmenu", "-commandmenu",
+      "slot1",        "slot2",        "slot3",           "slot4",
+      "slot5",        "slot6",        "slot7",           "slot8",
+      "slot9",        "slot10",       "missionbriefing", "invnext",
+      "invprev",      "+showscores",  "-showscores",     "votemenu",
+      "+attack",      "+commandmenu", "-commandmenu",    "messagemode",
+      "messagemode2",
   };
   auto &list = entries();
   list.reserve(std::size(kHooked));

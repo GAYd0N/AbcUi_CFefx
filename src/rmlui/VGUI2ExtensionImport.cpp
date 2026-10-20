@@ -371,6 +371,22 @@ void wireConsoleBackend() {
   services::console::consoleBackend().setSeams(seams);
 }
 
+// The engine IBaseUI singleton (T09): resolved from the same factory the
+// extension's BaseUI_Install used, so the vtable the pointer carries is the
+// hooked (proxied) one. The outer CBaseUI bodies then keep their engine-root
+// side effects while the inner takeover answers the queries. A failed
+// resolution is retried by the next caller (the engine side may not be up).
+IBaseUI *baseUi() {
+  static IBaseUI *BaseUi = nullptr;
+  if (BaseUi)
+    return BaseUi;
+  const auto factory =
+      g_pMetaHookAPI ? g_pMetaHookAPI->GetEngineFactory() : nullptr;
+  BaseUi = factory ? (IBaseUI *)factory(BASEUI_INTERFACE_VERSION, nullptr)
+                   : nullptr;
+  return BaseUi;
+}
+
 } // namespace
 
 // T21a: wire the entry-layer seams before any callback can fire. The callback
@@ -749,18 +765,31 @@ bool hideGameUi() {
   // extension's BaseUI_Install used - so the vtable this pointer carries is
   // the hooked (proxied) one, and the call keeps the outer CBaseUI engine
   // root side effects while our inner takeover answers the queries.
-  static IBaseUI *BaseUi = nullptr;
-  if (!BaseUi) {
-    const auto factory = g_pMetaHookAPI->GetEngineFactory();
-    BaseUi = factory ? (IBaseUI *)factory(BASEUI_INTERFACE_VERSION, nullptr)
-                     : nullptr;
-  }
+  IBaseUI *BaseUi = baseUi();
   if (!BaseUi) {
     abc::ConsoleWarn("[AbcUi] IBaseUI unavailable - resume cannot run the "
                      "engine-side hide\n");
     return false;
   }
   BaseUi->HideGameUI();
+  return true;
+}
+
+// Issue #5: the console counterpart. The outer IBaseUI::HideConsole body is
+// where both the `hideconsole` command and the suppressed inner CGameUI::
+// HideGameUI ended up: it flips the engine's own console-toggle flag and
+// forwards to the proxied IGameConsole::Hide. The replacement console's
+// close paths must run it too, or the stale flag re-enters the console on
+// the next ActivateGameUI. The forwarding callback re-enters the bridge, so
+// every caller lowers the replacement's presentation truth first.
+bool hideConsole() {
+  IBaseUI *BaseUi = baseUi();
+  if (!BaseUi) {
+    abc::ConsoleWarn("[AbcUi] IBaseUI unavailable - the engine-side console "
+                     "close cannot run\n");
+    return false;
+  }
+  BaseUi->HideConsole();
   return true;
 }
 

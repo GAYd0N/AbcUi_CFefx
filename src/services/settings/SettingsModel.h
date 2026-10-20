@@ -249,6 +249,10 @@ public:
   // dirty); applied rows re-snapshot to the written value. kCommandToggle
   // rows land kQueued (command channel, settles on the frame beat).
   std::vector<ApplyResult> apply();
+  // The same transaction for exactly one row (the model-picker commits its
+  // selection immediately instead of waiting for the page's Apply).
+  // std::nullopt when the cvar is not in the table.
+  std::optional<ApplyResult> applyOne(const char *cvar);
 
   std::vector<RowView> rows() const;
   std::optional<RowView> find(const char *cvar) const;
@@ -300,6 +304,9 @@ private:
   const RowRuntime *runtime(const char *cvar) const;
   void adoptEngineLocked(RowRuntime &target, float value);
   void adoptEngineTextLocked(RowRuntime &target, const std::string &text);
+  // The shared apply() / applyOne() row transaction: write + read-back +
+  // state landing. The caller pre-screens clean/queued/invalid rows.
+  ApplyResult applyRow(RowRuntime &entry);
   static std::string formatValue(float value);
   static bool parseValue(const char *text, float &out);
   // kText/kStringEnum write validation (T13 boundary): printable bytes

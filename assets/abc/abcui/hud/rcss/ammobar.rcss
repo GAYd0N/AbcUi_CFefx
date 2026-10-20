@@ -59,13 +59,15 @@
 	opacity: var(--abc-hud-icon-opacity);
 }
 
-/* HL2-style reserve: a step smaller, dimmer, still on the clip baseline. */
+/* HL2-style reserve: a step smaller and only slightly dimmer, still on the
+   clip baseline. The reserve is small type, so it keeps the readable 90%
+   accent instead of the 49% shared dim (that read as almost black). */
 #ammobar .pool .reserve {
 	font-weight: normal;
 	font-size: 13dp;
 	letter-spacing: 0dp;
 	margin-left: 2dp;
-	color: var(--abc-hud-accent-dim);
+	color: var(--abc-hud-accent-reserve);
 	font-effect: outline(1px #000000b4);
 }
 

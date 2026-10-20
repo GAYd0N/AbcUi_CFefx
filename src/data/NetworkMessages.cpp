@@ -31,6 +31,7 @@ abc::CallbackList<void(int, int, int, const std::string &)> ShowMenu;
 abc::CallbackList<void(int)> FlashBat;
 abc::CallbackList<void(bool, int)> Flashlight;
 abc::CallbackList<TextMsgCallback> TextMsg;
+abc::CallbackList<SayTextCallback> SayText;
 abc::CallbackList<void(const DamageData &)> Damage;
 abc::CallbackList<void(const PopNumData &)> PopNum;
 // Batch C additions.
@@ -43,6 +44,8 @@ abc::CallbackList<void(const VoteMenuData &)> VoteMenu;
 abc::CallbackList<void()> EndVote;
 abc::CallbackList<void(const MapListData &)> MapList;
 abc::CallbackList<void()> ClExtrasInfo;
+abc::CallbackList<void(const VoiceMaskData &)> VoiceMask;
+abc::CallbackList<void()> ReqState;
 #pragma endregion
 
 namespace {
@@ -68,6 +71,7 @@ pfnUserMsgHook original_ShowMenu = nullptr;
 pfnUserMsgHook original_FlashBat = nullptr;
 pfnUserMsgHook original_Flashlight = nullptr;
 pfnUserMsgHook original_TextMsg = nullptr;
+pfnUserMsgHook original_SayText = nullptr;
 pfnUserMsgHook original_Damage = nullptr;
 pfnUserMsgHook original_MetaHook = nullptr;
 // hud_vote gate for the VoteMenu consumer (set by panels/vote at HUD_Init -
@@ -83,6 +87,8 @@ pfnUserMsgHook original_VoteMenu = nullptr;
 pfnUserMsgHook original_EndVote = nullptr;
 pfnUserMsgHook original_MapList = nullptr;
 pfnUserMsgHook original_ClExtrasInfo = nullptr;
+pfnUserMsgHook original_VoiceMask = nullptr;
+pfnUserMsgHook original_ReqState = nullptr;
 
 int __MsgFunc_AmmoX(const char *pszName, int iSize, void *pbuf) {
   abc::MsgReader msg(pbuf, iSize);
@@ -305,6 +311,30 @@ int __MsgFunc_TextMsg(const char *pszName, int iSize, void *pbuf) {
   return chain ? original_TextMsg(pszName, iSize, pbuf) : 1;
 }
 
+// SayText (issue 13): sender index + one composed line. Sven Co-op ships
+// exactly those two fields; the HLSDK shape appends up to four substitution
+// strings, so whatever remains on the wire is read as parameters and a short
+// message still parses (no field is required past the line itself).
+int __MsgFunc_SayText(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  SayTextData data;
+  data.client = msg.readByte();
+  data.text = msg.readString();
+  if (!msg.ok())
+    return original_SayText(pszName, iSize, pbuf);
+  for (int i = 0; i < 4 && msg.remaining() > 0; i++)
+    data.params[i] = msg.readString();
+  // A subscriber that cannot draw the line must not eat it: `chain` mirrors
+  // the TextMsg rule, so the native CHudSayText stays the fallback.
+  bool chain = true;
+  SayText.forEach(
+      [&](const abc::CallbackList<SayTextCallback>::Handle &,
+          const abc::CallbackList<SayTextCallback>::Callback &callback) {
+        chain &= callback(data);
+      });
+  return chain ? original_SayText(pszName, iSize, pbuf) : 1;
+}
+
 int __MsgFunc_Damage(const char *pszName, int iSize, void *pbuf) {
   abc::MsgReader msg(pbuf, iSize);
   DamageData data;
@@ -436,6 +466,29 @@ int __MsgFunc_ClExtrasInfo(const char *pszName, int iSize, void *pbuf) {
   return result;
 }
 
+// Issue 17: the server's voice state (long audible, long serverBanned,
+// byte modEnable; the trailing byte absent = 0 - the legacy read rule).
+// The service owns the semantics; this is parse + chain like every hook.
+int __MsgFunc_VoiceMask(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  VoiceMaskData data;
+  data.audible = static_cast<unsigned long>(msg.readLong());
+  data.serverBanned = static_cast<unsigned long>(msg.readLong());
+  if (!msg.ok())
+    return original_VoiceMask(pszName, iSize, pbuf);
+  data.modEnable = msg.readByte();
+  if (!msg.ok())
+    data.modEnable = 0;
+  VoiceMask(data);
+  return original_VoiceMask(pszName, iSize, pbuf);
+}
+
+int __MsgFunc_ReqState(const char *pszName, int iSize, void *pbuf) {
+  // Empty payload: the server wants our vban/VModEnable now.
+  ReqState();
+  return original_ReqState(pszName, iSize, pbuf);
+}
+
 int __MsgFunc_MetaHook(const char *pszName, int iSize, void *pbuf) {
   // The old plugin-to-plugin usermsg carrier (registered by the user's
   // server-side addon; absent on vanilla servers - original may be null).
@@ -498,6 +551,7 @@ void init() {
   original_FlashBat = HOOK_MESSAGE(FlashBat);
   original_Flashlight = HOOK_MESSAGE(Flashlight);
   original_TextMsg = HOOK_MESSAGE(TextMsg);
+  original_SayText = HOOK_MESSAGE(SayText);
   original_Damage = HOOK_MESSAGE(Damage);
   // The MetaHook carrier is addon-registered; a null chain (vanilla servers)
   // leaves every read a no-op passthrough (see __MsgFunc_MetaHook).
@@ -512,6 +566,8 @@ void init() {
   original_EndVote = HOOK_MESSAGE(EndVote);
   original_MapList = HOOK_MESSAGE(MapList);
   original_ClExtrasInfo = HOOK_MESSAGE(ClExtrasInfo);
+  original_VoiceMask = HOOK_MESSAGE(VoiceMask);
+  original_ReqState = HOOK_MESSAGE(ReqState);
 }
 
 void setVoteGate(cvar_t *cvar) {

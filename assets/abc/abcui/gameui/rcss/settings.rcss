@@ -215,6 +215,68 @@ body#menusettings #panel scrollbarvertical sliderbar:active,
 	margin-bottom: 8dp;
 }
 
+/* Preview card with a second widget (the crosshair RGBA pickers): both
+   widgets share the preview column, stacked - the preview keeps the
+   remaining height above the pickers instead of the pickers sitting beside
+   it in the row. */
+.settings-card.has-preview.has-side-stack .settings-card-widgets {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+}
+.settings-card.has-preview.has-side-stack .settings-card-widgets .settings-widget {
+	flex: 0 0 auto;
+}
+.settings-card.has-preview.has-side-stack #widget-crosshair-preview {
+	flex: 1 1 auto;
+	min-height: 150dp;
+}
+
+/* Two-up section (the crosshair card): the widget band spans the card above
+   a two-column row grid. The preview and the RGBA pickers share the band, so
+   the preview is a compact fixed window instead of a full-height column, and
+   pairing the rows halves the card height. */
+.settings-card.layout-two-up .settings-card-widgets {
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	margin-bottom: 10dp;
+}
+.settings-card.layout-two-up .settings-card-widgets .settings-widget {
+	display: flex;
+	flex-direction: column;
+	min-width: 0dp;
+}
+.settings-card.layout-two-up #widget-crosshair-preview {
+	flex: 0 0 220dp;
+	width: 220dp;
+}
+.settings-card.layout-two-up #widget-crosshair-color {
+	flex: 1 1 0%;
+	margin: 0dp 0dp 0dp 12dp;
+}
+.settings-card.layout-two-up .row-pair {
+	display: flex;
+	align-items: flex-start;
+}
+.settings-card.layout-two-up .row-pair .row {
+	flex: 1 1 0%;
+	min-width: 0dp;
+	margin-right: 8dp;
+}
+.settings-card.layout-two-up .row-pair .row:last-child {
+	margin-right: 0dp;
+}
+.settings-card.layout-two-up .row-input,
+.settings-card.layout-two-up .row-select {
+	width: 100%;
+}
+/* The value readout takes 46dp of the paired row; a 150dp slider plus the
+   readout still fits the narrowest 640x480 card. */
+.settings-card.layout-two-up input.row-slider {
+	width: 150dp;
+}
+
 /* ---- rows ---------------------------------------------------------------- */
 
 .row {
@@ -515,13 +577,15 @@ input:disabled {
 
 /* The player model preview fills its whole cell: the live FBO re-renders at
    the box's size, so it grows with the card instead of sitting in a 150dp
-   slot with dead space beside it. */
+   slot with dead space beside it. The min-height keeps a real viewport even
+   when the row column is short (RmlUi's flex does not reliably propagate a
+   stretched column height down to an auto-height custom element). */
 #model-preview {
 	display: block;
 	flex: 1 1 auto;
 	width: 100%;
 	height: auto;
-	min-height: 0dp;
+	min-height: 300dp;
 	background-color: var(--abc-inset);
 	border: 1dp var(--abc-line);
 	cursor: move;
@@ -559,6 +623,34 @@ input:disabled {
 	left: 50%;
 	top: 50%;
 	background-color: rgba(0, 0, 0, 0);
+}
+
+/* ---- crosshair RGBA picker widget --------------------------------------- */
+
+/* One picker per colour, stacked under the preview. The element paints the
+   hue strip, the saturation/value square and the alpha strip itself; the
+   box only supplies the size and the inset frame. */
+#widget-crosshair-color {
+	display: block;
+	margin-top: 8dp;
+}
+
+.color-row {
+	display: block;
+	margin-bottom: 9dp;
+}
+
+.color-row .row-label {
+	margin-bottom: 3dp;
+}
+
+colorpicker {
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	height: 64dp;
+	background-color: var(--abc-inset);
+	border: 1dp var(--abc-line);
 }
 
 /* ---- spray maker --------------------------------------------------------- */
@@ -844,4 +936,176 @@ input:disabled {
 
 .settings-layer button:first-child {
 	margin-left: 0dp;
+}
+
+/* ---- I16 model picker ---------------------------------------------------- */
+
+/* The player-model list widget (favorites + text filtering). It shares the
+   preview card's right column with the live <model> preview and mirrors the
+   spray picker's list styling. */
+#model-picker {
+	display: block;
+	margin-top: 6dp;
+}
+
+#model-picker-filter {
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	height: 22dp;
+	line-height: 20dp;
+	margin-bottom: 4dp;
+	font-size: 9dp;
+}
+
+#model-picker-favonly {
+	display: inline-block;
+	width: auto;
+	min-width: 0dp;
+	height: 20dp;
+	line-height: 18dp;
+	margin: 0dp 0dp 4dp 0dp;
+	padding: 0dp 8dp;
+	font-size: 8dp;
+}
+
+#model-picker-favonly.on {
+	background-color: var(--abc-accent);
+	border: 1dp var(--abc-accent);
+	color: var(--abc-accent-ink);
+}
+
+#model-picker-list {
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	height: 180dp;
+	overflow-y: auto;
+	background-color: var(--abc-inset);
+	border: 1dp var(--abc-line);
+}
+
+.model-picker-row {
+	display: block;
+	width: auto;
+	min-width: 0dp;
+	height: 22dp;
+	line-height: 20dp;
+	margin: 0dp;
+	padding: 0dp 6dp;
+	background-color: transparent;
+	border: 0dp;
+	border-left: 2dp transparent;
+	color: var(--abc-text);
+	font-size: 9dp;
+	text-align: left;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.model-picker-row:hover,
+.model-picker-row:focus {
+	background-color: var(--abc-surface-3);
+	border: 0dp;
+	border-left: 2dp transparent;
+	color: var(--abc-text);
+}
+
+.model-picker-row.selected {
+	background-color: var(--abc-surface-3);
+	border-left: 2dp var(--abc-accent);
+	color: var(--abc-text-strong);
+}
+
+.model-picker-name {
+	display: inline-block;
+	width: auto;
+	overflow: hidden;
+}
+
+/* The favorite mark rides every row (dimmed until toggled) and carries its
+   own action, so the click never selects the row underneath it. */
+.model-picker-star {
+	display: inline-block;
+	float: right;
+	height: 20dp;
+	line-height: 20dp;
+	min-width: 0dp;
+	padding: 0dp 2dp 0dp 8dp;
+	background-color: transparent;
+	border: 0dp;
+	color: var(--abc-text-dim);
+	font-size: 8dp;
+}
+
+.model-picker-star.on {
+	color: var(--abc-accent);
+}
+
+.model-picker-empty {
+	display: block;
+	height: 22dp;
+	line-height: 22dp;
+	padding: 0dp 8dp;
+	color: var(--abc-text-dim);
+	font-size: 9dp;
+}
+
+#model-picker-status {
+	display: block;
+	font-size: 8dp;
+	color: var(--abc-text-dim);
+	height: 14dp;
+	line-height: 14dp;
+	margin-top: 4dp;
+}
+
+#model-picker-list scrollbarvertical {
+	z-index: 100;
+	width: 0dp;
+}
+
+#model-picker-list scrollbarvertical sliderbar {
+	margin-left: -10dp;
+	width: 10dp;
+	min-height: 24dp;
+	background-color: var(--abc-line);
+}
+
+.model-picker-label {
+	display: block;
+	font-size: 8dp;
+	color: var(--abc-text-dim);
+	height: 14dp;
+	line-height: 14dp;
+	margin-bottom: 2dp;
+}
+
+/* The picker's right-click favorite menu: the console copy menu's recipe -
+   an absolutely positioned frame clamped to the viewport, sized by these
+   fixed dp (the opener clamps with the same numbers). */
+#model-picker-context-menu {
+	position: absolute;
+	display: none;
+	z-index: 20;
+	min-width: 96dp;
+	padding: 2dp;
+	background-color: #181d22f8;
+	border: 1dp var(--abc-line);
+	border-top: 2dp var(--abc-accent);
+}
+
+.model-picker-context-item {
+	display: block;
+	height: 20dp;
+	line-height: 20dp;
+	padding-left: 8dp;
+	padding-right: 8dp;
+	font-size: 9dp;
+	color: var(--abc-text);
+}
+
+.model-picker-context-item:hover {
+	background-color: var(--abc-accent);
+	color: var(--abc-accent-ink);
 }

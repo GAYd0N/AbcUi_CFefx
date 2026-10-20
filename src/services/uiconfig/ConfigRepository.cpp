@@ -104,9 +104,28 @@ void ConfigRepository::load(const std::filesystem::path &Root,
         auto Existing = std::find_if(
             Page.Items.begin(), Page.Items.end(),
             [&](const auto &Item) { return Item.Cvar == Row.Cvar; });
-        if (Existing != Page.Items.end())
+        if (Existing != Page.Items.end()) {
+          // The page definition owns the presentation: the script supplies
+          // the registration data (kind, domain, default, options), never
+          // the card a row lands in or its translated label. The shipped
+          // user.scr rows carry the flat legacy section token and literal
+          // prompts, so copying either used to move every overridden row
+          // into an undeclared section and blank its card. The page's
+          // behavioural flags (dependencies, read-only, hue swatch, file
+          // choices) are not script concepts either and stay as declared.
+          const SettingDefinition Presentation = *Existing;
           *Existing = copyRow(Row);
-        else {
+          Existing->Label = Presentation.Label;
+          Existing->Section = Presentation.Section;
+          Existing->RequireCvar = Presentation.RequireCvar;
+          Existing->RequireEnabled = Presentation.RequireEnabled;
+          Existing->ReadOnly = Presentation.ReadOnly;
+          Existing->FileChoices = Presentation.FileChoices;
+          Existing->Source = Presentation.Source;
+          Existing->HueSwatch =
+              Existing->Kind == settings::SettingKind::kFloat &&
+              Existing->Bounded && Presentation.HueSwatch;
+        } else {
           // Appended script rows land in the page's declared
           // script section, never in an undeclared group.
           SettingDefinition Appended = copyRow(Row);

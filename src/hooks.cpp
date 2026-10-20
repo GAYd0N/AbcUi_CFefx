@@ -28,6 +28,7 @@
 #include "rmlui/InputBridge.h"
 #include "rmlui/RmlUiModule.h"
 #include "services/steam/SteamAPI.h"
+#include "services/voice/VoiceStatus.h"
 #include "services/GameUiBridge.h"
 
 namespace hooks {
@@ -95,6 +96,7 @@ static void H_HUD_Init() {
   if (!CommandsRegistered) {
     CommandsRegistered = true;
     netmsg::init();
+    services::voice::status().init();
     hudstate::init();
     weaponres::init();
     playerres::init();
@@ -112,6 +114,7 @@ static int H_HUD_VidInit() {
   hudstate::reset();
   weaponres::reset();
   playerres::resetAll();
+  services::voice::status().resetForWorld();
   rmlui::onVidInit();
   return result;
 }
@@ -124,6 +127,7 @@ static void H_HUD_Frame(double frametime) {
   // precondition (see PlayerTrace.h): tracing while a map change replaces
   // the world faults inside the engine's own trace.
   playertrace::update(services::nativeUiBridge().hasLevel());
+  services::voice::status().frame();
   rmlui::onFrame(frametime);
 }
 
@@ -230,6 +234,7 @@ H_HUD_GetStudioModelInterface(int version,
 }
 
 static void H_HUD_Shutdown() {
+  services::voice::status().shutdown();
   rmlui::onHudShutdown();
   gExportfuncs.HUD_Shutdown();
   // Old UninstallClientHook order: the hook comes down after the client's
@@ -262,6 +267,12 @@ static void H_CL_CreateMove(float time, usercmd_s *cmd, int active) {
   if (owner)
     gEngfuncs.GetViewAngles(angles);
   gExportfuncs.CL_CreateMove(time, cmd, active);
+  // Old exportfuncs CL_CreateMove: the scoreboard latch rides the usercmd
+  // button stream as IN_SCORE - the server streams every player's
+  // ping/loss only to clients it believes hold the scoreboard (issue #9;
+  // without this the engine player tables sit at 0/0 the whole session).
+  if (panels::scoreboard::inScore())
+    cmd->buttons |= IN_SCORE;
   if (owner) {
     cmd->buttons &= ~(IN_ATTACK | IN_ATTACK2);
     for (int i = 0; i < 3; ++i)

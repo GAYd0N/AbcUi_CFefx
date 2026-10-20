@@ -97,6 +97,15 @@
 //                         Failed     -> Disconnected, pages=[Main],
 //                                       overlays=[ConnectionError], reason copy
 //                         Password   -> push Password overlay, stay Connecting
+//   kMapLoadStarted       no connect/local attempt owns the screen (InGame,
+//                         Disconnected or Booting: a changelevel) -> new
+//                         generation with attemptKind kMapLoad; phase
+//                         Loading; pages=[Loading]; overlays/focus cleared;
+//                         NO backend action (the engine already started).
+//                         A live Connecting/Loading attempt ignores it (its
+//                         own generation owns the stream); Fatal/ShuttingDown
+//                         ignore it. It ends through the ordinary
+//                         kLoadingFinished(g) rows above.
 //   kFatal(reason)        Fatal; pages cleared; overlays=[Emergency];
 //                         reason copied; ESC/back refused there, quit path
 //                         stays available
@@ -179,6 +188,7 @@ private:
   void loadingStarted(uint32_t generation);
   void loadingFinished(uint32_t generation, LoadingOutcome outcome,
                        const std::string &reason);
+  void mapLoadStarted();
   void applyFatal(const std::string &reason);
   void applyShutdown();
 

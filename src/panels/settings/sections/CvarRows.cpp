@@ -1,6 +1,7 @@
 // Extracted from SettingsPage.cpp (UTF-8). Responsibility: sections/CvarRows.
 #include "panels/settings/SettingsUi.h"
 #include "panels/settings/SettingsPage.h"
+#include "panels/settings/sections/ColorRows.h"
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Elements/ElementFormControlSelect.h>
@@ -92,12 +93,20 @@ void SettingsPage::buildRows() {
               "class=\"row-status\"></div></div>";
   };
   auto OpenCard = [&](const std::string &CardId, const std::string &TitleToken,
-                      bool HasPreview, bool HasBlock) {
+                      bool HasPreview, bool HasBlock, bool Stacked,
+                      bool TwoUp) {
     Markup += "<div class=\"settings-card";
     if (HasPreview)
       Markup += " has-preview";
-    if (HasBlock)
+    // A full-width block above the rows only exists on a card without a
+    // preview column; on a preview card the block shares that column and
+    // stacks under the preview.
+    if (HasBlock && !HasPreview)
       Markup += " has-block";
+    if (Stacked)
+      Markup += " has-side-stack";
+    if (TwoUp)
+      Markup += " layout-two-up";
     Markup += "\" id=\"" + CardId + "\">";
     if (!TitleToken.empty())
       Markup += "<div class=\"settings-card-title section-header\">" +
@@ -110,11 +119,13 @@ void SettingsPage::buildRows() {
       // sitting in a fixed 150dp slot with dead space beside it. The
       // widget column closes the body in CloseCard.
       Markup += "<div class=\"settings-card-body\"><div "
-                "class=\"settings-card-items\">";
+                "class=\"settings-card-items\" id=\"" +
+                CardId + "-items\">";
     } else {
       Markup += "<div class=\"settings-card-widgets\" id=\"" + CardId +
                 "-widgets\"></div>";
-      Markup += "<div class=\"settings-card-items\">";
+      Markup +=
+          "<div class=\"settings-card-items\" id=\"" + CardId + "-items\">";
     }
   };
   auto CloseCard = [&](const std::string &CardId, bool HasPreview) {
@@ -132,25 +143,81 @@ void SettingsPage::buildRows() {
         for (const auto &Section : Page->Sections) {
           bool HasPreview = false;
           bool HasBlock = false;
+          bool HasWidget = false;
           for (const auto &Component : Section.Components)
             for (int I = 0; I < kWidgetBlockCount; ++I)
               if (Component == kWidgetBlocks[I].Component) {
+                HasWidget = true;
                 if (kWidgetBlocks[I].Preview)
                   HasPreview = true;
-                else
+                // A row-flow block lives in the rows column, never in the
+                // widget column, so it must not claim the card's block
+                // layout (that class used to turn the preview column into a
+                // plain block and stop the model preview from stretching).
+                else if (!kWidgetBlocks[I].RowFlow)
                   HasBlock = true;
               }
-          OpenCard("settings-card-" + Page->Id + "-" + Section.Id,
-                   Section.Label, HasPreview, HasBlock);
-          for (const auto &View : Views) {
+          // The rows a section actually draws. Suppressed rows stay in the
+          // model (drafts, apply, reset) but their widget owns the
+          // presentation.
+          const auto VisibleRow = [&](const auto &View) {
             if (Section.Id != View.row->Section)
-              continue;
+              return false;
             if (std::find(Page->Cvars.begin(), Page->Cvars.end(),
                           View.row->Cvar) == Page->Cvars.end())
-              continue;
-            AppendRow(View);
+              return false;
+            // I16: the model-picker widget owns the `model` cvar's
+            // presentation in its section - the plain select row would
+            // duplicate it. The row stays declared: the picker and the
+            // preview ride its drafts, options and status.
+            if (Section.hasComponent("model-picker") &&
+                std::string(View.row->Cvar) == "model")
+              return false;
+            // The crosshair RGBA pickers own the eight colour rows.
+            if (Section.hasComponent(sections::kColorPickerComponent) &&
+                sections::ownsColorCvar(View.row->Cvar))
+              return false;
+            return true;
+          };
+          int RowCount = 0;
+          for (const auto &View : Views)
+            if (VisibleRow(View))
+              ++RowCount;
+          // A card with neither rows nor a widget is a blank band: drop it
+          // from the page (the user.scr page's "more settings" target is
+          // empty until a mod script appends entries there).
+          if (RowCount == 0 && !HasWidget)
+            continue;
+          // Two-up sections put the widget band above a two-column row
+          // grid; the band keeps the preview and the RGBA pickers side by
+          // side, so the preview no longer owns a whole column.
+          const bool TwoUp = Section.Layout == "two-up";
+          const bool Stacked = !TwoUp && HasPreview && HasBlock;
+          OpenCard("settings-card-" + Page->Id + "-" + Section.Id,
+                   Section.Label, TwoUp ? false : HasPreview,
+                   TwoUp ? false : HasBlock, Stacked, TwoUp);
+          if (TwoUp) {
+            int InPair = 0;
+            for (const auto &View : Views) {
+              if (!VisibleRow(View))
+                continue;
+              if (InPair == 0)
+                Markup += "<div class=\"row-pair\">";
+              AppendRow(View);
+              if (++InPair == 2) {
+                Markup += "</div>";
+                InPair = 0;
+              }
+            }
+            if (InPair != 0)
+              Markup += "</div>";
+          } else {
+            for (const auto &View : Views)
+              if (VisibleRow(View))
+                AppendRow(View);
           }
-          CloseCard("settings-card-" + Page->Id + "-" + Section.Id, HasPreview);
+          CloseCard("settings-card-" + Page->Id + "-" + Section.Id,
+                    TwoUp ? false : HasPreview);
         }
         Markup += "</div>";
       };
@@ -162,7 +229,7 @@ void SettingsPage::buildRows() {
     int CardIndex = 0;
     auto OpenLegacyCard = [&](const std::string &Token) {
       OpenCard("settings-card-legacy-" + std::to_string(CardIndex++), Token,
-               false, false);
+               false, false, false, false);
       Open = true;
     };
     for (const auto &View : Views) {

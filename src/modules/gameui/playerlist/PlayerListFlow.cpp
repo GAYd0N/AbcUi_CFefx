@@ -54,8 +54,7 @@ void PlayerListFlow::toggleMute() {
     break;
   case services::playerlist::ToggleError::kUnavailable:
     abc::ConsoleWarn(
-        "[AbcUi] player mute unavailable on this install (no %s)\n",
-        "GameClientExports001");
+        "[AbcUi] player mute unavailable (voice service not initialized)\n");
     break;
   case services::playerlist::ToggleError::kNoSelection:
     abc::ConsoleWarn("[AbcUi] player mute refused (no selection)\n");

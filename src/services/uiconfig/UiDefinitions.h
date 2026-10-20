@@ -41,6 +41,10 @@ struct SectionDefinition {
   std::string Id;
   std::string Label;
   std::vector<std::string> Components;
+  // Optional row layout: "two-up" pairs the section's rows in two columns
+  // and puts the widget band above them (the compact crosshair card).
+  // Empty is the default single-column row flow.
+  std::string Layout;
 
   bool hasComponent(const char *Name) const;
 };

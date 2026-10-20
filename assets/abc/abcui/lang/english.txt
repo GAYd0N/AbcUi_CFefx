@@ -82,6 +82,8 @@ Scores_MenuCopyName = Copy Steam Name
 Scores_MenuCopyNameRaw = Copy Game Name
 Scores_MenuCopySteamID = Copy SteamID
 Scores_MenuCopySteamID64 = Copy SteamID64
+Scores_MenuMute = Mute Voice
+Scores_MenuUnmute = Unmute Voice
 
 # Item highlight (P7 itemhighlight panel); token names are the old
 # ABCEnchance localize keys (byte-matched against the old schinese.txt).
@@ -304,9 +306,20 @@ Settings_PrimaryColor = Primary color
 Settings_SecondaryColor = Secondary color
 Settings_Spraypaint = Spraypaint image
 Settings_PlayerModelHint = Drag to turn the model
+Settings_ModelFilter = Filter
+Settings_ModelFavOnly = Favorites only
+Settings_ModelStar = F
+Settings_ModelFavAdd = Add favorite
+Settings_ModelFavRemove = Remove favorite
+Settings_ModelPickerModels = models
+Settings_ModelPickerEmpty = No player models found
+Settings_ModelPickerNoMatch = No models match the filter
+Settings_ModelFavLocked = Favorites are read-only (the store is damaged)
 Settings_SpraypaintColor = Spraypaint color
 Settings_SprayPreviewHint = Preview of the selected image and color
 Settings_CrosshairPreviewHint = Preview of the selected crosshair settings
+Settings_CrosshairColor = Crosshair color
+Settings_CrosshairOutlineColor = Crosshair outline color
 Settings_SprayMakerTitle = Spraypaint maker
 Settings_SprayMakerHintTitle = Custom spray
 Settings_SprayMakerChoose = Choose image...
@@ -386,6 +399,8 @@ Settings_Unset = (unset)
 # T14 connection surfaces (loading page / error / password / direct connect)
 Loading_Title = Connecting
 Loading_Connecting = Contacting the server...
+Loading_MapTitle = Loading
+Loading_MapStatus = Loading map...
 Loading_Cancel = Cancel
 Loading_Return = Return
 Loading_Retry = Retry
@@ -706,3 +721,7 @@ Settings_SecScripted=More settings
 # In-game command menu
 CommandMenu_Title=Command Menu
 CommandMenu_Empty=No commands available for this map.
+
+# Chat (issue 13): the message-mode prompt of the RmlUi chat input line.
+Chat_Say = Say:
+Chat_Team = Team:

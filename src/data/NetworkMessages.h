@@ -57,6 +57,15 @@ struct PopNumData {
   int color[4] = {};
 };
 
+// VoiceMask: the server's voice state ack (issue 17). Two 32-slot bitmask
+// words - who the server says is audible, and what it believes we banned -
+// plus its own voice_modenable (absent = 0, the legacy read rule).
+struct VoiceMaskData {
+  unsigned long audible = 0;
+  unsigned long serverBanned = 0;
+  int modEnable = 0;
+};
+
 extern abc::CallbackList<void(int, int)> AmmoX; // (ammoIndex, count)
 extern abc::CallbackList<void(const WeaponListData &)> WeaponList;
 extern abc::CallbackList<void()> InitHud;
@@ -80,6 +89,24 @@ extern abc::CallbackList<void(int, int, int, const std::string &)>
 extern abc::CallbackList<void(int)> FlashBat;         // flashlight battery
 extern abc::CallbackList<void(bool, int)> Flashlight; // (on, battery)
 extern abc::CallbackList<TextMsgCallback> TextMsg;
+// SayText: one chat line (issue 13). `client` is the sender's entity index
+// (0 = server console); `text` is the line the server composed, which may
+// still carry the engine's colour control bytes (0x01 normal / 0x02
+// use-old-colours / 0x03 player name / 0x04 location) and positional
+// `%s`/`%sN` placeholders whose substitution strings ride in `params`
+// (empty when the server sent none - Sven Co-op composes the whole line
+// itself and ships only the two fields).
+struct SayTextData {
+  int client = 0;
+  std::string text;
+  std::string params[4];
+};
+
+// Subscribers return false to swallow the vanilla CHudSayText draw: exactly
+// one chat log may be on screen. All-true chains the native handler, which
+// is also what keeps chat alive while the RmlUi chat panel is disabled.
+using SayTextCallback = bool(const SayTextData &);
+extern abc::CallbackList<SayTextCallback> SayText;
 extern abc::CallbackList<void(const DamageData &)> Damage;
 extern abc::CallbackList<void(const PopNumData &)> PopNum;
 // Batch C additions.
@@ -112,6 +139,10 @@ extern abc::CallbackList<void(const VoteMenuData &)> VoteMenu;
 extern abc::CallbackList<void()> EndVote;
 extern abc::CallbackList<void(const MapListData &)> MapList;
 extern abc::CallbackList<void()> ClExtrasInfo;
+// Issue 17: the voice state feed. ReqState means "send your vban/VModEnable
+// now" (right after connect); VoiceMask is the server's ack of that state.
+extern abc::CallbackList<void(const VoiceMaskData &)> VoiceMask;
+extern abc::CallbackList<void()> ReqState;
 
 // HUD_Init: installs the HookUserMsg chain. Idempotent.
 void init();

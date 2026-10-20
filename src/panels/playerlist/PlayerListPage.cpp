@@ -132,9 +132,12 @@ void PlayerListPage::render() {
   Rml::Element *mute = doc->GetElementById("pl-mute");
   if (mute) {
     const auto *selected = Model->selectedEntry();
+    // Issue 17 rules: bots, the local player and SteamID-less rows are not
+    // mutable (the model refuses bots/local too; the predicate just keeps
+    // the button honest).
     const bool mutableSelection = selected != nullptr &&
                                   selected->steamId64 != 0 && !selected->bot &&
-                                  Model->muteAvailable();
+                                  !selected->local && Model->muteAvailable();
     std::string label;
     if (!Model->muteAvailable())
       label = resolve("#PL_MuteUnavailable");

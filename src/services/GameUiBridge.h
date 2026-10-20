@@ -256,7 +256,10 @@ public:
   // stays (ESC parity: one layer per event). Both are idempotent and
   // report a state transition. The UI-side dismissal (routed ESC, the
   // close button) goes through noteConsoleDismissed - the module IS the
-  // sink, no callback echo.
+  // sink, no callback echo. That call lowers only THIS truth; the engine's
+  // own console flag is a separate fact and is cleared by the engine-facing
+  // seam the module drives alongside it (EngineUiBackend::hideConsole,
+  // issue #5).
   bool requestConsoleOpen(NativeUiOrigin origin);
   bool requestConsoleClose(NativeUiOrigin origin);
   void noteConsoleDismissed();

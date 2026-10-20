@@ -6,8 +6,10 @@
 // Old control mapping: the two ImagePanel overlays (Danger/UnderWater, both
 // efx_darkround.png tinted) become two full-screen imgs; the two ImageSprPanel
 // water splashes (face_rainleft/right.spr, kRenderTransAdd, framerate 10)
-// become imgs whose src flips across sprframe:// URIs (SpriteResource decodes
-// the standalone .spr frames; frames upload lazily).
+// become two <animimg> elements playing animated WebP files of the same
+// frames at the same rate (see rmlui/animated/ElementAnimatedImage.h). The
+// element owns the frame clock and the texture; this controller only restarts
+// the sequence on the OUT_WATER edge and drives the alpha ramp.
 //
 // The old AnimationController alpha ramps are reproduced with timestamps in
 // onData (DeadMsg instrument): the danger vignette ramps toward its target on
@@ -15,6 +17,10 @@
 // transition, so a per-frame opacity write replaces CSS transitions there.
 
 #include "../../framework/HudPanel.h"
+
+namespace rmlui::animated {
+class ElementAnimatedImage;
+}
 
 namespace panels {
 
@@ -43,21 +49,20 @@ private:
 
   void setHealth(int health);
   void setWater(WaterType type);
-  // Old CSPRImage::Animate at framerate 10 (visible splashes only).
-  void animateWater();
-  void applyWaterFrame(const char *elementId, const char *sprPath, int frame);
+  // Typed handle on one splash <animimg> (nullptr when the document element
+  // is missing or not an animated image).
+  rmlui::animated::ElementAnimatedImage *splash(const char *elementId) const;
 
   int OldWaterStatus = 0;
   WaterType NowWaterType = WaterType::None;
   double OutWaterStart = 0.0;
-  // Animation clock for the splash frame flip (old CSPRImage Animate).
+  // Client clock for the alpha ramps (the frame clock lives in the element).
   double ClientTimeNow = 0.0;
-  double WaterAnimTime = 0.0;
-  // The two splash files carry different frame counts (38 vs 33) and the old
-  // CSPRImage pair animated independently - one counter per sprite; a shared
-  // modulo on the left file walked the right sprite out of range.
-  int WaterFrameLeft = 0;
-  int WaterFrameRight = 0;
+  // The splash elements replay from frame 0 once per OUT_WATER transition -
+  // the old CSPRImage SetFrame(0) restart.
+  rmlui::animated::ElementAnimatedImage *LeftSplash = nullptr;
+  rmlui::animated::ElementAnimatedImage *RightSplash = nullptr;
+  bool OutWaterStarted = false;
 };
 
 } // namespace panels

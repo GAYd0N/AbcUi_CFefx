@@ -72,6 +72,13 @@ void GameUiModule::dismissMenu() {
   VoiceModel.stopTest();
   Controller.dispatch(MenuEvent{EventKind::kMenuHidden});
   hideAllMenuDocuments();
+  // Issue #5: the menu takes the console layer with it - vanilla
+  // CGameUI::HideGameUI issued `hideconsole` here. Lowering only our own
+  // presentation truth left the ENGINE's console flag set, so the next
+  // ActivateGameUI re-entered the console. The bridge truth is already down
+  // (requestMenuDown) and hideConsole() re-asserts it before the engine
+  // call, so the proxied IGameConsole::Hide echo cannot toggle twice.
+  menuBackend().hideConsole();
   if (MenuPresented) {
     MenuPresented = false;
     PageToken.release();

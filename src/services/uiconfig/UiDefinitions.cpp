@@ -257,8 +257,9 @@ std::string componentName(const Value &V, const std::string &Path,
   // belongs to the section that shows it (page -> sections -> widgets).
   const std::set<std::string> PageComponents = {"user-script"};
   const std::set<std::string> SectionComponents = {
-      "bindings",          "video",         "voice",      "model-preview",
-      "crosshair-preview", "spray-preview", "spray-maker"};
+      "bindings",      "video",         "voice",
+      "model-picker",  "model-preview", "crosshair-preview",
+      "crosshair-color", "spray-preview", "spray-maker"};
   const auto &Allowed = PageLevel ? PageComponents : SectionComponents;
   require(Allowed.count(Name) != 0, Path,
           PageLevel
@@ -268,11 +269,16 @@ std::string componentName(const Value &V, const std::string &Path,
 }
 
 SectionDefinition section(const Value &Item, const std::string &P) {
-  fields(Item, {"id", "label", "components"}, P);
+  fields(Item, {"id", "label", "components", "layout"}, P);
   SectionDefinition Result;
   Result.Id = text(Item, "id", P);
   require(identifier(Result.Id), P + ".id", "invalid section identifier");
   Result.Label = text(Item, "label", P);
+  if (Item.HasMember("layout")) {
+    Result.Layout = text(Item, "layout", P);
+    require(Result.Layout == "two-up", P + ".layout",
+            "unknown section layout");
+  }
   if (Item.HasMember("components")) {
     array(Item["components"], P + ".components", 8);
     for (const auto &C : Item["components"].GetArray()) {

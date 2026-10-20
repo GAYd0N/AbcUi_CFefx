@@ -101,14 +101,18 @@ void LoadingPage::render() {
   if (!doc || !Model)
     return;
   // Title: the attempt-kind token when the module set one (the T19 local
-  // start), else the shipped connect title (the document's own text node).
-  if (!TitleToken.empty())
-    setText(doc, "loading-title", resolveText(TitleToken));
-  // Status line: the engine truth when it has spoken, else the page's own
-  // "connecting" default (the few frames before the first callback).
-  const std::string status = Model->statusText().empty()
-                                 ? resolveText("#Loading_Connecting")
-                                 : resolveText(Model->statusText());
+  // start / an engine map change), else the shipped connect title. Always
+  // re-applied so a reused page cannot keep the previous attempt's title.
+  setText(doc, "loading-title",
+          resolveText(TitleToken.empty() ? "#Loading_Title" : TitleToken));
+  // Status line: the engine truth when it has spoken, else the attempt's
+  // own default (the few frames before the first callback). A map load must
+  // not claim it is contacting a server.
+  const std::string status =
+      Model->statusText().empty()
+          ? resolveText(StatusToken.empty() ? "#Loading_Connecting"
+                                            : StatusToken)
+          : resolveText(Model->statusText());
   setText(doc, "loading-status", status);
   setText(doc, "loading-target", Model->address());
 

@@ -18,6 +18,7 @@
 #include "../../services/serverbrowser/ServerListModel.h"
 #include "../../services/serverbrowser/ServerQuery.h"
 #include "../../services/settings/KeyBindModel.h"
+#include "../../services/settings/ModelFavorites.h"
 #include "../../services/settings/SettingsModel.h"
 #include "../../services/settings/VideoModeModel.h"
 #include "../../services/settings/VoiceModel.h"
@@ -166,6 +167,7 @@ private:
   services::uiconfig::ConfigRepository UiConfig;
   services::settings::SettingsModel SettingsModel;
   services::settings::KeyBindModel BindModel;
+  services::settings::ModelFavorites ModelFavorites;
   services::settings::VoiceModel VoiceModel;
   services::settings::VideoModeModel VideoModel;
   services::loading::LoadingModel LoadingModelState;

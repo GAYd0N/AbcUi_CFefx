@@ -29,6 +29,7 @@
 
 #include "../../framework/InteractiveDocument.h"
 #include "sections/CrosshairPreview.h"
+#include "sections/ModelPicker.h"
 #include "sections/SpraySection.h"
 #include "sections/VideoSection.h"
 #include "services/uiconfig/UiDefinitions.h"
@@ -97,6 +98,11 @@ public:
   void setVoiceModel(services::settings::VoiceModel *model) {
     VoiceModel_ = model;
   }
+  // I16 model picker: the persisted favorite set (store-owned, read and
+  // toggled through it; every change persists immediately).
+  void setFavorites(services::settings::ModelFavorites *favorites) {
+    ModelPicker.setFavorites(favorites);
+  }
   // Spray maker: the module owns decode/encode/write, so a confirmed pick
   // travels out through this sink and the answer comes back through
   // setSprayResult (message + the pixels to preview).
@@ -155,6 +161,10 @@ private:
 
   void handleClick(Rml::Event &event);
   void handleChange(Rml::Event &event);
+  // I16 model picker surfaces: a double-click toggles the row's favorite,
+  // a right press opens the row's favorite context menu.
+  void handleDblClick(Rml::Event &event);
+  void handlePointerDown(Rml::Event &event);
   void buildRows();
   void buildNavigation();
   void projectPage();
@@ -210,6 +220,7 @@ private:
   sections::VideoSection VideoView;
   sections::CrosshairPreviewState CrosshairPreview;
   sections::SpraySection Spray;
+  sections::ModelPicker ModelPicker;
   std::map<std::string, std::vector<std::string>> SelectValuesShown;
   // The hue colour last painted on one row's drag thumb (cvar -> "rgb(...)"):
   // the swatch is rewritten only when it changed, so the render that follows

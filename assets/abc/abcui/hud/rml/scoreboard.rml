@@ -31,6 +31,7 @@
 			<div class="item" id="menu-copy-name-raw"></div>
 			<div class="item" id="menu-copy-steamid"></div>
 			<div class="item" id="menu-copy-steamid64"></div>
+			<div class="item" id="menu-mute"></div>
 		</div>
 	</div>
 </body>

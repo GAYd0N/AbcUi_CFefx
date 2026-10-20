@@ -118,6 +118,9 @@ void MenuController::dispatch(const MenuEvent &event) {
   case EventKind::kLoadingFinished:
     loadingFinished(event.generation, event.outcome, event.text);
     break;
+  case EventKind::kMapLoadStarted:
+    mapLoadStarted();
+    break;
   case EventKind::kFatal:
     applyFatal(event.text);
     break;
@@ -430,6 +433,36 @@ void MenuController::loadingStarted(uint32_t generation) {
   if (State.phase != BackendPhase::kConnecting)
     return;
   State.phase = BackendPhase::kLoading;
+}
+
+void MenuController::mapLoadStarted() {
+  switch (State.phase) {
+  case BackendPhase::kConnecting:
+  case BackendPhase::kLoading:
+    return; // a live connect/local attempt owns this loading stream
+  case BackendPhase::kFatal:
+  case BackendPhase::kShuttingDown:
+    return; // emergency/terminal screens stay
+  case BackendPhase::kBooting:
+  case BackendPhase::kDisconnected:
+  case BackendPhase::kInGame:
+    break;
+  }
+  // The engine's changelevel: it is already loading, so this transition
+  // emits no backend action. Allocating an ordinary generation lets the
+  // existing model/stream/retire machinery own the progress values and the
+  // ordinary kLoadingFinished rows end it (Success -> InGame, Failed ->
+  // Disconnected + error). A stale attempt generation is retired first.
+  retireAttempt();
+  const uint32_t generation = NextGeneration++;
+  State.connectGeneration = generation;
+  State.connectAddress.clear(); // no user-supplied target for a map load
+  State.attemptKind = AttemptKind::kMapLoad;
+  State.phase = BackendPhase::kLoading;
+  State.pages.clear();
+  State.pages.push(MenuPage::kLoading);
+  State.overlays.clear();
+  State.errorReason.clear();
 }
 
 void MenuController::loadingFinished(uint32_t generation,

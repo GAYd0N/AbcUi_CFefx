@@ -242,10 +242,17 @@ void Router::onFocusLost() {
 }
 
 void Router::reset() {
-  // Teardown: the owners still clean up, but the sink must not run the
-  // engine-side exclusive-change effects (see the header contract).
+  // Teardown: the owners still clean up, but no engine-side effect may run -
+  // not the sink's (see the header contract), and not the ones an owner
+  // reaches from its force-release (tearingDown()).
+  Teardown_ = true;
   drainOwners(false);
   resetKeyState();
+  Teardown_ = false;
+}
+
+bool Router::tearingDown() const {
+  return Teardown_;
 }
 
 size_t Router::ownerCount() const {

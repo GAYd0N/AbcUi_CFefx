@@ -7,7 +7,11 @@
 namespace gameui {
 void GameUiModule::syncAttemptState() {
   const auto &state = Controller.state();
-  if (state.phase == gameui::menu::BackendPhase::kConnecting &&
+  // Connecting starts a remote/local attempt; Loading also starts the model
+  // for an engine-initiated changelevel (kMapLoad), whose generation is
+  // allocated by the controller on the kMapLoadStarted transition.
+  if ((state.phase == gameui::menu::BackendPhase::kConnecting ||
+       state.phase == gameui::menu::BackendPhase::kLoading) &&
       state.connectGeneration != 0 &&
       LoadingModelState.generation() != state.connectGeneration) {
     LoadingModelState.startAttempt(state.connectGeneration,
@@ -17,7 +21,7 @@ void GameUiModule::syncAttemptState() {
     // generation, so capture it while it is still set.
     CurrentAttemptIsLocal =
         state.attemptKind == gameui::menu::AttemptKind::kLocalGame;
-    if (!CurrentAttemptIsLocal)
+    if (state.attemptKind == gameui::menu::AttemptKind::kConnect)
       Create->invalidatePending(); // a stale local request can never retry
     PasswordInvalid = false;
     PasswordPrompts = 0;
@@ -48,6 +52,25 @@ void GameUiModule::drainLoadingFeed() {
   bool rendered = false;
   while (services::loadingFeed().pop(event)) {
     changed = true;
+    // A server changelevel streams IGameUI loading events with no connect
+    // attempt behind them. Turning the level-start event into the ordinary
+    // attempt machinery is what keeps the Loading page (and the menu host)
+    // up: without it the phase stayed InGame, DisconnectFromServer had
+    // already cleared the level fact, and the next ActivateGameUI reconciled
+    // to Disconnected - the no-map Main page and its menu movie appeared
+    // while the new map was still loading. A live attempt
+    // (Connecting/Loading) owns its stream; emergency/terminal screens are
+    // left alone. Only "level" starts a transition, so a stray resource
+    // event can never open a loading page that no finish would close.
+    const auto phase = Controller.state().phase;
+    if (event.kind == services::LoadingFeedKind::kLoadingStarted &&
+        event.text == "level" &&
+        phase != gameui::menu::BackendPhase::kConnecting &&
+        phase != gameui::menu::BackendPhase::kLoading &&
+        phase != gameui::menu::BackendPhase::kFatal &&
+        phase != gameui::menu::BackendPhase::kShuttingDown) {
+      Controller.dispatch(gameui::menu::makeMapLoadStarted());
+    }
     syncAttemptState();
     const uint32_t live = LoadingModelState.generation();
     switch (event.kind) {
@@ -145,6 +168,18 @@ void GameUiModule::drainLoadingFeed() {
   if (!changed)
     return;
   syncAttemptState();
+  // An engine-initiated map load has no menu page behind it: the player was
+  // in game with the menu closed. Raise the host now so the Loading page has
+  // a surface (the engine may or may not call ActivateGameUI for the load).
+  // A normal connect already has the menu up and skips this.
+  if (!MenuPresented &&
+      Controller.state().phase == gameui::menu::BackendPhase::kLoading) {
+    if (!services::nativeUiBridge().menuUp())
+      services::nativeUiBridge().requestMenuUp(
+          services::NativeUiOrigin::kOwnUi);
+    if (!MenuPresented)
+      presentMenu();
+  }
   if (MenuPresented)
     syncMenuPresentation();
   // A drained success/failure moved the controller; a no-longer-active

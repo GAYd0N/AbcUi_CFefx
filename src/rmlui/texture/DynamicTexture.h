@@ -10,6 +10,8 @@
 // Extracted from services::video::VideoTexture when the spray maker needed the
 // same plumbing: one implementation, one owner per instance.
 
+#include "../TextureBlend.h"
+
 #include <string>
 
 namespace services::texture {
@@ -17,8 +19,12 @@ namespace services::texture {
 class DynamicTexture {
 public:
   // `prefix` must be process-unique per instance (it keys the Rml external
-  // texture registry).
-  explicit DynamicTexture(std::string prefix);
+  // texture registry). `blend` is the draw program the texture registers
+  // with: the animated image element animates old kRenderTransAdd sprites, so
+  // it asks for Additive; video/spray keep straight alpha.
+  explicit DynamicTexture(std::string prefix,
+                          rmlui::TextureBlend blend =
+                              rmlui::TextureBlend::StraightAlpha);
   ~DynamicTexture();
   DynamicTexture(const DynamicTexture &) = delete;
   DynamicTexture &operator=(const DynamicTexture &) = delete;
@@ -47,6 +53,7 @@ private:
   int Width = 0;
   int Height = 0;
   unsigned int Generation = 0;
+  rmlui::TextureBlend Blend = rmlui::TextureBlend::StraightAlpha;
   std::string Prefix;
   std::string Uri;
 };

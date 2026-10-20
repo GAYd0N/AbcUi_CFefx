@@ -7,15 +7,13 @@
 #include <RmlUi/Core/Element.h>
 
 #include <algorithm>
-#include <cstdio>
-#include <format>
 #include <string>
 
 #include <abc/CvarCmd.h>
 
 #include "../../data/HudState.h"
 #include "../../data/NetworkMessages.h"
-#include "../../rmlui/texture/SpriteResource.h"
+#include "../../rmlui/animated/ElementAnimatedImage.h"
 
 // Windows.h min/max macros fight std::min/std::max (old repo precedent).
 #undef max
@@ -39,22 +37,29 @@ namespace {
 // Old EffectPanel.res timing.
 constexpr float kFadeTime = 0.2f;      // fade_time (danger + under overlay)
 constexpr float kWaterKeepTime = 1.5f; // water_keeptime (splash fade)
-constexpr float kWaterFramerate = 10.0f;
 
 // Old WATERLEVEL enum (clientdata waterlevel values).
 constexpr int kWaterLevelHead = 3;
-
-// Mod-relative splash files (installed under abc/abcui/hud/spr/, see the
-// assets).
-constexpr const char *kLeftWaterSpr = "abc/abcui/hud/spr/face_rainleft.spr";
-constexpr const char *kRightWaterSpr = "abc/abcui/hud/spr/face_rainright.spr";
 
 } // namespace
 
 EffectPanel::EffectPanel()
     : HudPanel("effect", "abc/abcui/hud/rml/effect.rml") {}
 
+rmlui::animated::ElementAnimatedImage *
+EffectPanel::splash(const char *elementId) const {
+  Rml::Element *element = Document ? Document->GetElementById(elementId)
+                                   : nullptr;
+  return element ? rmlui_dynamic_cast<rmlui::animated::ElementAnimatedImage *>(
+                       element)
+                 : nullptr;
+}
+
 void EffectPanel::onDocumentReady() {
+  // The splashes are <animimg> elements: the element owns the frame clock and
+  // the texture, this controller only restarts them on the OUT_WATER edge.
+  LeftSplash = splash("left-water");
+  RightSplash = splash("right-water");
   subscribe(netmsg::Health, [this](int health) {
     // Old Viewport g_EventHealth handler ran before both panels' SetHealth:
     // while connected and not spectating, non-positive health clamps to 1.
@@ -74,8 +79,11 @@ void EffectPanel::reset() {
   // Old Reset: panel shown, all overlays hidden, water state cleared.
   OldWaterStatus = 0;
   NowWaterType = WaterType::None;
-  WaterFrameLeft = 0;
-  WaterFrameRight = 0;
+  OutWaterStarted = false;
+  if (LeftSplash)
+    LeftSplash->setPlaying(false);
+  if (RightSplash)
+    RightSplash->setPlaying(false);
   if (Document) {
     for (const char *id :
          {"left-water", "right-water", "under-water", "danger"}) {
@@ -117,37 +125,9 @@ void EffectPanel::setWater(WaterType type) {
     return;
   NowWaterType = type;
   OutWaterStart = ClientTimeNow;
-}
-
-void EffectPanel::applyWaterFrame(const char *elementId, const char *sprPath,
-                                  int frame) {
-  Rml::Element *splash =
-      Document ? Document->GetElementById(elementId) : nullptr;
-  if (!splash)
-    return;
-  const std::string uri = std::format("sprframe://{}|{}", sprPath, frame);
-  splash->SetAttribute("src", uri);
-}
-
-void EffectPanel::animateWater() {
-  // Old OnThink: Animate() advanced each splash's own frame clock (own frame
-  // count per CSPRImage; the old sequence clamped at the last frame -
-  // m_bSequenceLoop defaults false - while the port loops; invisible either
-  // way, the splash alpha expires after 15 frames < 33).
-  const float frameDelta = static_cast<float>(ClientTimeNow - WaterAnimTime);
-  if (frameDelta < 1.0f / kWaterFramerate)
-    return;
-  WaterAnimTime = ClientTimeNow;
-  const int leftCount = sprites::standaloneFrameCount(kLeftWaterSpr);
-  if (leftCount > 0) {
-    WaterFrameLeft = (WaterFrameLeft + 1) % leftCount;
-    applyWaterFrame("left-water", kLeftWaterSpr, WaterFrameLeft);
-  }
-  const int rightCount = sprites::standaloneFrameCount(kRightWaterSpr);
-  if (rightCount > 0) {
-    WaterFrameRight = (WaterFrameRight + 1) % rightCount;
-    applyWaterFrame("right-water", kRightWaterSpr, WaterFrameRight);
-  }
+  // Old SetWater(OUT_WATER): both splashes restart at frame 0 / alpha 255 in
+  // the same frame as the transition.
+  OutWaterStarted = type == WaterType::OutWater;
 }
 
 void EffectPanel::onData(double frameTime) {
@@ -209,29 +189,28 @@ void EffectPanel::onData(double frameTime) {
   }
   case WaterType::OutWater: {
     // Old: splashes restart at frame 0 / alpha 255 and fade over
-    // water_keeptime; the under overlay fades out over fade_time.
+    // water_keeptime; the under overlay fades out over fade_time. The frame
+    // sequence (old CSPRImage Animate, 10 fps) is the element's; the panel
+    // restarts it once on the transition frame.
+    if (OutWaterStarted) {
+      OutWaterStarted = false;
+      if (LeftSplash)
+        LeftSplash->Restart();
+      if (RightSplash)
+        RightSplash->Restart();
+    }
     const float splashAlpha = std::max(
         0.0f, 1.0f - static_cast<float>(ClientTimeNow - OutWaterStart) /
                          kWaterKeepTime);
     const float underAlpha = std::max(
         0.0f,
         1.0f - static_cast<float>(ClientTimeNow - OutWaterStart) / kFadeTime);
-    // Old SetFrame(0) restart: snap both splashes back to frame 0 on
-    // the transition frame only (splashAlpha still at its first
-    // frame).
-    if (splashAlpha >= 1.0f) {
-      WaterFrameLeft = 0;
-      WaterFrameRight = 0;
-      applyWaterFrame("left-water", kLeftWaterSpr, WaterFrameLeft);
-      applyWaterFrame("right-water", kRightWaterSpr, WaterFrameRight);
-    }
     left->SetProperty("display", "block");
     left->SetProperty("opacity", std::to_string(splashAlpha));
     right->SetProperty("display", "block");
     right->SetProperty("opacity", std::to_string(splashAlpha));
     under->SetProperty("display", "block");
     under->SetProperty("opacity", std::to_string(underAlpha));
-    animateWater();
     break;
   }
   }
