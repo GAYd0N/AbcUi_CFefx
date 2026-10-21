@@ -22,15 +22,15 @@ void GameUiModule::onContextReady(Rml::Context *context) {
   // joins it on the same seam - a degraded document's Quit button runs
   // the confirmed quit backend (a fault-time exit must not depend on
   // the quit-confirm overlay, which may be exactly what failed).
-  const auto wire = [this, context](auto &page) {
+  const auto emergencySink = [](const char *intent) {
+    if (intent &&
+        std::strcmp(intent,
+                    framework::InteractiveDocument::kEmergencyQuitIntent) == 0)
+      menuBackend().quitGame();
+  };
+  const auto wire = [this, context, &emergencySink](auto &page) {
     page->setActionSink([this](const char *action) { onMenuAction(action); });
-    page->setEmergencySink([](const char *intent) {
-      if (intent &&
-          std::strcmp(intent,
-                      framework::InteractiveDocument::kEmergencyQuitIntent) ==
-              0)
-        menuBackend().quitGame();
-    });
+    page->setEmergencySink(emergencySink);
     logLoadOutcome(page->load(context));
   };
   Shell = std::make_unique<panels::mainmenu::MainMenuPage>();
@@ -98,6 +98,17 @@ void GameUiModule::onContextReady(Rml::Context *context) {
   CommandMenuPage_->setCommandSink(
       [this](const std::string &command) { Command->handleCommand(command); });
   CommandMenuPage_->setCloseSink([this] { Command->close(); });
+  InventoryPage_ = std::make_unique<panels::inventory::InventoryPage>();
+  Inventory->setPage(InventoryPage_.get());
+  InventoryPage_->setActionSink([this](services::inventory::Action action) {
+    Inventory->handleAction(action);
+  });
+  InventoryPage_->setCloseSink([this] { Inventory->close(); });
+  // The inventory page projects item actions, not navigation action strings,
+  // so it loads outside the generic wire (same emergency sink and outcome
+  // logging).
+  InventoryPage_->setEmergencySink(emergencySink);
+  logLoadOutcome(InventoryPage_->load(context));
   VideoConfirm = std::make_unique<panels::settings::VideoConfirmPage>();
   VideoConfirm->setVideoModel(&VideoModel);
   Video->setPage(VideoConfirm.get());
@@ -149,6 +160,8 @@ void GameUiModule::onContextReady(Rml::Context *context) {
     Vote->open();
   if (Command->consumeRequest())
     Command->open();
+  if (Inventory->consumeRequest())
+    Inventory->open();
 }
 
 void GameUiModule::logLoadOutcome(
@@ -179,9 +192,9 @@ void GameUiModule::serviceEmergencyPages() {
       Browser.get(),         CreateGamePage_.get(),
       PlayerListPage_.get(), VoteMenuPage_.get(),
       VideoConfirm.get(),    CommandMenuPage_.get(),
-      ConfirmQuit.get(),     Loading.get(),
-      ConnError.get(),       Password.get(),
-      DirectConnect.get(),
+      InventoryPage_.get(),  ConfirmQuit.get(),
+      Loading.get(),         ConnError.get(),
+      Password.get(),        DirectConnect.get(),
   };
   bool recovered = false;
   for (framework::InteractiveDocument *page : pages) {
@@ -218,6 +231,7 @@ void GameUiModule::serviceEmergencyPages() {
   Player->setPresented(false);
   Vote->setPresented(false);
   Command->setPresented(false);
+  Inventory->setPresented(false);
   syncMenuPresentation();
 }
 

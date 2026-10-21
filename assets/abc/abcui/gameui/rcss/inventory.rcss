@@ -1,0 +1,460 @@
+/* inventory.rcss - the in-game inventory window (issue 10).
+
+   A centred 520x360dp dialog on the shared menu theme: dimmed scrim, title
+   bar with the close button, a framed item list, the selected item's detail
+   card (name, description, server flags) and the action row. Every panel is
+   absolutely positioned with a fixed size on the 480dp-tall logical screen,
+   and the window is horizontally centred with left:50% + a negative
+   half-width margin so 4:3 and 16:9 both centre it. */
+
+body#menuinventory {
+	width: 100%;
+	height: 100%;
+}
+
+/* ---- scrim -------------------------------------------------------------- */
+
+#inv-scrim {
+	position: absolute;
+	left: 0dp;
+	top: 0dp;
+	right: 0dp;
+	bottom: 0dp;
+	background-color: #0206098c;
+}
+
+/* ---- frame -------------------------------------------------------------- */
+
+#inv-window {
+	position: absolute;
+	box-sizing: border-box;
+	left: 50%;
+	margin-left: -260dp;
+	top: 60dp;
+	width: 520dp;
+	height: 360dp;
+	background-color: transparent;
+	border: 1dp var(--abc-line);
+	border-top: 2dp var(--abc-accent);
+	border-radius: 2dp;
+}
+
+#inv-window-bg {
+	position: absolute;
+	left: 0dp;
+	top: 0dp;
+	right: 0dp;
+	bottom: 0dp;
+	background-color: #0b1114f7;
+	border-radius: 1dp;
+}
+
+/* ---- header ------------------------------------------------------------- */
+
+#inv-header {
+	position: absolute;
+	box-sizing: border-box;
+	left: 0dp;
+	top: 0dp;
+	width: 520dp;
+	height: 64dp;
+	border-bottom: 1dp var(--abc-line-soft);
+}
+
+#inv-eyebrow {
+	position: absolute;
+	left: 18dp;
+	top: 13dp;
+	height: 10dp;
+	line-height: 10dp;
+	font-size: 7dp;
+	font-weight: bold;
+	letter-spacing: 3dp;
+	text-transform: uppercase;
+	color: var(--abc-accent);
+}
+
+#inv-title {
+	position: absolute;
+	left: 18dp;
+	top: 26dp;
+	height: 24dp;
+	line-height: 24dp;
+	font-size: 17dp;
+	font-weight: bold;
+	letter-spacing: 0.4dp;
+	color: var(--abc-text-strong);
+}
+
+#inv-close {
+	position: absolute;
+	right: 16dp;
+	top: 18dp;
+	width: 24dp;
+	height: 24dp;
+	min-width: 24dp;
+	line-height: 22dp;
+	padding: 0dp;
+	margin: 0dp;
+	font-size: 13dp;
+	color: var(--abc-text-dim);
+	background-color: transparent;
+	border: 1dp var(--abc-line-soft);
+	border-radius: 2dp;
+}
+
+#inv-close:hover {
+	color: var(--abc-accent);
+	background-color: var(--abc-surface-2);
+	border: 1dp var(--abc-line);
+}
+
+/* ---- panels ------------------------------------------------------------- */
+
+#inv-list-panel, #inv-detail-panel {
+	position: absolute;
+	box-sizing: border-box;
+	top: 76dp;
+	height: 216dp;
+	background-color: var(--abc-inset);
+	border: 1dp var(--abc-line-soft);
+	border-radius: 2dp;
+}
+
+#inv-list-panel {
+	left: 16dp;
+	width: 284dp;
+}
+
+#inv-detail-panel {
+	left: 316dp;
+	width: 188dp;
+}
+
+#inv-list-head, #inv-detail-head {
+	position: absolute;
+	box-sizing: border-box;
+	left: 0dp;
+	top: 0dp;
+	width: 100%;
+	height: 26dp;
+	line-height: 26dp;
+	padding-left: 10dp;
+	border-bottom: 1dp var(--abc-line-soft);
+	font-size: 7.5dp;
+	font-weight: bold;
+	letter-spacing: 1.6dp;
+	text-transform: uppercase;
+	color: var(--abc-text-dim);
+}
+
+#inv-count {
+	position: absolute;
+	right: 8dp;
+	top: 5dp;
+	box-sizing: border-box;
+	min-width: 22dp;
+	height: 16dp;
+	line-height: 15dp;
+	padding-left: 5dp;
+	padding-right: 5dp;
+	text-align: center;
+	font-size: 8dp;
+	font-weight: bold;
+	letter-spacing: 0dp;
+	color: var(--abc-accent);
+	background-color: #ff9a3c14;
+	border: 1dp #ff9a3c55;
+	border-radius: 9dp;
+}
+
+/* ---- item list ---------------------------------------------------------- */
+
+#inv-list-wrap {
+	position: absolute;
+	left: 0dp;
+	top: 26dp;
+	width: 284dp;
+	height: 188dp;
+}
+
+#inv-list {
+	position: absolute;
+	left: 0dp;
+	top: 0dp;
+	width: 284dp;
+	height: 188dp;
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+
+.inv-row {
+	display: block;
+	position: relative;
+	box-sizing: border-box;
+	width: auto;
+	height: 26dp;
+	line-height: 26dp;
+	padding-left: 10dp;
+	padding-right: 10dp;
+	border-left: 2dp transparent;
+	cursor: pointer;
+	transition: background-color 0.12s linear-in;
+}
+
+.inv-row:hover {
+	background-color: var(--abc-surface-2);
+}
+
+.inv-row.inv-selected {
+	background-color: var(--abc-surface-3);
+	border-left: 2dp var(--abc-accent);
+}
+
+.inv-row-index {
+	display: inline-block;
+	box-sizing: border-box;
+	width: 22dp;
+	height: 26dp;
+	line-height: 26dp;
+	margin-right: 8dp;
+	text-align: right;
+	vertical-align: top;
+	font-size: 7.5dp;
+	color: var(--abc-text-dim);
+}
+
+.inv-row-name {
+	display: inline-block;
+	box-sizing: border-box;
+	max-width: 200dp;
+	height: 26dp;
+	line-height: 26dp;
+	vertical-align: top;
+	font-size: 9dp;
+	color: var(--abc-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.inv-row-mark {
+	display: none;
+	position: absolute;
+	right: 10dp;
+	top: 0dp;
+	height: 26dp;
+	line-height: 26dp;
+	font-size: 11dp;
+	color: var(--abc-accent);
+}
+
+.inv-row.inv-selected .inv-row-index,
+.inv-row.inv-selected .inv-row-name {
+	color: var(--abc-accent);
+}
+
+.inv-row.inv-selected .inv-row-mark {
+	display: inline-block;
+}
+
+/* ---- empty list --------------------------------------------------------- */
+
+#inv-empty {
+	position: absolute;
+	left: 16dp;
+	right: 16dp;
+	top: 52dp;
+	text-align: center;
+}
+
+#inv-empty-title {
+	display: block;
+	height: 16dp;
+	line-height: 16dp;
+	font-size: 10dp;
+	font-weight: bold;
+	color: var(--abc-text-dim);
+}
+
+#inv-empty-hint {
+	display: block;
+	margin-top: 6dp;
+	font-size: 8.5dp;
+	line-height: 13dp;
+	color: #5f6b73;
+	white-space: normal;
+}
+
+/* ---- item detail -------------------------------------------------------- */
+
+#inv-detail-body {
+	position: absolute;
+	left: 10dp;
+	top: 34dp;
+	width: 168dp;
+}
+
+#inv-name {
+	display: block;
+	height: 18dp;
+	line-height: 18dp;
+	font-size: 12dp;
+	font-weight: bold;
+	color: var(--abc-text-strong);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+#inv-detail-rule {
+	display: block;
+	height: 1dp;
+	margin-top: 6dp;
+	background-color: var(--abc-line-soft);
+}
+
+#inv-desc {
+	display: block;
+	height: 112dp;
+	margin-top: 6dp;
+	font-size: 8.9dp;
+	line-height: 13dp;
+	color: var(--abc-text-dim);
+	white-space: normal;
+	overflow-y: auto;
+}
+
+#inv-tags {
+	position: absolute;
+	left: 10dp;
+	top: 182dp;
+	width: 168dp;
+	height: 18dp;
+}
+
+.inv-tag {
+	display: inline-block;
+	box-sizing: border-box;
+	height: 18dp;
+	line-height: 16dp;
+	padding-left: 7dp;
+	padding-right: 7dp;
+	margin-right: 5dp;
+	font-size: 8dp;
+	border: 1dp var(--abc-line);
+	border-radius: 9dp;
+	color: var(--abc-text-dim);
+}
+
+.inv-tag.inv-tag-ok {
+	color: var(--abc-ok);
+	background-color: #7ddc8a12;
+	border: 1dp #7ddc8a55;
+}
+
+.inv-tag.inv-tag-blocked {
+	color: var(--abc-danger);
+	background-color: #ff5f5f10;
+	border: 1dp #ff5f5f44;
+}
+
+#inv-select-hint {
+	position: absolute;
+	left: 16dp;
+	right: 16dp;
+	top: 88dp;
+	font-size: 9dp;
+	line-height: 14dp;
+	text-align: center;
+	color: #5f6b73;
+	white-space: normal;
+}
+
+/* ---- footer ------------------------------------------------------------- */
+
+#inv-footer-rule {
+	position: absolute;
+	left: 16dp;
+	top: 304dp;
+	width: 488dp;
+	height: 1dp;
+	background-color: var(--abc-line-soft);
+}
+
+#inv-actions {
+	position: absolute;
+	left: 16dp;
+	top: 312dp;
+	width: 488dp;
+	height: 28dp;
+}
+
+#inv-actions button {
+	position: absolute;
+	top: 0dp;
+	box-sizing: border-box;
+	height: 28dp;
+	line-height: 26dp;
+	padding: 0dp;
+	margin: 0dp;
+	font-size: 9dp;
+	border-radius: 2dp;
+	transition: background-color 0.12s linear-in;
+}
+
+#inv-dropall {
+	left: 0dp;
+	width: 132dp;
+}
+
+#inv-drop {
+	left: 284dp;
+	width: 88dp;
+}
+
+#inv-activate {
+	left: 380dp;
+	width: 108dp;
+}
+
+#inv-actions button.inv-primary {
+	background-color: var(--abc-accent);
+	border: 1dp var(--abc-accent);
+	color: var(--abc-accent-ink);
+	font-weight: bold;
+}
+
+#inv-actions button.inv-primary:hover {
+	background-color: #ffb066;
+	border: 1dp #ffb066;
+}
+
+#inv-actions button.inv-primary:focus {
+	background-color: var(--abc-text-strong);
+	border: 1dp var(--abc-text-strong);
+	color: var(--abc-accent-ink);
+}
+
+#inv-actions button.inv-secondary {
+	background-color: var(--abc-surface-2);
+	border: 1dp var(--abc-line);
+	color: var(--abc-text);
+}
+
+#inv-actions button.inv-secondary:hover {
+	background-color: var(--abc-surface-3);
+	border: 1dp var(--abc-text-dim);
+	color: var(--abc-text-strong);
+}
+
+#inv-actions button.inv-ghost-danger {
+	background-color: transparent;
+	border: 1dp var(--abc-line-soft);
+	color: var(--abc-danger);
+}
+
+#inv-actions button.inv-ghost-danger:hover {
+	background-color: #ff5f5f14;
+	border: 1dp #ff5f5f66;
+}

@@ -61,6 +61,12 @@ void GameUiModule::onClaimedKeyDown(int keynum) {
   // here); the release pairs the just-fed ESC down inside the router.
   if (Controller.state().overlays.empty() && Command->handleKey(keynum))
     return;
+  // Issue 10: the inventory window owns ESC/arrows/Enter/Delete while it is
+  // up (its Esc closes the window and returns to gameplay, never the pause
+  // page). Placed after the command menu: only the top page is visible, so
+  // at most one of the two claims the key.
+  if (Controller.state().overlays.empty() && Inventory->handleKey(keynum))
+    return;
   if (keynum == '`' || keynum == '~') {
     // T16 console hotkey (the ` / toggleconsole key): while the menu
     // owns the keyboard the engine never sees this edge, so the

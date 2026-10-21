@@ -1,0 +1,74 @@
+/* ime.rcss - the IME composition + candidate overlay (rmlui::ime).
+   One small panel at the caret: the composition line as its header, the
+   candidate page under it. The palette is the HUD's - the amber accent rule
+   and the translucent plate - so the IME reads as part of the game's UI
+   rather than as a stray Windows dialog. The document never takes the
+   pointer (rmlui::ime sets pointer-events: none). */
+
+#ime {
+	position: absolute;
+	left: 0dp;
+	top: 0dp;
+	width: auto;
+	height: auto;
+}
+
+#ime-panel {
+	display: block;
+	width: auto;
+	max-width: 180dp;
+	padding: 2dp 3dp;
+	background-color: #0b0f12e6;
+	border: 1dp #ffffff24;
+	border-left: 2dp var(--abc-hud-accent);
+}
+
+/* The unfinished composition (pinyin), dim amber: the same string the editor
+   shows inline, here as the page's caption. */
+#ime-composition {
+	display: block;
+	font-size: 8.9dp;
+	line-height: 12dp;
+	white-space: nowrap;
+	color: var(--abc-hud-accent);
+}
+
+/* One horizontal row, like the game's own IME window: the page is short
+   (<= 10 entries) and a row keeps the panel from covering the play area. */
+#ime-candidates {
+	display: flex;
+	flex-flow: row;
+	flex-wrap: wrap;
+	margin-top: 1dp;
+}
+
+.ime-candidate {
+	display: inline-block;
+	width: auto;
+	height: 15dp;
+	line-height: 15dp;
+	padding: 0dp 4dp;
+	font-size: 8.9dp;
+	white-space: nowrap;
+	color: #e8e8e8;
+}
+
+/* The selection key the IME listens for, in the HUD accent: the player picks
+   a candidate by pressing its number. */
+.ime-index {
+	margin-right: 2dp;
+	font-size: 7.6dp;
+	font-weight: bold;
+	color: var(--abc-hud-accent);
+}
+
+.ime-candidate.selected .ime-index {
+	color: #101010;
+}
+
+/* The row Enter would commit: amber fill, dark ink (the console's selected
+   suggestion pair). */
+.ime-candidate.selected {
+	background-color: var(--abc-hud-accent);
+	color: #101010;
+}

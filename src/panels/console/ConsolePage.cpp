@@ -899,11 +899,27 @@ void ConsolePage::submitFromEditor() {
   setControlValue(doc, "console-input", "");
   HistoryCursor = -1;
   hideCompletion();
+  recordSubmission(trimmed);
   if (Submit && Submit(trimmed))
     answerUnknownCommand(trimmed);
   const ActionSink Callback = Sink;
   if (Callback)
     Callback(kActionSubmit);
+}
+
+// The vanilla console's input record: exactly one "] <command>" line in the
+// same scrollback the output uses, written before the command is handed to
+// the engine so it is present even when the backend refuses or the command
+// produces no output. The text is plain input (the buffer never parses
+// markup); recordSubmission is deliberately separate from
+// answerUnknownCommand, which represents engine-side output.
+void ConsolePage::recordSubmission(const std::string &command) {
+  if (!Buffer || command.empty())
+    return;
+  std::string line = "] ";
+  line += command;
+  line += '\n'; // one complete console line
+  Buffer->pushText(line.data(), line.size(), false);
 }
 
 // The console's own answer for a command the client runtime catalog does not
@@ -1130,6 +1146,7 @@ void ConsolePage::executeConfirmed() {
     setControlValue(doc, "console-input", "");
   HistoryCursor = -1;
   for (const std::string &line : lines) {
+    recordSubmission(line); // one input record per confirmed command line
     if (Submit)
       Submit(line); // one validated submission per line, in order
   }

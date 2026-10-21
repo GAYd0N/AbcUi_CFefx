@@ -22,11 +22,13 @@
 //   idempotent, and nothing here ever consumes the message.
 // - Async poll (HUD_Frame): position + button fallback for injected input
 //   invisible to the WndProc chain (P6 acceptance finding).
-// - BaseUI Key_Event callback: stays a no-op. The engine only routes keys
-//   there while the original GameUI owns the key destination; wiring it is
-//   T08's takeover seam. Choosing one physical injection entry IS the
-//   dual-callback dedup; when T08 adds the second source it must land in
-//   routeKey, not beside it.
+// - BaseUI Key_Event callback: the UI-level key seam (the same function
+//   CaptionMod's VGUI chat entry ends up in). While an owner reports
+//   Owner::blocksGameplay (the chat input line) the edge is fed here and the
+//   callback reports it handled, which is what makes the engine skip the
+//   binding - no usercmd filtering, no per-bind whack-a-mole. Choosing one
+//   physical injection entry IS the dual-callback dedup; when T08 adds the
+//   second source it must land in routeKey, not beside it.
 //
 // Mouse: the gate is the VGUI cursor visibility OR router exclusivity; the
 // fallback poll (no VGUI2Extension) keeps the Phase 3 shape.

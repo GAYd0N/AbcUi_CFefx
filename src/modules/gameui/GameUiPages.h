@@ -8,6 +8,7 @@
 #include "../../panels/commandmenu/CommandMenuPage.h"
 #include "../../panels/console/ConsolePage.h"
 #include "../../panels/creategame/CreateGamePage.h"
+#include "../../panels/inventory/InventoryPage.h"
 #include "../../panels/loading/LoadingWindows.h"
 #include "../../panels/mainmenu/MainMenuPage.h"
 #include "../../panels/menushared/MenuShellWindows.h"

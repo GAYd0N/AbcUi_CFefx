@@ -34,13 +34,15 @@ void registerAll() {
   // command page and keep the native VGUI command menu fully suppressed.
   // `messagemode`/`messagemode2` belong to the chat panel (issue 13): the
   // bare invocation opens the Rml input line, an argumented one chains.
+  // `inventory`/`+inventory`/`-inventory` feed the Rml inventory window
+  // (issue 10) and keep the native CInventoryPanel fully suppressed.
   constexpr const char *kHooked[] = {
       "slot1",        "slot2",        "slot3",           "slot4",
       "slot5",        "slot6",        "slot7",           "slot8",
       "slot9",        "slot10",       "missionbriefing", "invnext",
       "invprev",      "+showscores",  "-showscores",     "votemenu",
       "+attack",      "+commandmenu", "-commandmenu",    "messagemode",
-      "messagemode2",
+      "messagemode2", "inventory",    "+inventory",      "-inventory",
   };
   auto &list = entries();
   list.reserve(std::size(kHooked));

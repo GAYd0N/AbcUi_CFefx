@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include <abc/NetMsg.h>
+#include <abc/Console.h>
 
 #include <cvardef.h>
 
@@ -46,6 +47,8 @@ abc::CallbackList<void(const MapListData &)> MapList;
 abc::CallbackList<void()> ClExtrasInfo;
 abc::CallbackList<void(const VoiceMaskData &)> VoiceMask;
 abc::CallbackList<void()> ReqState;
+abc::CallbackList<void(const InvItemData &)> InvAdd;
+abc::CallbackList<void(int, int)> InvRemove;
 #pragma endregion
 
 namespace {
@@ -89,6 +92,8 @@ pfnUserMsgHook original_MapList = nullptr;
 pfnUserMsgHook original_ClExtrasInfo = nullptr;
 pfnUserMsgHook original_VoiceMask = nullptr;
 pfnUserMsgHook original_ReqState = nullptr;
+pfnUserMsgHook original_InvAdd = nullptr;
+pfnUserMsgHook original_InvRemove = nullptr;
 
 int __MsgFunc_AmmoX(const char *pszName, int iSize, void *pbuf) {
   abc::MsgReader msg(pbuf, iSize);
@@ -489,6 +494,39 @@ int __MsgFunc_ReqState(const char *pszName, int iSize, void *pbuf) {
   return original_ReqState(pszName, iSize, pbuf);
 }
 
+// Issue 10: the inventory stream. The native window owns this format
+// (CInventoryPanel::MsgFunc_InvAdd): long id, three flag bytes, one float,
+// then five strings. Keep the exact order - the native handler stays chained
+// behind ours so the client's own bookkeeping never diverges.
+int __MsgFunc_InvAdd(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  InvItemData data;
+  data.id = msg.readLong();
+  data.canActivate = msg.readByte() != 0;
+  data.canDrop = msg.readByte() != 0;
+  data.removeLocked = msg.readByte() != 0;
+  data.value = msg.readFloat();
+  data.name = msg.readString();
+  data.displayName = msg.readString();
+  data.description = msg.readString();
+  data.extra = msg.readString();
+  data.key = msg.readString();
+  if (!msg.ok())
+    return original_InvAdd ? original_InvAdd(pszName, iSize, pbuf) : 0;
+  InvAdd(data);
+  return original_InvAdd ? original_InvAdd(pszName, iSize, pbuf) : 0;
+}
+
+int __MsgFunc_InvRemove(const char *pszName, int iSize, void *pbuf) {
+  abc::MsgReader msg(pbuf, iSize);
+  const int id = msg.readLong();
+  const int force = msg.readByte();
+  if (!msg.ok())
+    return original_InvRemove ? original_InvRemove(pszName, iSize, pbuf) : 0;
+  InvRemove(id, force);
+  return original_InvRemove ? original_InvRemove(pszName, iSize, pbuf) : 0;
+}
+
 int __MsgFunc_MetaHook(const char *pszName, int iSize, void *pbuf) {
   // The old plugin-to-plugin usermsg carrier (registered by the user's
   // server-side addon; absent on vanilla servers - original may be null).
@@ -568,6 +606,16 @@ void init() {
   original_ClExtrasInfo = HOOK_MESSAGE(ClExtrasInfo);
   original_VoiceMask = HOOK_MESSAGE(VoiceMask);
   original_ReqState = HOOK_MESSAGE(ReqState);
+  // Issue 10: the client registers both at its own HUD_Init, which runs
+  // before this init() from the hook spine. A null result means the message
+  // table moved; the inventory page then has no data (fail-closed, the
+  // native panel is still suppressed by the command hook).
+  original_InvAdd = HOOK_MESSAGE(InvAdd);
+  original_InvRemove = HOOK_MESSAGE(InvRemove);
+  if (!original_InvAdd || !original_InvRemove)
+    abc::ConsoleWarn("[AbcUi] inventory messages (InvAdd/InvRemove) were not "
+                     "registered by the client; the inventory page has no "
+                     "data\n");
 }
 
 void setVoteGate(cvar_t *cvar) {

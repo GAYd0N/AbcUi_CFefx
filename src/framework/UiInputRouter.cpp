@@ -211,6 +211,13 @@ bool Router::onWheelPulse(int keynum) const {
   return top.owner && top.owner->onClaimedWheelPulse(keynum);
 }
 
+bool Router::blocksGameplay() const {
+  if (Count == 0)
+    return false;
+  const Entry &top = Stack[topIndex()];
+  return top.owner && top.owner->blocksGameplay();
+}
+
 bool Router::exclusive() const {
   return Count != 0;
 }

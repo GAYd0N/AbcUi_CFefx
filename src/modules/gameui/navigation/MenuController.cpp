@@ -16,6 +16,7 @@ bool isSubPage(MenuPage page) {
   case MenuPage::kPlayerList:
   case MenuPage::kVoteMenu:
   case MenuPage::kCommandMenu:
+  case MenuPage::kInventory:
     return true;
   default:
     return false; // kMain/kPause/kLoading are transition-managed only

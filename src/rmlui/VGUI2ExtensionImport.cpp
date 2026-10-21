@@ -133,19 +133,29 @@ public:
   }
   void Key_Event(int &down, int &keynum, const char *&pszCurrentBinding,
                  VGUI2Extension_CallbackContext *CallbackContext) override {
-    // Second source from T06's table (S6). While the ORIGINAL GameUI held
-    // the key destination the engine drove this seam and then forwarded to
-    // the client export chain; the takeover keeps the destination from
-    // ever activating (the menu queries answer ours and the paint is
-    // gated), so this callback stays OBSERVATION-ONLY - feeding a second
-    // physical source into routeKey would violate the one-injection-point
-    // rule (T06 step 1). What the count proves at acceptance: whether any
-    // edge still reaches the vanilla chain while the menu is up.
-    (void)down;
-    (void)keynum;
+    // This is the seam through which the engine asks the UI layer whether it
+    // consumed a key (CBaseUI::Key_Event). It is how the native chat entry
+    // and CaptionMod's VGUI chat dialog keep the player still: a focused
+    // text entry reports the key handled, and hw.dll's Key_Event then skips
+    // the binding outright - no usercmd filtering involved. AbcUi has no
+    // VGUI entry, so while the chat input line owns the keyboard
+    // (Owner::blocksGameplay) the same answer is produced here: the edge goes
+    // through the one injection point and the callback reports it handled.
+    //
+    // Edges the owner declines (the router's pre-held passthrough, so bindings
+    // pair cleanly) are left to the engine: no SUPERCEDE, no synthetic
+    // release. rmlui::routeKey de-duplicates the two seams that can deliver
+    // one physical edge, so the editor never sees a doubled keystroke.
     (void)pszCurrentBinding;
-    (void)CallbackContext;
     services::nativeUiBridge().noteBaseUiKeyEvent();
+    if (CallbackContext->IsPost)
+      return;
+    if (!rmlui::uiRouter().blocksGameplay())
+      return;
+    if (!rmlui::routeKey(down != 0, keynum, false))
+      return;
+    CallbackContext->Result = VGUI2Extension_Result::SUPERCEDE;
+    CallbackContext->pPluginReturnValue = reinterpret_cast<void *>(1);
   }
   // T07 text seam: the engine forwards raw SDL_Event structs here (the
   // SDL2-based IBaseUI shape - CallEngineSurfaceAppHandler). Text events
@@ -382,8 +392,8 @@ IBaseUI *baseUi() {
     return BaseUi;
   const auto factory =
       g_pMetaHookAPI ? g_pMetaHookAPI->GetEngineFactory() : nullptr;
-  BaseUi = factory ? (IBaseUI *)factory(BASEUI_INTERFACE_VERSION, nullptr)
-                   : nullptr;
+  BaseUi =
+      factory ? (IBaseUI *)factory(BASEUI_INTERFACE_VERSION, nullptr) : nullptr;
   return BaseUi;
 }
 

@@ -7,6 +7,8 @@
 
 #include <Windows.h>
 
+#include <chrono>
+
 #include "KeyMap.h"
 #include "RmlUiModule.h"
 #include "TextInput.h"
@@ -152,6 +154,29 @@ void activateGameMouse() {
   vgui2ext::discardRelativeMouseMotion();
 }
 
+namespace {
+
+// The same physical edge reaches TWO seams once the BaseUI key proxy feeds the
+// router (the UI callback and the client export chain). Whichever seam runs
+// first feeds; the second must consume without feeding again, or a backspace
+// would delete two characters. Only armed while an owner blocks gameplay, so
+// the ordinary single-seam paths keep their auto-repeat behaviour untouched.
+bool duplicateEdge(int down, int keynum) {
+  using Clock = std::chrono::steady_clock;
+  static Clock::time_point last{};
+  static int lastKey = -1;
+  static bool lastDown = false;
+  const Clock::time_point now = Clock::now();
+  const bool same = lastKey == keynum && lastDown == (down != 0) &&
+                    (now - last) < std::chrono::milliseconds(15);
+  lastKey = keynum;
+  lastDown = down != 0;
+  last = now;
+  return same;
+}
+
+} // namespace
+
 bool routeKey(int down, int keynum, bool staticWheelClaim) {
   // Wheel pulses: the top owner (menu scroll) or the static non-owning
   // claims (motd) scroll the UI; anything else stays a weapon switch. The
@@ -171,6 +196,12 @@ bool routeKey(int down, int keynum, bool staticWheelClaim) {
     }
     return false;
   }
+  // A blocked gameplay owner (the chat input line) is fed from both the
+  // BaseUI UI seam and this export chain; the second sighting of one edge is
+  // consumed without a second UI feed.
+  if (uiRouter().blocksGameplay() && down && !wheel &&
+      duplicateEdge(down, keynum))
+    return true;
   const framework::uiinput::Route route = uiRouter().onKey(down, keynum, wheel);
   return route.consumeEngine;
 }

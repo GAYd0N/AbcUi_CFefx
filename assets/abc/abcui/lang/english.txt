@@ -36,6 +36,26 @@ VoteMenu_NoMaps = The server has not sent a map list.
 VoteMenu_NoSelection = Select an entry first.
 VoteMenu_InvalidEntry = This entry cannot be sent safely.
 
+# Inventory window (issue 10). Text matches the client's titles.txt entries.
+Invmenu_Topcaption = Inventory
+Invmenu_NoInventory = You haven't got any inventory
+Invmenu_NoItemSelected = No item selected
+Invmenu_NoItemName = Nameless item
+Invmenu_NoItemDescription = No item description
+Invmenu_Activate = Activate Item
+Invmenu_Drop = Drop Item
+Invmenu_DropAll = Drop ALL Items
+
+# Inventory window chrome (redesign)
+Invmenu_ListHead = Items
+Invmenu_Details = Details
+Invmenu_Usable = Can use
+Invmenu_NotUsable = Cannot use
+Invmenu_Droppable = Can drop
+Invmenu_NotDroppable = Cannot drop
+Invmenu_EmptyHint = Items you pick up will appear here.
+Invmenu_SelectHint = Select an item to see its details.
+
 # Damage tiles (DmgTiles panel)
 DMGTiles_Poison = Poison
 DMGTiles_Acid = Acid

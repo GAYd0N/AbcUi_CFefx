@@ -36,6 +36,26 @@ VoteMenu_NoMaps = El servidor no ha enviado una lista de mapas.
 VoteMenu_NoSelection = Selecciona un elemento primero.
 VoteMenu_InvalidEntry = Este elemento no se puede enviar de forma segura.
 
+# Ventana de inventario (issue 10)
+Invmenu_Topcaption = Inventario
+Invmenu_NoInventory = No tienes ningún objeto en el inventario
+Invmenu_NoItemSelected = Ningún objeto seleccionado
+Invmenu_NoItemName = Objeto sin nombre
+Invmenu_NoItemDescription = Sin descripción del objeto
+Invmenu_Activate = Usar objeto
+Invmenu_Drop = Soltar objeto
+Invmenu_DropAll = Soltar TODOS los objetos
+
+# Textos de la ventana de inventario (rediseño)
+Invmenu_ListHead = Objetos
+Invmenu_Details = Detalles
+Invmenu_Usable = Se puede usar
+Invmenu_NotUsable = No se puede usar
+Invmenu_Droppable = Se puede soltar
+Invmenu_NotDroppable = No se puede soltar
+Invmenu_EmptyHint = Los objetos que recojas aparecerán aquí.
+Invmenu_SelectHint = Selecciona un objeto para ver sus detalles.
+
 # Damage tiles (DmgTiles panel)
 DMGTiles_Poison = intoxicación
 DMGTiles_Acid = erosión ácida

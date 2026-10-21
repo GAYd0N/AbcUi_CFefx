@@ -27,6 +27,7 @@
 #include "settings/SettingsResources.h"
 #include "commandmenu/CommandMenuFlow.h"
 #include "creategame/CreateGameFlow.h"
+#include "inventory/InventoryFlow.h"
 #include "playerlist/PlayerListFlow.h"
 #include "settings/SprayMaker.h"
 #include "serverbrowser/ServerBrowserFlow.h"
@@ -45,6 +46,9 @@ class ConsolePage;
 }
 namespace creategame {
 class CreateGamePage;
+}
+namespace inventory {
+class InventoryPage;
 }
 namespace loading {
 class LoadingPage;
@@ -160,6 +164,7 @@ private:
   PlayerListHost MakePlayerListHost();
   VoteMenuHost MakeVoteMenuHost();
   CommandMenuHost MakeCommandMenuHost();
+  InventoryHost MakeInventoryHost();
   CreateGameHost MakeCreateGameHost();
   ServerBrowserHost MakeServerBrowserHost();
   Rml::Context *Context = nullptr;
@@ -184,6 +189,8 @@ private:
   bool VoteMenuCommandBound = false;
   bool VoteMenuMapListBound = false;
   bool CommandMenuCommandBound = false;
+  bool InventoryCommandBound = false;
+  bool InventoryFeedBound = false;
   // 自动重试 (the browser's toggle): a failed join attempt re-enters the
   // existing typed retry path, bounded per failure chain. The page owns the
   // toggle's truth; the gate owns the run policy.
@@ -199,12 +206,14 @@ private:
       PlayerListPage_; // T20 page
   std::unique_ptr<panels::votemenu::VoteMenuPage> VoteMenuPage_;
   std::unique_ptr<panels::commandmenu::CommandMenuPage> CommandMenuPage_;
+  std::unique_ptr<panels::inventory::InventoryPage> InventoryPage_;
   std::unique_ptr<panels::settings::VideoConfirmPage> VideoConfirm;
   std::unique_ptr<VideoFlow> Video;
   std::unique_ptr<PlayerListFlow> Player;
   std::unique_ptr<SprayMaker> Spray;
   std::unique_ptr<VoteMenuFlow> Vote;
   std::unique_ptr<CommandMenuFlow> Command;
+  std::unique_ptr<InventoryFlow> Inventory;
   std::unique_ptr<CreateGameFlow> Create;
   std::unique_ptr<ServerBrowserFlow> Server;
   std::unique_ptr<SettingsFlow> SettingsView;

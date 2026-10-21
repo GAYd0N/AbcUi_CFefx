@@ -25,7 +25,10 @@
 //   - The editor is single-line: text enters only through the T07 text
 //     pipeline, so an uncommitted composition can never execute. Enter
 //     submits through the sink, Up/Down walk the backend history, Tab
-//     completes through the backend catalog.
+//     completes through the backend catalog. Every submitted command line is
+//     mirrored into the scrollback as "] <command>" before execution, the
+//     vanilla console's own input record; a multi-line paste records each
+//     confirmed line.
 //   - A multi-line paste NEVER executes silently: Ctrl+V with newline-
 //     bearing clipboard text opens the confirm pane; only its explicit
 //     Confirm submits (one T15-validated command per line), Cancel restores
@@ -197,6 +200,10 @@ private:
   void openConfirm(const std::string &text, bool fromPaste);
   void closeConfirm();
   void executeConfirmed();
+  // One "] <command>" line in the shared scrollback before execution: the
+  // vanilla console's own input record. Every confirmed command line goes
+  // through here, including each line of a multi-line paste.
+  void recordSubmission(const std::string &command);
   void answerUnknownCommand(const std::string &command);
   void walkHistory(int delta);
 

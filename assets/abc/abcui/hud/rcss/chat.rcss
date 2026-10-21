@@ -1,42 +1,48 @@
 /* chat.rcss - the RmlUi chat log and message-mode input line (issue 13).
-   Position: bottom-left, sitting on the HUD's own band (the ammo readout
-   owns bottom-right). The document is anchored by its BOTTOM edge and sized
-   by its content, so the log grows upward from the input row and the newest
-   line always ends up closest to where the player is typing - the native
-   say-text order.
+   Position: bottom-left, above the vitals (the ammo readout owns
+   bottom-right). The document is anchored by its BOTTOM edge and sized by its
+   content, so the log grows upward from the input row and the newest line
+   ends up closest to where the player is typing - the native say-text order.
 
-   Style: the same HUD language as the killfeed/notice panels - a soft
-   translucent row plate (deadmsg's #7d7d7d7d idea, darker because chat
-   carries full sentences), the amber --abc-hud-accent for the channel
-   decoration, and the HUD text colour for the message body. The input line
-   is the accent-barred field (left rule + track fill, like the console's
-   prompt row) so it reads as a HUD surface and not as a menu dialog. */
+   Review feedback pass: the chat is a COMPACT window over a deep scrollback.
+   The window is at most six rows tall (the panel sets max-height from
+   hud_saytext_lines, capped in code), the type follows the HUD's small
+   readout size, long lines wrap, and a thin scrollbar reaches the 256-line
+   buffer. The palette is the HUD's: a soft translucent row plate, the amber
+   --abc-hud-accent for the channel decoration, the HUD text colour for the
+   body, and an accent-barred input field like the console's prompt row. */
 
 #chat {
 	position: absolute;
 	left: 16dp;
-	bottom: 88dp;
-	width: 340dp;
+	bottom: 72dp;
+	width: 190dp;
 	height: auto;
 }
 
-/* Rows stack in arrival order; the panel appends and trims DOM rows itself
-   (the line-count cvar), so the log is a plain block. */
+/* The scrolling viewport. `max-height` is written by the panel (rows *
+   13dp); overflow turns the log into the scrollable history window. */
 #chat-log {
 	display: block;
 	width: 100%;
+	max-height: 78dp;
+	overflow-x: hidden;
+	overflow-y: auto;
 }
 
+/* One message: a plate that never widens past the window - a long line wraps
+   inside it instead of stretching the chat across the screen. */
 .chat-line {
 	display: block;
+	box-sizing: border-box;
 	width: auto;
 	max-width: 100%;
 	margin-top: 1dp;
-	padding: 1dp 6dp;
+	padding: 1dp 4dp;
 	background-color: #0000005e;
-	border-radius: 3dp;
-	font-size: 10dp;
-	line-height: 14dp;
+	border-radius: 2dp;
+	font-size: 8.9dp;
+	line-height: 11dp;
 	color: #e8e8e8;
 	white-space: normal;
 	word-break: break-word;
@@ -58,43 +64,98 @@
 	color: var(--abc-hud-accent);
 }
 
-/* Message-mode input line: one accent-barred row under the log. */
+/* RmlUi builds its scrollbar elements without any user-agent styles: the
+   sample pattern is a zero-width positioned container whose thin bar juts
+   out over the content. The bar only accepts the pointer while the input
+   line is open (the panel enables pointer-events then). */
+#chat-log scrollbarvertical {
+	z-index: 100;
+	width: 0dp;
+}
+
+#chat-log scrollbarvertical slidertrack {
+	margin-left: -4dp;
+	width: 4dp;
+	background-color: #ffffff1c;
+	border-radius: 2dp;
+}
+
+#chat-log scrollbarvertical sliderbar {
+	margin-left: -4dp;
+	width: 4dp;
+	min-height: 16dp;
+	background-color: var(--abc-hud-accent-dim);
+	border-radius: 2dp;
+}
+
+#chat-log scrollbarvertical sliderbar:hover,
+#chat-log scrollbarvertical sliderbar:active {
+	background-color: var(--abc-hud-accent);
+}
+
+/* Message-mode input line: one accent-barred row under the log.
+   Layout note (live bug): this row used to be a flex line. A longer prompt
+   ("队伍：") pushed the editor past the row's width, and the editor then
+   started on a second line - the caret ended up UNDER the prompt instead of
+   beside it. Both children are now absolutely positioned single-line boxes:
+   the prompt is a label at the left edge and the editor fills everything to
+   the right of it, so no prompt width (any language, any IME) can move the
+   caret. The row itself is a plain block whose auto width already excludes
+   its own border (a `width: 100%` row would be 2dp wider than the panel). */
 #chat-input-row {
-	display: flex;
-	flex-flow: row;
-	align-items: center;
-	width: 100%;
-	height: 18dp;
+	position: relative;
+	display: block;
+	box-sizing: border-box;
+	height: 15dp;
 	margin-top: 2dp;
 	background-color: #000000a0;
 	border-left: 2dp var(--abc-hud-accent);
-	padding-left: 6dp;
-	padding-right: 8dp;
 }
 
+/* Prompt column. Absolute positioning keeps it on one line for good; 44dp
+   of left inset covers the widest shipped prompt ("Equipo:" / "队伍："), so
+   the label and the editor never overlap. */
 #chat-prompt {
-	flex-basis: auto;
-	flex-grow: 0;
-	flex-shrink: 0;
-	margin-right: 6dp;
-	font-size: 10dp;
+	position: absolute;
+	left: 4dp;
+	top: 0dp;
+	height: 15dp;
+	font-size: 8.9dp;
 	font-weight: bold;
-	line-height: 18dp;
+	line-height: 15dp;
 	white-space: nowrap;
 	color: var(--abc-hud-accent);
 }
 
-/* The editor is only the ink: the row above is the plate. */
+/* The editor is only the ink: the row above is the plate. left/right size
+   the absolute box to the space the prompt leaves (RmlUi applies the
+   left+right width constraint to absolute elements). */
 #chat-input {
-	flex-basis: auto;
-	flex-grow: 1;
-	flex-shrink: 1;
-	height: 16dp;
+	position: absolute;
+	left: 44dp;
+	right: 25dp;
+	top: 0dp;
+	height: 15dp;
 	padding: 0dp;
-	font-size: 10dp;
-	line-height: 16dp;
+	font-size: 8.9dp;
+	line-height: 15dp;
 	color: #ffffff;
 	background-color: transparent;
 	border-width: 0dp;
 	caret-color: var(--abc-hud-accent);
+}
+
+/* Input-method badge at the end of the row: the active layout's short tag
+   ("CN"/"TW"/"JP"/"KR"), set by the panel and hidden while the layout has no
+   IME. Amber-dim so it reads as HUD ink, not as another prompt. */
+#chat-ime {
+	position: absolute;
+	right: 4dp;
+	top: 0dp;
+	height: 15dp;
+	line-height: 15dp;
+	font-size: 7.6dp;
+	font-weight: bold;
+	white-space: nowrap;
+	color: var(--abc-hud-accent-dim);
 }

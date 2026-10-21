@@ -117,6 +117,8 @@ void GameUiModule::pumpVisibleWork() {
       PlayerListPage_->refocusDefault();
     } else if (state.pages.top() == MenuPage::kVoteMenu && VoteMenuPage_) {
       VoteMenuPage_->refocusDefault();
+    } else if (state.pages.top() == MenuPage::kInventory && InventoryPage_) {
+      InventoryPage_->refocusDefault();
     } else if (state.pages.top() == MenuPage::kLoading && Loading) {
       Loading->refocusDefault();
     } else if (SubStub) {

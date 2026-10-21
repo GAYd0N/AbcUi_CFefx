@@ -84,6 +84,9 @@ void GameUiModule::syncMenuPresentation() {
     case MenuPage::kCommandMenu:
       Command->present();
       break;
+    case MenuPage::kInventory:
+      Inventory->present();
+      break;
     case MenuPage::kLoading:
       // Fresh projection on every sync: the attempt's values moved
       // since the last frame (the frame drain re-renders too). T19:
@@ -93,10 +96,9 @@ void GameUiModule::syncMenuPresentation() {
       if (Loading) {
         const auto kind = state.attemptKind;
         const bool mapLoad = kind == menu::AttemptKind::kMapLoad;
-        Loading->setTitleToken(
-            kind == menu::AttemptKind::kLocalGame
-                ? "#CG_LoadingTitle"
-                : (mapLoad ? "#Loading_MapTitle" : ""));
+        Loading->setTitleToken(kind == menu::AttemptKind::kLocalGame
+                                   ? "#CG_LoadingTitle"
+                                   : (mapLoad ? "#Loading_MapTitle" : ""));
         Loading->setStatusToken(mapLoad ? "#Loading_MapStatus" : "");
         Loading->render();
         Loading->show();
@@ -152,6 +154,8 @@ void GameUiModule::syncMenuPresentation() {
     Vote->hide();
   if (state.pages.empty() || state.pages.top() != MenuPage::kCommandMenu)
     Command->hide();
+  if (state.pages.empty() || state.pages.top() != MenuPage::kInventory)
+    Inventory->hide();
 
   // Overlay layer, top-most last (each show pulls to the context
   // front); idempotent shows neither re-focus nor re-order. The loading

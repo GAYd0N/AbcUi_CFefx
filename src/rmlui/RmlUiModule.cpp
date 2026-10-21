@@ -36,6 +36,7 @@
 #include "AbcSystemInterface.h"
 #include "InputBridge.h"
 #include "PaintGate.h"
+#include "ImeOverlay.h"
 #include "TextInput.h"
 #include "VGUI2ExtensionImport.h"
 #include "../services/GameUiBridge.h"
@@ -59,9 +60,18 @@ namespace {
 // locked screen the fault policy forbids), so init() stops the process
 // through framework::fatalExit. The Debug-only "-abcui_fonts <dir>" override
 // exists so the fault matrix can exercise that path against an empty dir.
+// Fallback faces are tried in load order for glyphs the primary face does
+// not have, so the colour emoji face comes BEFORE the monochrome symbol
+// face: the BMP dingbats both fonts carry (heart, sun, smiley) then render
+// in colour, and only the symbols Segoe UI Emoji lacks fall through to
+// Segoe UI Symbol. RmlUi renders colour glyphs itself - FreeType is asked
+// for FT_LOAD_COLOR and a BGRA bitmap becomes an RGBA8 font atlas, which the
+// RGBA texture upload path already carries.
 constexpr const char *kFontFiles[] = {
     "verdana.ttf",  // old scheme body/number face
     "verdanab.ttf", // Verdana bold (hud numbers)
+    "seguiemj.ttf", // Segoe UI Emoji (colour emoji fallback)
+    "seguisym.ttf", // Segoe UI Symbol (dingbats/arrows/symbols)
     "tahoma.ttf",   // old "UiBold" face
     "msyh.ttc",     // Microsoft YaHei regular (fallback face)
     "msyhbd.ttc",   // Microsoft YaHei bold
@@ -394,6 +404,9 @@ void init() {
 
   Rml::Debugger::Initialise(Context);
   Rml::Debugger::SetVisible(false);
+  // IME composition/candidate overlay: a plain document on this context, so
+  // it serves the HUD, the menus and the console alike.
+  ime::init(Context);
 
   abc::MetaRenderer()->RegisterRenderCallbacks(&Callbacks);
   Initialised = true;
@@ -431,6 +444,7 @@ void shutdown() {
   if (Sink.shutdown)
     Sink.shutdown();
   framework::PanelManager::shutdown();
+  ime::shutdown();
 
   // Rml::Shutdown first releases per-load borrowed/owned records; cache IDs
   // are deleted only afterwards, including never-delivered avatar uploads.

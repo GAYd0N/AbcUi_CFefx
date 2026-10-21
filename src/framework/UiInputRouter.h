@@ -52,6 +52,16 @@ public:
   virtual bool claimsKey(int down, int keynum) = 0;
   // Wheel pulses scroll the UI instead of switching weapons while true.
   virtual bool claimsWheel() = 0;
+  // While true the game must not act on the engine's own input state for
+  // this frame (a text field owns the keyboard). Swallowing key edges is
+  // not enough: the engine's bind handler runs before this hook sees the
+  // edge, so +/-forward can already be latched when the first character is
+  // typed. The client CreateMove seam zeroes the movement axes while this
+  // reports true, which is how the native chat entry keeps the player
+  // standing still.
+  virtual bool blocksGameplay() const {
+    return false;
+  }
   // Exactly-once action per physical press of a claimed key (post
   // auto-repeat dedup). Called after the edge was fed to the UI; the owner
   // may release its own token inside (ESC closing the menu).
@@ -133,6 +143,9 @@ public:
 
   // Wheel pulses scroll the UI only when the top owner claims them.
   bool wheelClaimed() const;
+  // True while the top owner blocks the engine's input state (see
+  // Owner::blocksGameplay): the CreateMove clamp reads this.
+  bool blocksGameplay() const;
   // T11 capture seam: true when the top owner consumed the pulse (capture
   // took the wheel edge; the scroll path must not run).
   bool onWheelPulse(int keynum) const;

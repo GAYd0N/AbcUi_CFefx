@@ -30,6 +30,7 @@
 #include "../../framework/Localization.h"
 #include "../../framework/TextUtil.h"
 #include "../../hooks.h"
+#include "../../rmlui/ImeOverlay.h"
 #include "../../rmlui/InputBridge.h"
 #include "../../rmlui/TextInput.h"
 #include "../../services/GameUiBridge.h"
@@ -46,6 +47,14 @@ constexpr double kFadeSeconds = 1.0;
 // behaves like a chat instead of drawing nothing.
 constexpr float kDefaultSayTextTime = 10.0f;
 constexpr int kDefaultSayTextLines = 5; // HLSDK MAX_LINES
+// Review feedback: the log is a compact window over a deep scrollback. The
+// window tops out at six rows no matter how large hud_saytext_lines is, and
+// the buffer keeps the last 256 lines for the scrollbar.
+constexpr std::size_t kMaxBuffer = 256;
+constexpr int kMaxWindowRows = 6;
+// One row of the scroll math: the 11dp line, 1dp of vertical padding and the
+// 1dp gap between plates (they must match chat.rcss).
+constexpr float kRowHeightDp = 13.0f;
 } // namespace
 
 namespace chat {
@@ -225,6 +234,7 @@ void ChatPanel::onDocumentReady() {
   if (Rml::Element *row =
           Document ? Document->GetElementById("chat-input-row") : nullptr)
     row->SetProperty("display", "none");
+  applyWindowHeight();
 }
 
 void ChatPanel::reset() {
@@ -297,72 +307,50 @@ void ChatPanel::pushLine(const std::string &text,
 
 void ChatPanel::appendNode(const std::vector<chat::Run> &runs,
                            const std::string &nameColor, double now) {
-  Rml::Element *log = Document ? Document->GetElementById("chat-log") : nullptr;
+  Rml::Element *log = chatLog();
   if (!log)
     return;
+  // Follow the tail only when the reader is already there; a scrolled-up
+  // reader keeps their position while new lines arrive underneath.
+  const bool follow = atLogBottom();
+
   Rml::ElementPtr node = Document->CreateElement("div");
   node->SetClass("chat-line", true);
   node->SetInnerRML(runsToRml(runs, nameColor));
   Rml::Element *row = log->AppendChild(std::move(node));
 
-  Line line;
-  // While the input line is open the log is a reader surface: nothing
-  // expires until it closes (closeInput re-arms the countdown).
-  line.expireAt = now + sayTextTime();
-  line.node = row;
-  Lines.push_back(std::move(line));
-
-  const int limit = sayTextLineCount();
-  while (static_cast<int>(Lines.size()) > limit) {
-    if (Lines.front().node)
-      removeRow(Lines.front().node);
-    Lines.erase(Lines.begin());
+  Lines.push_back(Line{row});
+  // Ring buffer: the oldest row leaves the DOM together with its entry.
+  while (Lines.size() > kMaxBuffer) {
+    removeRow(Lines.front().node);
+    Lines.pop_front();
   }
+
+  // A new line restarts the on-screen clock; while the input is open the
+  // log stays up regardless (the reader is using the scrollback).
+  HideAt = now + sayTextTime();
+  FadeOpacity = -1; // the block comes back to full opacity on the next pump
+  if (follow)
+    ScrollFrames = 2; // the row's height only exists after the next layout
+  // Re-assert full opacity in the same frame the log comes back, so a line
+  // arriving during the fade-out never paints one transparent frame.
+  updateFade();
   updateVisibility();
 }
 
-void ChatPanel::expireLines(double now) {
-  if (Token_.held())
-    return; // the input line is open: the reader is looking at the log
-  for (auto it = Lines.begin(); it != Lines.end();) {
-    const double remaining = it->expireAt - now;
-    if (remaining <= 0.0) {
-      if (it->node)
-        removeRow(it->node);
-      it = Lines.erase(it);
-      continue;
-    }
-    // Fade the last second out per row (CaptionMod's CHATLINE_FADE_TIME),
-    // written only when the quantised value changes - an ungated per-frame
-    // property write re-lays-out the document.
-    const int opacity =
-        remaining < kFadeSeconds
-            ? static_cast<int>(std::clamp(remaining / kFadeSeconds, 0.0, 1.0) *
-                               100.0)
-            : 100;
-    if (it->node && opacity != it->opacity) {
-      it->opacity = opacity;
-      char value[8] = {};
-      std::snprintf(value, sizeof(value), "%.2f",
-                    static_cast<double>(opacity) / 100.0);
-      it->node->SetProperty("opacity", value);
-    }
-    ++it;
-  }
-}
-
 void ChatPanel::clearLines() {
-  for (auto &line : Lines) {
-    if (line.node)
-      removeRow(line.node);
-  }
+  for (auto &line : Lines)
+    removeRow(line.node);
   Lines.clear();
+  HideAt = 0.0;
+  FadeOpacity = -1;
+  ScrollFrames = 0;
 }
 
 void ChatPanel::updateVisibility() {
   if (!Document)
     return;
-  const bool wanted = chatVisible() && (!Lines.empty() || Mode_ != Mode::kNone);
+  const bool wanted = chatVisible() && (Mode_ != Mode::kNone || Clock < HideAt);
   if (!wanted) {
     if (isVisible())
       hide();
@@ -370,6 +358,66 @@ void ChatPanel::updateVisibility() {
   }
   if (!isVisible())
     show();
+}
+
+void ChatPanel::updateFade() {
+  if (!Document)
+    return;
+  const double remaining = HideAt - Clock;
+  int percent = 100;
+  if (Mode_ == Mode::kNone && remaining < kFadeSeconds)
+    percent = remaining <= 0.0
+                  ? 0
+                  : static_cast<int>(
+                        std::clamp(remaining / kFadeSeconds, 0.0, 1.0) * 100.0);
+  if (percent == FadeOpacity)
+    return;
+  FadeOpacity = percent;
+  char value[8] = {};
+  std::snprintf(value, sizeof(value), "%.2f", percent / 100.0);
+  Document->SetProperty("opacity", value);
+}
+
+void ChatPanel::applyWindowHeight() {
+  // hud_saytext_lines still decides how many rows the HUD is allowed to
+  // show, but the window is capped so the chat cannot eat the play area -
+  // everything older is reachable through the scrollbar.
+  const int rows = std::clamp(sayTextLineCount(), 2, kMaxWindowRows);
+  if (rows == WindowRows)
+    return;
+  WindowRows = rows;
+  Rml::Element *log = chatLog();
+  if (!log)
+    return;
+  char value[16] = {};
+  std::snprintf(value, sizeof(value), "%.0fdp", rows * kRowHeightDp);
+  log->SetProperty("max-height", value);
+}
+
+Rml::Element *ChatPanel::chatLog() const {
+  return Document ? Document->GetElementById("chat-log") : nullptr;
+}
+
+bool ChatPanel::atLogBottom() const {
+  Rml::Element *log = chatLog();
+  if (!log)
+    return true;
+  const float scrollable = log->GetScrollHeight() - log->GetClientHeight();
+  return scrollable <= 0.0f || log->GetScrollTop() >= scrollable - 4.0f;
+}
+
+void ChatPanel::scrollLogToBottom() {
+  Rml::Element *log = chatLog();
+  if (!log)
+    return;
+  log->SetScrollTop(log->GetScrollHeight());
+}
+
+void ChatPanel::scrollLog(float deltaDp) {
+  Rml::Element *log = chatLog();
+  if (!log)
+    return;
+  log->SetScrollTop(log->GetScrollTop() + deltaDp);
 }
 
 void ChatPanel::openInput(Mode mode) {
@@ -380,14 +428,24 @@ void ChatPanel::openInput(Mode mode) {
   setInputText(std::string());
   if (Rml::Element *row = Document->GetElementById("chat-input-row"))
     row->SetProperty("display", "block");
+  // The scrollbar needs the pointer while the reader browses the log; the
+  // rest of the time the HUD document stays pointer-transparent.
+  Document->SetProperty("pointer-events", "auto");
   show();
   if (Rml::Element *input = inputElement())
     input->Focus();
   if (!Token_.held())
     Token_ = rmlui::uiRouter().acquire(
         this, framework::uiinput::OwnerTier::kInteractiveHud);
+  // The reader is here: nothing fades while the input line is open, and the
+  // newest line is in view.
+  HideAt = Clock + sayTextTime();
+  FadeOpacity = -1;
+  ScrollFrames = 2;
   HistoryCursor = -1;
   HistoryDraft.clear();
+  updateImeBadge();
+  updateFade();
   updateVisibility();
 }
 
@@ -409,11 +467,13 @@ void ChatPanel::closeInput() {
   if (Rml::Element *input = inputElement())
     input->Blur();
   Token_.release();
+  if (Document)
+    Document->SetProperty("pointer-events", "none");
   HistoryCursor = -1;
   HistoryDraft.clear();
-  // Rows held open by the input resume their countdown from here.
-  for (auto &line : Lines)
-    line.expireAt = Clock + sayTextTime();
+  // The log lingers for one full window after the input closes, then fades.
+  HideAt = Clock + sayTextTime();
+  FadeOpacity = -1;
   updateVisibility();
 }
 
@@ -425,6 +485,20 @@ void ChatPanel::setPrompt(Mode mode) {
     return;
   prompt->SetInnerRML(framework::TextUtil::escapeRml(
       translated(mode == Mode::kTeam ? "Chat_Team" : "Chat_Say")));
+}
+
+void ChatPanel::updateImeBadge() {
+  if (!Document)
+    return;
+  Rml::Element *badge = Document->GetElementById("chat-ime");
+  if (!badge)
+    return;
+  const std::string tag = rmlui::ime::inputLanguageTag();
+  if (tag == ImeBadge)
+    return;
+  ImeBadge = tag;
+  badge->SetInnerRML(framework::TextUtil::escapeRml(tag));
+  badge->SetProperty("display", tag.empty() ? "none" : "block");
 }
 
 void ChatPanel::submit() {
@@ -516,6 +590,21 @@ bool ChatPanel::claimsWheel() {
   return Mode_ != Mode::kNone;
 }
 
+bool ChatPanel::blocksGameplay() const {
+  return Mode_ != Mode::kNone;
+}
+
+bool ChatPanel::onClaimedWheelPulse(int keynum) {
+  if (Mode_ == Mode::kNone)
+    return false;
+  // Three rows per notch, independent of where the pointer happens to sit.
+  if (keynum == K_MWHEELUP)
+    scrollLog(-kRowHeightDp * 3.0f);
+  else if (keynum == K_MWHEELDOWN)
+    scrollLog(kRowHeightDp * 3.0f);
+  return true;
+}
+
 void ChatPanel::onClaimedKeyDown(int keynum) {
   if (Mode_ == Mode::kNone)
     return;
@@ -552,12 +641,21 @@ void ChatPanel::onOwnershipLost() {
 void ChatPanel::onData(double frameTime) {
   if (frameTime > 0.0)
     Clock += frameTime;
+  applyWindowHeight();
   // The pause menu (or HIDEALL) takes the keyboard: do not leave a focused
   // editor behind the other surface.
   if (Mode_ != Mode::kNone && (services::nativeUiBridge().menuUp() ||
                                hudstate::isHudHidden(hudstate::kHideAll)))
     closeInput();
-  expireLines(Clock);
+  // The appended row is only measured by the next layout pass, so tail
+  // following runs over a couple of frames after each append.
+  if (ScrollFrames > 0) {
+    scrollLogToBottom();
+    ScrollFrames--;
+  }
+  if (Mode_ != Mode::kNone)
+    updateImeBadge();
+  updateFade();
   updateVisibility();
 }
 

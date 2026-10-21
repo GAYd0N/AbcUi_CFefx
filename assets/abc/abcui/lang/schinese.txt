@@ -36,6 +36,26 @@ VoteMenu_NoMaps = 服务器尚未发送地图列表。
 VoteMenu_NoSelection = 请先选择一个条目。
 VoteMenu_InvalidEntry = 该条目无法安全发送。
 
+# 物品栏窗口（issue 10）
+Invmenu_Topcaption = 物品栏
+Invmenu_NoInventory = 你没有任何物品
+Invmenu_NoItemSelected = 未选择物品
+Invmenu_NoItemName = 未命名物品
+Invmenu_NoItemDescription = 无物品描述
+Invmenu_Activate = 使用物品
+Invmenu_Drop = 丢弃物品
+Invmenu_DropAll = 丢弃全部物品
+
+# 物品栏界面文字（重构）
+Invmenu_ListHead = 物品
+Invmenu_Details = 详情
+Invmenu_Usable = 可使用
+Invmenu_NotUsable = 不可使用
+Invmenu_Droppable = 可丢弃
+Invmenu_NotDroppable = 不可丢弃
+Invmenu_EmptyHint = 拾取物品后会显示在这里。
+Invmenu_SelectHint = 在左侧选择一件物品查看详情。
+
 # Damage tiles (DmgTiles panel)
 DMGTiles_Poison = 中毒
 DMGTiles_Acid = 酸蚀

@@ -50,6 +50,7 @@ enum class MenuPage {
   kPlayerList,
   kVoteMenu,
   kCommandMenu,
+  kInventory,
   kLoading,
 };
 

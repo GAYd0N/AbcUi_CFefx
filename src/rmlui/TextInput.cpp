@@ -1,6 +1,7 @@
 // rmlui::TextInput implementation - see TextInput.h.
 #include "TextInput.h"
 
+#include "ImeOverlay.h"
 #include "RmlUiModule.h"
 
 #include <RmlUi/Core/Context.h>
@@ -298,12 +299,21 @@ void noteSurfaceWindow(const void *hwnd) {
 // candidate window excluding the caret line. CFS_FORCE_POSITION takes surface
 // client pixels directly (the context pixel space, T06) - no scaling layer.
 void updateImePlacement(Rml::Vector2f caretPosition, float lineHeight) {
+  // The composition panel follows the caret (rmlui::ime); the vgui2 candidate
+  // window is placed under it the way a VGUI text entry places it.
+  ime::setAnchor(caretPosition.x, caretPosition.y, lineHeight);
+
   const HWND window = gameWindow();
   if (!window)
     return;
   const HIMC context = ImmGetContext(window);
   if (!context)
     return;
+  // Candidate page: read it from the IME itself (the same CANDIDATELIST
+  // vgui2's window renders). The SDL candidates event is NOT used - its
+  // payload layout in this build does not match the header copy (live crash:
+  // the field we took for the string-array pointer held the count).
+  ime::feedCandidatesFromIme(context);
   constexpr LONG kBottomMargin = 2;
   const LONG x = static_cast<LONG>(caretPosition.x);
   const LONG y = static_cast<LONG>(caretPosition.y);
@@ -334,10 +344,12 @@ void feedTextInput(const char *utf8) {
     if (sanitized == "`" || sanitized == "~")
       return;
   }
-  if (adapter().composing())
+  if (adapter().composing()) {
     adapter().confirmComposition(sanitized);
-  else
+    ime::hide();
+  } else {
     submitToFocusedEditor(sanitized);
+  }
 }
 
 void swallowToggleKeyText() {
@@ -354,8 +366,12 @@ void feedTextEditing(const char *utf8, int startBytes) {
     // Empty composition while tracking = the platform cancelled it
     // (ESC) or cleared it post-commit (already ended -> no-op above).
     adapter().cancelComposition();
+    ime::hide();
     return;
   }
+  // The overlay header shows the running composition (the editor shows the
+  // same string inline, underlined); the candidate page arrives separately.
+  ime::setComposition(std::string(sanitized).c_str(), startBytes);
   // The cursor offset is a byte offset inside the composition string
   // (SDL contract); Rml's caret is a character index.
   const int clamped =
@@ -367,6 +383,7 @@ void feedTextEditing(const char *utf8, int startBytes) {
 
 void cancelComposition() {
   adapter().cancelComposition();
+  ime::hide();
 }
 
 void onWindowFocusLost() {
@@ -374,6 +391,7 @@ void onWindowFocusLost() {
   // deactivates; the mirrored Rml state must not survive into the next
   // focus period.
   adapter().reset();
+  ime::hide();
 }
 
 void onSurfaceAppEvent(const void *sdlEvent) {
@@ -394,10 +412,20 @@ void onSurfaceAppEvent(const void *sdlEvent) {
     break;
   }
   case kSdlEventTextEditingCandidates:
+    // The page is read from the IME itself (imm32 CANDIDATELIST, see
+    // feedCandidatesFromIme), never from this event: its payload layout in
+    // this build is not the documented one - a live crash read the count
+    // field as the string-array pointer. The event is used as the "the page
+    // changed" trigger only (paging/selection change without a caret move).
     Counters.AppProcCandidates++;
-    // Observed, not consumed: candidate presentation stays with the
-    // platform/original surface; caret positioning rides the
-    // SystemInterface ActivateKeyboard seam (AbcSystemInterface).
+    if (adapter().hasActiveEditor()) {
+      if (const HWND window = gameWindow()) {
+        if (const HIMC context = ImmGetContext(window)) {
+          ime::feedCandidatesFromIme(context);
+          ImmReleaseContext(window, context);
+        }
+      }
+    }
     break;
   default:
     break; // keys/mouse/wheel ride the T06 event sources

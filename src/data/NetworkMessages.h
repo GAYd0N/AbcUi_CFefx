@@ -144,6 +144,29 @@ extern abc::CallbackList<void()> ClExtrasInfo;
 extern abc::CallbackList<void(const VoiceMaskData &)> VoiceMask;
 extern abc::CallbackList<void()> ReqState;
 
+// Inventory feed (issue 10). InvAdd carries one item exactly as the native
+// CInventoryPanel::MsgFunc_InvAdd reads it: long id, three flag bytes, one
+// float, then five NUL-terminated strings. The native window renders the
+// second string as the item name (the first is its fallback) and the third
+// as the description; the last two are the native selection key and an
+// unused field, carried through so the wire contract is not narrowed.
+struct InvItemData {
+  int id = 0;
+  bool canActivate = false;  // native item+0x04: Activate warning tint
+  bool canDrop = false;      // native item+0x05: Drop warning tint
+  bool removeLocked = false; // native item+0x06: needs a forced InvRemove
+  float value = 0.0f;        // native item+0x08 (not rendered by the window)
+  std::string name;          // native item+0x0c
+  std::string displayName;   // native item+0x10 (preferred by the window)
+  std::string description;   // native item+0x14
+  std::string extra;         // native item+0x18 (unused by the window)
+  std::string key;           // native item+0x1c (native selection key)
+};
+extern abc::CallbackList<void(const InvItemData &)> InvAdd;
+// InvRemove: (item id, force). id 0 removes every unlocked item; force != 0
+// also removes items whose removeLocked flag is set (native removal rule).
+extern abc::CallbackList<void(int, int)> InvRemove;
+
 // HUD_Init: installs the HookUserMsg chain. Idempotent.
 void init();
 // panels/vote hands its hud_vote cvar here (HUD_Init time) - the VoteMenu

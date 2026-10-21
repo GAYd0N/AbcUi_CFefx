@@ -11,11 +11,20 @@
 // chained commands (framework::commands), SayText is chained through
 // data::netmsg, and the client viewport is never replaced.
 //
+// Log model (review feedback): the panel keeps a 256-message ring buffer and
+// shows it in a compact scrollable window (at most kMaxWindowRows rows). The
+// window auto-hides `hud_saytext_time` after the last line, fades its last
+// second out as one block, and keeps every row in the DOM so the scrollbar
+// still reaches older lines while the chat is open. Rows are escaped text
+// with the HUD plate styling; long lines wrap, they never widen the panel.
+//
 // Ownership (T06): while the input line is open the panel holds an
 // interactive-HUD router token, so every key belongs to the editor and the
 // movement bindings stay silent; the log on its own never owns input. The
-// document is pointer-transparent (HudPanel default), exactly like the other
-// HUD panels - the input is keyboard-only, as the native one was.
+// document is pointer-transparent while only the log is up - the input is
+// keyboard-only, as the native one was - and becomes pointer-capable while
+// the input line is open so the scrollbar can be dragged (the router already
+// shows the cursor for that owner).
 //
 // Coexistence with CaptionMod (issue 13): both plugins want the same two
 // commands and the same SayText message. Rule - whoever owns chat owns BOTH
@@ -25,6 +34,7 @@
 // chain through; `cap_newchat 0` hands chat to AbcUi. `abc_ui_chat 0` turns
 // the AbcUi side off and leaves the native chat in charge.
 
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -67,14 +77,9 @@ protected:
 private:
   enum class Mode { kNone = 0, kSay, kTeam };
 
-  // One log row: the moment it starts fading out plus the element the panel
-  // owns (dropped together with the entry). The runs themselves live in the
-  // DOM - the row is never rebuilt, only appended/removed.
+  // One buffered row: the element the panel owns. The runs themselves live in
+  // the DOM - a row is never rebuilt, only appended and trimmed.
   struct Line {
-    double expireAt = 0.0;
-    // Quantised fade opacity (0..100) of the row element; -1 forces the
-    // first write on the frame the fade starts.
-    int opacity = -1;
     Rml::Element *node = nullptr;
   };
 
@@ -87,6 +92,10 @@ private:
   void closeInput();
   void submit();
   void setPrompt(Mode mode);
+  // Input-method badge at the end of the input row ("CN"/"JP"/...); empty
+  // hides it. Re-read every frame while the line is open so switching IMEs
+  // while typing updates the badge.
+  void updateImeBadge();
   // Push/pop the send history into the editor (Up/Down).
   void recallHistory(int step);
 
@@ -94,9 +103,18 @@ private:
                 int client);
   void appendNode(const std::vector<chat::Run> &runs,
                   const std::string &nameColor, double now);
-  void expireLines(double now);
   void clearLines();
   void updateVisibility();
+  // Block-level fade out of the whole log in its last second
+  // (hud_saytext_time), written only when the quantised value changes.
+  void updateFade();
+  // Applies the window height from hud_saytext_lines (change-gated).
+  void applyWindowHeight();
+  // Scroll plumbing: the log is the scrolling element.
+  Rml::Element *chatLog() const;
+  bool atLogBottom() const;
+  void scrollLogToBottom();
+  void scrollLog(float deltaDp);
 
   // Input gates: the cvar pair plus the shared HUD visibility token.
   bool chatEnabled() const;
@@ -107,14 +125,22 @@ private:
   void setInputText(const std::string &text);
 
   // framework::uiinput::Owner: the open input line owns every key edge and
-  // the wheel (so typing never switches weapons).
+  // the wheel (so typing never switches weapons and the wheel scrolls the
+  // log instead).
   bool claimsKey(int down, int keynum) override;
   bool claimsWheel() override;
+  // The open input line claims the engine's key routing: while this is true
+  // the BaseUI key seam reports every claimed edge as handled by the UI (the
+  // mechanism the native chat entry and CaptionMod's VGUI dialog use), so the
+  // engine never executes a binding - WASD, jump, +use and any other bind.
+  bool blocksGameplay() const override;
+  bool onClaimedWheelPulse(int keynum) override;
   void onClaimedKeyDown(int keynum) override;
   void onOwnershipLost() override;
 
   Mode Mode_ = Mode::kNone;
-  std::vector<Line> Lines;
+  // Ring buffer of live rows (kMaxBuffer entries, oldest dropped first).
+  std::deque<Line> Lines;
   std::vector<std::string> History;
   int HistoryCursor = -1;
   std::string HistoryDraft;
@@ -122,6 +148,17 @@ private:
   // HUD_Frame delta accumulation (the panels' client clock; never the
   // engine time, which keeps running while paused).
   double Clock = 0.0;
+  // When the log stops being shown (last line + hud_saytext_time).
+  double HideAt = 0.0;
+  // Height applied to the log window in rows; 0 = not applied yet.
+  int WindowRows = 0;
+  // Frames left that still pull the log to the tail. A row's height is only
+  // known after the next layout pass, so an append arms a couple of frames.
+  int ScrollFrames = 0;
+  // Last badge text written to the DOM (change-gated like the other writes).
+  std::string ImeBadge;
+  // Last block opacity written (percent), -1 = not written yet.
+  int FadeOpacity = -1;
 };
 
 } // namespace panels

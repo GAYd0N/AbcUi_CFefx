@@ -4,6 +4,7 @@
 #include "../../panels/commandmenu/CommandMenuPage.h"
 #include "../../panels/console/ConsolePage.h"
 #include "../../panels/creategame/CreateGamePage.h"
+#include "../../panels/inventory/InventoryPage.h"
 #include "../../panels/loading/LoadingWindows.h"
 #include "../../panels/mainmenu/MainMenuPage.h"
 #include "../../panels/menushared/MenuShellWindows.h"
@@ -72,6 +73,7 @@ GameUiModule::GameUiModule()
       })),
       Vote(std::make_unique<VoteMenuFlow>(MakeVoteMenuHost(), voteMenuSeams())),
       Command(std::make_unique<CommandMenuFlow>(MakeCommandMenuHost())),
+      Inventory(std::make_unique<InventoryFlow>(MakeInventoryHost())),
       Create(std::make_unique<CreateGameFlow>(MakeCreateGameHost(),
                                               createGameSeams())),
       Server(std::make_unique<ServerBrowserFlow>(MakeServerBrowserHost(),
@@ -198,6 +200,50 @@ CommandMenuHost GameUiModule::MakeCommandMenuHost() {
     // A phase change can make the decided resume illegal. The menu command
     // still owns this presentation, so force-clear the host instead of
     // leaving the pause page behind it.
+    if (Controller.isMenuActive())
+      Controller.dispatch(MenuEvent{EventKind::kMenuHidden});
+  };
+  host.finishDispatch = [this] { finishDispatch(); };
+  return host;
+}
+
+InventoryHost GameUiModule::MakeInventoryHost() {
+  InventoryHost host;
+  host.shellReady = [this] { return Shell && Context; };
+  host.ensureMenu = [this](bool &raisedMenu) {
+    const bool menuWasUp = MenuPresented;
+    if (!menuWasUp) {
+      if (!services::nativeUiBridge().menuUp())
+        services::nativeUiBridge().requestMenuUp(
+            services::NativeUiOrigin::kOwnUi);
+      if (!MenuPresented)
+        presentMenu();
+    }
+    raisedMenu = !menuWasUp;
+    return MenuPresented;
+  };
+  host.cancelRaisedMenu = [this] {
+    services::nativeUiBridge().requestMenuDown(
+        services::NativeUiOrigin::kOwnUi);
+  };
+  host.reconcileInGame = [this] {
+    reconcilePhase();
+    return Controller.state().phase == menu::BackendPhase::kInGame;
+  };
+  host.dispatchOpen = [this] {
+    Controller.dispatch(menu::makeOpenPage(MenuPage::kInventory));
+  };
+  host.closeNavigation = [this](bool raisedMenu) {
+    if (!Controller.state().pages.topIs(MenuPage::kInventory))
+      return;
+    Controller.dispatch(MenuEvent{EventKind::kBack}); // inventory -> Pause
+    if (!raisedMenu)
+      return;
+    if (Controller.state().pages.topIs(MenuPage::kPause))
+      Controller.dispatch(MenuEvent{EventKind::kResume}); // close + resume
+    // Same recovery as the command menu: a phase change can make the decided
+    // resume illegal, so force-clear the host instead of leaving the pause
+    // page behind the closed window.
     if (Controller.isMenuActive())
       Controller.dispatch(MenuEvent{EventKind::kMenuHidden});
   };
@@ -423,6 +469,44 @@ void GameUiModule::onInit() {
                        "command menu cannot open\n");
     }
   }
+  // Issue 10: the native inventory window. The three client commands open
+  // the viewport panel (CInventoryPanel::ShowPanel); swallowing them here is
+  // what keeps that panel off-screen. `inventory` and `+inventory` both open
+  // (the native command did not toggle), `-inventory` closes.
+  if (!InventoryCommandBound) {
+    abc::CChainedCommand *open = commands::get("inventory");
+    abc::CChainedCommand *hold = commands::get("+inventory");
+    abc::CChainedCommand *release = commands::get("-inventory");
+    if (open && hold && release) {
+      open->Event().append([this]() {
+        Inventory->open();
+        return false; // the native CInventoryPanel never opens
+      });
+      hold->Event().append([this]() {
+        Inventory->open();
+        return false;
+      });
+      release->Event().append([this]() {
+        Inventory->close();
+        return false;
+      });
+      InventoryCommandBound = true;
+    } else {
+      abc::ConsoleWarn("[AbcUi] inventory commands unavailable; the Rml "
+                       "inventory window cannot open\n");
+    }
+  }
+  if (!InventoryFeedBound) {
+    // The item stream feeds the model directly (the page owns only the DOM);
+    // InvAdd/InvRemove are the same messages the native panel consumes, so
+    // the list is read-through and complete even while the window is closed.
+    netmsg::InvAdd.append([this](const netmsg::InvItemData &data) {
+      Inventory->model().add(data);
+    });
+    netmsg::InvRemove.append(
+        [this](int id, int force) { Inventory->model().remove(id, force); });
+    InventoryFeedBound = true;
+  }
 #ifndef NDEBUG
   DebugCommands::registerCommands();
 #endif
@@ -433,6 +517,7 @@ void GameUiModule::onVidInit() {
   // MapList for the next session; the page is not kept over a world change.
   Vote->resetForWorld();
   Command->resetForWorld();
+  Inventory->resetForWorld();
 }
 
 bool GameUiModule::launchLocalGame(const char *map, const char **reasonToken) {
@@ -483,6 +568,8 @@ void GameUiModule::onShutdown() {
   VoteMenuPage_.reset();
   Command->shutdown();
   CommandMenuPage_.reset();
+  Inventory->shutdown();
+  InventoryPage_.reset();
   Video->shutdown();
   VideoConfirm.reset();
   ConfirmQuit.reset();
