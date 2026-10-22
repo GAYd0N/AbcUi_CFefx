@@ -648,7 +648,13 @@ void clampKillTime(void *) {
 
 // Debug aids (the old abc_ui_cfefx probe driver): the module ABI carries no
 // command arguments, so each action gets its own command and the accumulator
-// is driven through the same entry point the netmsg sink uses.
+// is driven through the same entry point the netmsg sink uses. The damage
+// amount for abc_ui_cfefx_damage comes from a cvar because there is no argv.
+constexpr const char *kDebugAmountCvar = "abc_ui_cfefx_amount";
+constexpr float kDebugAmountDefault = 8000.0f;
+
+AbcUiCvarHandle DebugAmount = nullptr;
+
 void debugDump(const char *label) {
   const float volume = cvarFloat(Volume, 0.25f);
   Api->core->print(
@@ -672,9 +678,30 @@ void debugHit(void *) {
   debugDump("hit");
 }
 
+void debugTier(void *) {
+  // The old "tier 9" argument: clear the accumulator, then land exactly nine
+  // marks so every side mark and its star queue are visible at once.
+  reset();
+  onDamage(static_cast<int>(damageStep() * 9));
+  debugDump("tier");
+}
+
 void debugScore(void *) {
   onDamage(static_cast<int>(damageStep() * 10));
   debugDump("score");
+}
+
+void debugDamage(void *) {
+  // The old "hit <value>" argument, driven by a cvar: one injection the size
+  // of a single live netmsg.popnum package (default 8000, the large-hit case).
+  const float requested = cvarFloat(DebugAmount, kDebugAmountDefault);
+  const int amount =
+      requested <= 0.0f ? 0 : static_cast<int>(std::min(requested, 1.0e6f));
+  Api->core->print("[AbcUi] cfefx: injecting %d damage "
+                   "(abc_ui_cfefx_amount, hud_cfefx_max=%.0f)\n",
+                   amount, cvarFloat(MaxDamage, 1000.0f));
+  onDamage(amount);
+  debugDump("damage");
 }
 
 void debugSound(void *) {
@@ -690,9 +717,13 @@ void debugReset(void *) {
 }
 
 void registerDebugCommands() {
+  DebugAmount = Api->console->registerCvar(kDebugAmountCvar, "8000",
+                                           ABCUI_CVAR_VALUE);
   Api->console->registerCommand("abc_ui_cfefx_status", &debugStatus, nullptr);
   Api->console->registerCommand("abc_ui_cfefx_hit", &debugHit, nullptr);
+  Api->console->registerCommand("abc_ui_cfefx_tier", &debugTier, nullptr);
   Api->console->registerCommand("abc_ui_cfefx_score", &debugScore, nullptr);
+  Api->console->registerCommand("abc_ui_cfefx_damage", &debugDamage, nullptr);
   Api->console->registerCommand("abc_ui_cfefx_sound", &debugSound, nullptr);
   Api->console->registerCommand("abc_ui_cfefx_reset", &debugReset, nullptr);
 }
