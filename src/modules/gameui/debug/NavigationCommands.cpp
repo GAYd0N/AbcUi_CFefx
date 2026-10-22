@@ -3,7 +3,6 @@
 #include <metahook.h>
 
 #include "modules/gameui/GameUiModule.h"
-#include "modules/gameui/GameUiPages.h"
 #include "DebugCommands.h"
 #include <abc/Console.h>
 namespace gameui {
@@ -102,7 +101,7 @@ void DebugCommands::friendsTestCommand() {
 // mouse navigation. Lists the available ids when called without arguments.
 void DebugCommands::settingsPageCommand() {
   GameUiModule *module = currentModule();
-  if (!module || !module->Settings) {
+  if (!module) {
     abc::ConsoleWarn("[AbcUi] settings page not available\n");
     return;
   }
@@ -111,9 +110,11 @@ void DebugCommands::settingsPageCommand() {
       abc::ConsolePrint("[AbcUi] settings page: %s\n", page.Id.c_str());
     return;
   }
-  const bool selected = module->Settings->selectPage(gEngfuncs.Cmd_Argv(1));
-  abc::ConsolePrint("[AbcUi] settings page '%s': %s\n", gEngfuncs.Cmd_Argv(1),
-                    selected ? "shown" : "unknown");
+  // The settings page is a module document now: its tab selection is
+  // module-owned and cannot be driven from the console.
+  abc::ConsoleWarn("[AbcUi] settings page '%s': the page module owns the tab "
+                   "selection\n",
+                   gEngfuncs.Cmd_Argv(1));
 }
 
 } // namespace gameui

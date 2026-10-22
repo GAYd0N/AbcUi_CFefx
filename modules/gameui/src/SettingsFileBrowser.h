@@ -1,19 +1,17 @@
 #pragma once
 
-// services::filedialog::FileBrowser - the directory model behind the settings
-// file picker: an absolute directory, its visible children (subdirectories and
-// image files), quick roots, and the navigation commands. Pure filesystem
-// reads through std::filesystem - no DOM, no engine, no renderer.
+// settingspage::files - the directory model behind the settings spray picker:
+// an absolute directory, its visible children (subdirectories and image
+// files), quick roots, and the navigation commands. Pure filesystem reads
+// through std::filesystem - no DOM, no engine, no renderer.
 //
-// Replaces the SourceSDK vgui FileOpenDialog the original spray picker used:
-// same job (pick an image anywhere on disk), but the entries are data the
-// settings page projects into its own themed layer, capped and sorted so a
-// huge folder cannot stall the frame.
+// Moved into the page module with the page: the picker is page state (the
+// framework only receives the confirmed absolute path and runs the maker).
 
 #include <string>
 #include <vector>
 
-namespace services::filedialog {
+namespace settingspage::files {
 
 struct Entry {
   std::string Name;
@@ -34,8 +32,7 @@ public:
   static bool isImageName(const std::string &name);
   // The roots the picker starts from: the process working directory (the
   // game folder the engine launched from), %USERPROFILE%/Pictures and
-  // %USERPROFILE%/Desktop when they exist, then every drive. Pure
-  // environment/filesystem reads, no engine call.
+  // %USERPROFILE%/Desktop when they exist, then every drive.
   static std::vector<Root> defaultRoots();
 
   void setRoots(std::vector<Root> value) {
@@ -72,4 +69,4 @@ private:
   std::string Error;
 };
 
-} // namespace services::filedialog
+} // namespace settingspage::files

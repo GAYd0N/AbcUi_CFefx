@@ -590,6 +590,27 @@ std::vector<RowView> SettingsModel::rows() const {
   return views;
 }
 
+int SettingsModel::rowCount() const {
+  return static_cast<int>(Rows_.size());
+}
+
+bool SettingsModel::rowViewAt(int index, RowView &out) const {
+  if (index < 0 || index >= static_cast<int>(Rows_.size()))
+    return false;
+  // The same projection rows() builds, for exactly one entry.
+  const RowRuntime &entry = Rows_[static_cast<size_t>(index)];
+  out.row = entry.row;
+  out.engineValue = entry.engineValue;
+  out.engineText = entry.engineText;
+  out.draftText = entry.draftText;
+  out.draftValue = entry.draftValue;
+  out.state = entry.state;
+  out.missing = entry.missing;
+  out.options = &entry.options;
+  out.optionLabels = &entry.optionLabels;
+  return true;
+}
+
 std::optional<RowView> SettingsModel::find(const char *cvar) const {
   // Convenience single-row lookup over the same projection. Returned by
   // value: two finds must not alias one shared scratch object.

@@ -33,8 +33,15 @@ uint64_t ClickBinding = 0;
 uint64_t MousedownBinding = 0;
 // Focus/blur do not bubble (RmlUi event spec): every data-label element
 // carries its own pair so the status line follows whichever control holds
-// focus.
-std::vector<uint64_t> FocusBindings;
+// focus. The owning element and event type ride the binding: removal must
+// target that same element and phase or the dispatcher keeps a dangling
+// pointer (the quit shutdown walked it in DetachAllEvents).
+struct FocusBinding {
+  AbcUiElement *element;
+  const char *type;
+  uint64_t id;
+};
+std::vector<FocusBinding> FocusBindings;
 AbcUiSubscription StateSubscription = 0;
 AbcUiSubscription PaintSubscription = 0;
 // Model generation of the last friends projection (a steady list writes no
@@ -129,10 +136,13 @@ void attachFocusBindings(AbcUiElement *nodeElement) {
   if (!nodeElement)
     return;
   if (!attributeOf(nodeElement, "data-label").empty()) {
-    FocusBindings.push_back(Api->ui->elementAddListener(
-        nodeElement, "focus", &onFocusEvent, nullptr));
-    FocusBindings.push_back(Api->ui->elementAddListener(
-        nodeElement, "blur", &onFocusEvent, nullptr));
+    FocusBindings.push_back(
+        {nodeElement, "focus",
+         Api->ui->elementAddListener(nodeElement, "focus", &onFocusEvent,
+                                     nullptr)});
+    FocusBindings.push_back({nodeElement, "blur",
+                             Api->ui->elementAddListener(
+                                 nodeElement, "blur", &onFocusEvent, nullptr)});
   }
   const int32_t count = Api->ui->elementChildCount(nodeElement);
   for (int32_t index = 0; index < count; ++index)
@@ -458,8 +468,16 @@ void present(int32_t section, bool focusDefault) {
     // First presentation builds the entry buttons (the definition is the
     // framework's menuconfig section).
     buildEntries();
-    if (BoundRoot)
+    if (BoundRoot) {
       attachFocusBindings(BoundRoot);
+      // Delegated activation: buttons bubble their click to the root, and the
+      // handler walks up to the data-action carrier. Right clicks open the
+      // friends context menu through the same delegated mousedown.
+      ClickBinding =
+          Api->ui->elementAddListener(BoundRoot, "click", &onClick, nullptr);
+      MousedownBinding = Api->ui->elementAddListener(BoundRoot, "mousedown",
+                                                     &onMousedown, nullptr);
+    }
     Built = true;
   }
   showSection(section, focusDefault);
@@ -526,13 +544,9 @@ void onDocumentClose(void *) {
     Api->ui->elementRemoveListener(BoundRoot, "mousedown", MousedownBinding);
     MousedownBinding = 0;
   }
-  for (uint64_t binding : FocusBindings) {
-    if (binding && BoundRoot)
-      Api->ui->elementRemoveListener(BoundRoot, "focus", binding);
-  }
-  for (uint64_t binding : FocusBindings) {
-    if (binding && BoundRoot)
-      Api->ui->elementRemoveListener(BoundRoot, "blur", binding);
+  for (const FocusBinding &binding : FocusBindings) {
+    if (binding.id && binding.element)
+      Api->ui->elementRemoveListener(binding.element, binding.type, binding.id);
   }
   FocusBindings.clear();
   BoundRoot = nullptr;

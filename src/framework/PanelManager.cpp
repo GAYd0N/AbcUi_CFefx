@@ -23,8 +23,8 @@ void PanelManager::initAll(Rml::Context *context) {
   if (!context)
     return;
   if (Panels().empty()) {
-    abc::ConsoleWarn("[AbcUi] no HUD panels installed; "
-                     "modules::installHudPanels() was not called\n");
+    abc::ConsoleWarn("[AbcUi] no HUD panels installed; the HUD_Init panel "
+                     "install was not called\n");
     return;
   }
   for (auto &panel : Panels()) {

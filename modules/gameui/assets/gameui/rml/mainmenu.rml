@@ -2,7 +2,7 @@
 <head>
 	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
 	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/gameui/rcss/mainmenu.rcss"/>
+	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
 </head>
 <!-- The menu home (UI overhaul WS4). The blurred backdrop is inserted by
      framework::menubackdrop before this document's onDocumentReady runs, so

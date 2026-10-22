@@ -411,7 +411,7 @@ bool tableComplete(const AbcUiModuleApi &api) {
          api.documents && api.menu && api.votemenu && api.playerlist &&
          api.commandmenu && api.menuconfig && api.social && api.inventory &&
          api.creategame && api.consolepage && api.serverbrowser &&
-         api.connection;
+         api.connection && api.settings;
 }
 
 void verifySections() {
@@ -440,7 +440,8 @@ void verifySections() {
       allMembersSet(*CreateGameApi::get()) &&
       allMembersSet(*ConsolePageApi::get()) &&
       allMembersSet(*ServerBrowserApi::get()) &&
-      allMembersSet(*ConnectionApi::get());
+      allMembersSet(*ConnectionApi::get()) &&
+      allMembersSet(*SettingsApi::get());
   if (!complete) {
     abc::ConsoleError("[AbcUi] module api table has null section members");
   }
@@ -480,6 +481,7 @@ const AbcUiModuleApi *get() {
       ConsolePageApi::get(),
       ServerBrowserApi::get(),
       ConnectionApi::get(),
+      SettingsApi::get(),
   };
   static const bool complete = tableComplete(kApi);
   if (!complete)

@@ -49,10 +49,9 @@ inline std::string escapeText(const std::string &text) {
 }
 
 // Attribute-value variant (data-* payloads carry server-derived text).
-inline std::string escapeAttribute(const std::string &text) {
-  return escapeAttribute(text.c_str());
-}
-
+// The const char* overload must be declared FIRST: the string form delegates
+// to it, and a later declaration would not be visible inside that body (the
+// call would resolve to the string overload itself and recurse forever).
 inline std::string escapeAttribute(const char *text) {
   const int needed = Api->ui->escapeRmlAttribute(text ? text : "", nullptr, 0);
   if (needed <= 0)
@@ -62,6 +61,10 @@ inline std::string escapeAttribute(const char *text) {
                               static_cast<uint32_t>(out.size()));
   out.resize(static_cast<size_t>(needed));
   return out;
+}
+
+inline std::string escapeAttribute(const std::string &text) {
+  return escapeAttribute(text.c_str());
 }
 
 inline std::string attributeOf(AbcUiElement *element, const char *name) {

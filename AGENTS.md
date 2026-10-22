@@ -51,7 +51,7 @@ These are deliberate, audited exceptions rather than unfinished cleanups:
 - HUD_Init/HUD_Shutdown repeat within one engine process (the client re-runs
   its HUD cycle on map init and the teardown path runs on the way out).
   Everything HUD_Shutdown tears down must be re-armed by H_HUD_Init: the
-  panel list (`installHudPanels` when `PanelManager` is empty) and module
+  panel list (the panel install when `PanelManager` is empty) and module
   documents (`onContextReady`). Cvars, commands and module registration stay
   process-scoped and are guarded by a one-shot latch; do not move them into
   the per-cycle path. Usermsg hooks are installed once and re-chained only by
@@ -81,20 +81,22 @@ These are deliberate, audited exceptions rather than unfinished cleanups:
 The plugin is a UI-free framework plus loadable UI modules (zip packages). The
 implemented rules the transition must keep:
 
-- AbcUi.dll ends up UI-free: RmlUi runtime, render bridge, input bridge, IME,
+- AbcUi.dll is UI-free: RmlUi runtime, render bridge, input bridge, IME,
   theme/localization, texture services (sprites/avatars/custom elements), the
   data layer (NetworkMessages / WeaponResource / HudState / PlayerResource /
-  PlayerTrace / TextFeed) and the module machinery. No HUD panel or menu page
-  ships inside the framework.
+  PlayerTrace / TextFeed) and the module machinery. No HUD panel, menu page,
+  stub page, quit overlay, panel catalog or page stylesheet ships inside the
+  framework.
 - UI features live in modules under `modules/<id>/`: `manifest.json` + `src/`
   + `assets/` + a CMake `add_library(... MODULE)` target. Migrated so far:
   flashlight, textmenu, vote, motd, weaponchoose, killfeed, textfeed, sidetext,
   health, ammo, hudeffects, crosshair, damage, itemhighlight, playerboard,
-  radar, scoreboard and chat; `abcui.gameui` has the menu shell, the
-  console, the server browser and the vote creation, player-list,
-  command-menu, inventory and create-game pages (the remaining menu pages
-  still live in the framework); `demo` is the minimal example.
-  modeltest/videotest stay development-only.
+  radar, scoreboard and chat; `abcui.gameui` has every replacement menu
+  page (the shell, the console, the server browser, the connection
+  surfaces, the vote creation, player-list, command-menu, inventory,
+  create-game and settings pages, plus the display-mode confirmation and the
+  quit confirmation); `demo` is the minimal example. modeltest/videotest stay
+  development-only.
 - The module ABI is pure C, versioned struct tables under `sdk/abcui/`
   (same pattern as `AbcCore_CreateInterface`). A module DLL exports exactly
   one entry, `AbcUiModule_Main(abiVersion, api, outDescriptor)`; everything
@@ -103,13 +105,14 @@ implemented rules the transition must keep:
   Sections: core, console, events, vfs, panels, documents, data, ui, commands,
   weapons, players, radar, shell, voice, score, input, menu, votemenu,
   playerlist, commandmenu, menuconfig, social, inventory, creategame,
-  consolepage, serverbrowser, connection. Adding a function
+  consolepage, serverbrowser, connection, settings. Adding a function
   means appending it to the section end (and its initializer in
   `ApiTable.cpp` / `ApiSections.cpp` / `ApiWeapons.cpp` / `ApiPlayers.cpp` /
   `ApiDocuments.cpp` / `ApiMenu.cpp` / `ApiVoteMenu.cpp` /
   `ApiPlayerList.cpp` / `ApiCommandMenu.cpp` / `ApiMenuConfig.cpp` /
   `ApiSocial.cpp` / `ApiInventory.cpp` / `ApiCreateGame.cpp` /
-  `ApiConsolePage.cpp` / `ApiServerBrowser.cpp` / `ApiConnection.cpp` -
+  `ApiConsolePage.cpp` / `ApiServerBrowser.cpp` / `ApiConnection.cpp` /
+  `ApiSettings.cpp` -
   a missing initializer is silently a null pointer; the table audit in
   `ApiTable::get` catches it at boot), and
   appending to snapshot structs means the writer must honor the caller's
@@ -133,9 +136,9 @@ implemented rules the transition must keep:
   skipped together with its dependents; the process keeps running. Modules
   must avoid static TLS (`__declspec(thread)`) and delayimp.
 - Module panel descriptors are kept for the whole process and every
-  `installHudPanels` cycle builds fresh wrappers: `PanelManager::shutdown`
-  destroys the panel list on every HUD_Shutdown, so taking the wrappers once
-  would lose every module panel after the first map change.
+  HUD_Init cycle builds fresh wrappers: `PanelManager::shutdown` destroys the
+  panel list on every HUD_Shutdown, so taking the wrappers once would lose
+  every module panel after the first map change.
 - Interactive pages are module-owned documents (`documents->create`), never
   framework pages: the framework loads them on every context cycle, forwards
   ready/show/hide/close, and keeps the menu layer's focus guard and hide-all
@@ -143,8 +146,8 @@ implemented rules the transition must keep:
   themselves from `menu.state` (transitions) and `menu.paint` (the per-frame
   presentation beat), and navigate through the `menu` section
   (`openPage`/`back`/`ensureUp`/`resume`) - never through a native GameUI
-  window. The page stack, phase machine and takeover stay framework-side
-  until the last page moves out.
+  window. The page stack, phase machine and takeover stay framework-side;
+  every page is a module document.
 - Data exchange is event-bus based (`src/modsys/EventBus.h`): string channels,
   each backed by priority buckets of `abc::CallbackList` (eventpp reused from
   AbcCore). Priority > 0 runs before the framework default (interception and
@@ -194,8 +197,10 @@ cmake --build --preset win32-debug    # Release: win32-release
 - C-style casts remain in the ABCEnchance-derived code; new code uses
   `static_cast` / `const_cast` / `reinterpret_cast`.
 - Interface structure is orchestrated through the GameUI composition root.
-  Page assets live under `assets/abc/abcui/`: `gameui/{rml,rcss,config,img,
-  scence}`, `hud/{rml,rcss,img,spr}`, plus the shared `lang`, `rcss` and `img`.
+  Page documents and their stylesheets live in the module packages; the
+  configuration JSON and the shared theme stay under `assets/abc/abcui/`:
+  `gameui/{rcss,config,img,scence}`, `hud/{rml,rcss,img,spr}`, plus the
+  shared `lang`, `rcss` and `img`.
 - RmlUi 6.3 RCSS constraints: `font-family` accepts a single family name (CJK
   falls back through the fallback face), and transition easing names use the
   `linear-in` family.

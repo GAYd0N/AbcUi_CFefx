@@ -44,7 +44,7 @@ void unloadAll();
 bool acceptPanel(const AbcUiPanelDesc &desc);
 
 // Panels registered during boot, in registration order. The descriptors are
-// kept (onLoad runs once per process); every installHudPanels cycle gets
+// kept (onLoad runs once per process); every HUD_Init install cycle gets
 // fresh wrappers over them, because HUD_Shutdown destroys the panel list.
 std::vector<std::unique_ptr<HudPanel>> takePanels();
 

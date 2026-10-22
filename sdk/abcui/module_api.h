@@ -149,7 +149,7 @@ typedef struct AbcUiVfsApi {
 // Registers a HUD panel: one Rml document fed by the framework frame pumps.
 // documentPath is a mod:// uri inside the module package ("mod://<id>/rml/
 // health.rml"). Registration is only legal from onLoad; the panel joins the
-// next installHudPanels pass (the same HUD_Init cycle).
+// next HUD_Init install pass (the same HUD_Init cycle).
 typedef struct AbcUiPanelDesc {
   uint32_t structSize;
   const char *name;         // unique panel name (debug lookup, cvar prefix)
@@ -454,6 +454,26 @@ typedef struct AbcUiUiApi {
   int32_t (*elementPseudoClassSet)(AbcUiElement *element, const char *name);
   // Writes a <progress> element's value (0..max).
   void (*elementProgressValue)(AbcUiElement *element, float value);
+  // The last child (DOM or non-DOM widget part) with this tag name; null
+  // when there is none. A range slider's thumb is a non-DOM child that
+  // WidgetSlider appends after the DOM ones, so it is found by tag, never by
+  // selector or child index.
+  AbcUiElement *(*elementFindTag)(AbcUiElement *element, const char *tag);
+  // Disabled state of a form control (<input>/<select>; a <button> stays a
+  // generic element and gates through a class instead).
+  void (*elementSetDisabled)(AbcUiElement *element, int32_t disabled);
+  // Writes the RCSS "rgb(r, g, b)" text of a player-palette hue (0..255, the
+  // engine's topcolor/bottomcolor domain: ColorUtil::playerHueColor then
+  // format).
+  void (*formatHueColor)(float value, char *out, uint32_t outSize);
+  // Drops an Rml-cached texture by source URI. A preview <img> whose src is
+  // about to change must retire the previous variant, or every palette it
+  // showed stays resident on the GPU.
+  void (*releaseTexture)(const char *source);
+  // Moves an existing element under another parent (the settings page's
+  // singleton widget blocks move between cards); 1 on success, 0 for an
+  // invalid handle or a cycle. The element keeps its attributes and events.
+  int32_t (*elementAppendChild)(AbcUiElement *parent, AbcUiElement *child);
 } AbcUiUiApi;
 
 // ------------------------------------------------------------- commands ----
@@ -749,6 +769,14 @@ typedef struct AbcUiVoiceApi {
            // when the menu lowers and honored
            // by the focus guard
 
+// Cross-document z-order tiers. A page shell uses 0; the display-mode
+// confirmation outranks every menu surface (it is the only way back from a
+// bad mode) and carries no menu flag so a menu hide cannot drop it.
+#define ABCUI_DOC_ZINDEX_CONFIRM 650
+// The quit confirmation sits below the display-mode confirmation but above
+// every page surface (the old framework overlay used the same tier).
+#define ABCUI_DOC_ZINDEX_QUIT_CONFIRM 600
+
 typedef struct AbcUiDocumentDesc {
   uint32_t structSize;
   const char *name; // unique document name (diagnostics, lookup)
@@ -869,6 +897,10 @@ typedef struct AbcUiMenuApi {
   // Toggles the direct-connect overlay (the shell's direct-connect entry,
   // when a definition declares it).
   void (*directConnect)(void);
+  // Resolves the quit confirmation overlay from its own buttons: 1 quits
+  // through the backend, 0 cancels. The controller pops the overlay and runs
+  // the confirmed quit exactly once.
+  void (*quitResolve)(int32_t confirmed);
 } AbcUiMenuApi;
 
 // ------------------------------------------------------------- votemenu ----
@@ -1488,6 +1520,326 @@ typedef struct AbcUiConnectionApi {
                             uint32_t errorSize);
 } AbcUiConnectionApi;
 
+// ------------------------------------------------------------ settings ----
+
+// The settings page's data and transactions. The four models (cvar rows, key
+// bindings, display modes, microphone hardware), the JSON page tree, the
+// model-favorite store and the spray maker stay framework-side; a page module
+// projects them and calls back through this section. Read-through rules:
+//
+//  - a row's draft is the ONLY value an edit may change; nothing here writes
+//    an engine value outside apply(), and a refused write keeps the draft;
+//  - kCommandToggle rows land kQueued after apply (the engine command buffer
+//    flushes between frames) - the page re-snapshots while hasQueued() until
+//    the state settles;
+//  - a key-binding capture session stays framework-side: beginCapture() asks
+//    for one physical edge, the framework owns the router token and feeds the
+//    model, and the page re-projects from the bind rows (capturing()/
+//    conflictPending());
+//  - the display-mode transaction stays framework-side too (apply() persists
+//    a recovery record, writes the changed commands and restarts), so the
+//    page reports videoApply() and follows videoFacts();
+//  - the spray maker (decode/encode/write + the preview texture upload) is a
+//    framework service: sprayMake() starts it and the page reads the stored
+//    answer back (the picker's directory state is page-side).
+//
+// Row/section text limits mirror the JSON parser's bounds.
+
+#define ABCUI_SETTINGS_ID_MAX 96
+#define ABCUI_SETTINGS_LABEL_MAX 256
+#define ABCUI_SETTINGS_CVAR_MAX 64
+#define ABCUI_SETTINGS_TEXT_MAX 256
+#define ABCUI_SETTINGS_KEY_MAX 64
+
+// The row's control kind (mirrors services::settings::SettingKind).
+#define ABCUI_SET_KIND_BOOL 0
+#define ABCUI_SET_KIND_FLOAT 1
+#define ABCUI_SET_KIND_ENUM 2
+#define ABCUI_SET_KIND_NEGATE 3
+#define ABCUI_SET_KIND_TEXT 4
+#define ABCUI_SET_KIND_STRING_ENUM 5
+#define ABCUI_SET_KIND_COMMAND_TOGGLE 6
+
+// The row's lifecycle (mirrors services::settings::RowState).
+#define ABCUI_SET_STATE_CLEAN 0
+#define ABCUI_SET_STATE_DIRTY 1
+#define ABCUI_SET_STATE_INVALID 2
+#define ABCUI_SET_STATE_CONFLICT 3
+#define ABCUI_SET_STATE_QUEUED 4
+#define ABCUI_SET_STATE_APPLY_FAILED 5
+#define ABCUI_SET_STATE_MISSING 6
+
+// Row facts (AbcUiSettingRow::flags).
+#define ABCUI_SET_ROW_BOUNDED 0x1      // a real [min, max] domain
+#define ABCUI_SET_ROW_READ_ONLY 0x2    // shown, never editable
+#define ABCUI_SET_ROW_HUE_SWATCH 0x4   // the value is a player-palette hue
+#define ABCUI_SET_ROW_FILE_CHOICES 0x8 // scanned values are file paths
+#define ABCUI_SET_ROW_HAS_DEFAULT 0x10 // the default is verified
+#define ABCUI_SET_ROW_REQUIRE_ENABLED 0x20
+#define ABCUI_SET_ROW_MISSING 0x40  // the cvar is not registered
+#define ABCUI_SET_ROW_EDITABLE 0x80 // editable(cvar) right now
+
+// One projected row. The static LIST options (optionCount/optionAt) and the
+// scanned string choices (choiceCount/choiceAt) are read through the section
+// by cvar; this struct carries only the row's own facts and its current
+// draft/engine values.
+typedef struct AbcUiSettingRow {
+  uint32_t structSize;
+  char cvar[ABCUI_SETTINGS_CVAR_MAX];
+  int32_t kind;        // ABCUI_SET_KIND_*
+  int32_t state;       // ABCUI_SET_STATE_*
+  int32_t flags;       // ABCUI_SET_ROW_*
+  int32_t optionCount; // static enum options
+  int32_t choiceCount; // scanned string choices
+  float minValue;
+  float maxValue;
+  float step;
+  float defaultValue;
+  float engineValue;
+  float draftValue; // meaningful when state != ABCUI_SET_STATE_INVALID
+  char labelToken[ABCUI_SETTINGS_LABEL_MAX]; // "#Settings_*" or literal
+  char section[ABCUI_SETTINGS_ID_MAX];       // the row's section id
+  char stateName[ABCUI_SETTINGS_ID_MAX];     // kCommandToggle state / scan
+  char requireCvar[ABCUI_SETTINGS_ID_MAX];   // dependency cvar (may be empty)
+  char engineText[ABCUI_SETTINGS_TEXT_MAX];  // kText/kStringEnum engine value
+  char draftText[ABCUI_SETTINGS_TEXT_MAX];   // committed field text
+} AbcUiSettingRow;
+
+// One page of the JSON page tree (settings/*.json).
+typedef struct AbcUiSettingsPage {
+  uint32_t structSize;
+  int32_t sectionCount;
+  int32_t cvarCount;
+  char id[ABCUI_SETTINGS_ID_MAX];
+  char label[ABCUI_SETTINGS_LABEL_MAX];
+  char description[ABCUI_SETTINGS_LABEL_MAX];
+} AbcUiSettingsPage;
+
+// One declared section of a page: the card the rows group into, plus the
+// widget components it declares.
+typedef struct AbcUiSettingsSection {
+  uint32_t structSize;
+  int32_t componentCount;
+  char id[ABCUI_SETTINGS_ID_MAX];
+  char label[ABCUI_SETTINGS_LABEL_MAX];
+  char layout[ABCUI_SETTINGS_ID_MAX]; // "two-up" or empty
+} AbcUiSettingsSection;
+
+// The applied-row tally apply() reports (the page composes its status line).
+typedef struct AbcUiSettingsApply {
+  uint32_t structSize;
+  int32_t applied;
+  int32_t queued; // engine command buffer (kCommandToggle rows)
+  int32_t failed;
+} AbcUiSettingsApply;
+
+// The key-binding section's per-action lifecycle (mirrors
+// services::settings::BindRowState).
+#define ABCUI_BIND_STATE_CLEAN 0
+#define ABCUI_BIND_STATE_DIRTY 1
+#define ABCUI_BIND_STATE_QUEUED 2
+#define ABCUI_BIND_STATE_APPLY_FAILED 3
+#define ABCUI_BIND_STATE_UNAVAILABLE 4
+
+// One kb_act.lst row. Header rows carry no command; the label is the raw
+// file text ("#Valve_*" or a literal - resolve it through ui->translate or
+// bindLookupLabel). The draft key names are read with bindKeyAt().
+typedef struct AbcUiBindAction {
+  uint32_t structSize;
+  int32_t index; // action index (the DOM anchor and every write target)
+  int32_t header;
+  int32_t state;    // ABCUI_BIND_STATE_*
+  int32_t keyCount; // draft keys (bindKeyAt)
+  char label[ABCUI_SETTINGS_LABEL_MAX];
+  char command[ABCUI_SETTINGS_TEXT_MAX];
+} AbcUiBindAction;
+
+// The display-mode facts (mirrors services::settings::VideoModeModel).
+typedef struct AbcUiVideoFacts {
+  uint32_t structSize;
+  int32_t available;        // the engine queries are reachable
+  int32_t actualKnown;      // the actual mode could be read
+  int32_t awaitingConfirm;  // an unconfirmed switch owns the screen
+  int32_t hasStaged;        // a staged request waits for videoApply
+  int32_t remainingSeconds; // confirmation window countdown
+  int32_t modeCount;        // enumerated modes (videoModeAt)
+  int32_t actualWidth;
+  int32_t actualHeight;
+  int32_t actualWindowed;
+  int32_t stagedWidth; // the staged target (staged over actual)
+  int32_t stagedHeight;
+  int32_t stagedWindowed;
+  // While awaitingConfirm: how the actual mode compares with the requested
+  // one (ABCUI_VIDEO_CONFIRM_*) and the requested mode the recovery record
+  // holds.
+  int32_t confirmKind;
+  int32_t requestedWidth;
+  int32_t requestedHeight;
+  int32_t requestedWindowed;
+} AbcUiVideoFacts;
+
+#define ABCUI_VIDEO_CONFIRM_APPLIED 0     // actual == requested
+#define ABCUI_VIDEO_CONFIRM_NOT_APPLIED 1 // the switch never took
+#define ABCUI_VIDEO_CONFIRM_UNKNOWN 2     // unreadable / matches neither
+
+// The microphone hardware facts (mirrors services::settings::VoiceModel).
+// Volume is the engine scale 0..1 (the page shows x100); speakingLevel is
+// the engine's own GetSpeakingVolume answer, never an animation.
+typedef struct AbcUiVoiceFacts {
+  uint32_t structSize;
+  int32_t available;
+  int32_t testing;
+  int32_t micBoost;
+  int32_t micBoostDraft;
+  int32_t micBoostDirty;
+  int32_t micDirty;
+  float micVolume;
+  float micVolumeDraft;
+  float speakingLevel;
+} AbcUiVoiceFacts;
+
+typedef struct AbcUiSettingsApi {
+  uint32_t structSize;
+  // Model generation: moves whenever anything the page projects changed
+  // (drafts, states, capture, video stage, voice, favorites, spray answer).
+  // The page re-projects only when it moved.
+  uint32_t (*revision)(void);
+
+  // --- cvar rows -------------------------------------------------------
+  int32_t (*rowCount)(void);
+  // Copies row `index` (declaration order); 0 when out of range.
+  int32_t (*rowAt)(int32_t index, AbcUiSettingRow *out);
+  // Copies the row for one cvar; 0 when the table has no such row.
+  int32_t (*rowFind)(const char *cvar, AbcUiSettingRow *out);
+  // The row's static LIST option; 0 when out of range. `label` is the raw
+  // table label ("#Valve_*" or a literal).
+  int32_t (*optionAt)(const char *cvar, int32_t index, float *value,
+                      char *label, uint32_t labelSize);
+  // The row's scanned string choice (a directory / file scan); 0 when out of
+  // range. `label` may be empty (the page then derives its own).
+  int32_t (*choiceAt)(const char *cvar, int32_t index, char *value,
+                      uint32_t valueSize, char *label, uint32_t labelSize);
+
+  // --- drafts and transactions ----------------------------------------
+  // Re-reads engine truth (cvar rows plus the bind, display and microphone
+  // models) - called once per page opening.
+  void (*snapshot)(void);
+  // The cvar rows only (the kCommandToggle settle beat; the page re-snapshots
+  // while hasQueued() until the state lands).
+  void (*snapshotRows)(void);
+  int32_t (*setDraftText)(const char *cvar, const char *text);
+  int32_t (*setDraftBool)(const char *cvar, int32_t value);
+  int32_t (*setDraftEnum)(const char *cvar, float value);
+  int32_t (*setDraftString)(const char *cvar, const char *text);
+  // Drops a row's pending edit and takes the engine value (conflict).
+  int32_t (*adopt)(const char *cvar);
+  // Drafts := verified defaults. The confirmation is the page's job; null
+  // cvars/count 0 resets the whole table.
+  void (*resetDefaults)(const char *const *cvars, int32_t count);
+  // Discards every draft (provably writes nothing).
+  void (*cancel)(void);
+  int32_t (*dirty)(void);
+  int32_t (*hasConflicts)(void);
+  int32_t (*editable)(const char *cvar);
+  // A command-channel row is still settling (re-snapshot while nonzero).
+  int32_t (*hasQueued)(void);
+  // Writes every dirty row over the injected seams and reads back. Fills the
+  // tally; null is allowed.
+  void (*apply)(AbcUiSettingsApply *out);
+  // The same transaction for exactly one row (the model picker commits its
+  // selection immediately instead of waiting for Apply); 1 when a row was
+  // written, 0 when the cvar is unknown, clean or not writable right now.
+  int32_t (*applyOne)(const char *cvar);
+
+  // --- page tree (settings/*.json) -------------------------------------
+  int32_t (*pageCount)(void);
+  int32_t (*pageAt)(int32_t index, AbcUiSettingsPage *out);
+  // One page cvar (the reset scope and the row filter).
+  int32_t (*pageCvarAt)(int32_t page, int32_t index, char *out,
+                        uint32_t outSize);
+  int32_t (*sectionAt)(int32_t page, int32_t index, AbcUiSettingsSection *out);
+  int32_t (*sectionComponentAt)(int32_t page, int32_t section, int32_t index,
+                                char *out, uint32_t outSize);
+  // The page declares the component (directly or on one of its sections).
+  int32_t (*pageHasComponent)(int32_t page, const char *component);
+
+  // --- key bindings ----------------------------------------------------
+  int32_t (*bindReadsAvailable)(void);
+  int32_t (*bindRowCount)(void);
+  int32_t (*bindRowAt)(int32_t index, AbcUiBindAction *out);
+  // Draft key `index` of the action row; 0 out of range.
+  int32_t (*bindKeyAt)(int32_t actionIndex, int32_t index, char *out,
+                       uint32_t outSize);
+  // The kb_def/valve token table ("Valve_X" -> display text); 0 unknown.
+  int32_t (*bindLookupLabel)(const char *token, char *out, uint32_t outSize);
+  // The capturing row, -1 when no session is live.
+  int32_t (*bindCapturing)(void);
+  // Starts one capture session (the framework takes the input token and
+  // feeds the next physical edge to the model). 0 when refused.
+  int32_t (*bindBeginCapture)(int32_t actionIndex);
+  int32_t (*bindConflictPending)(void);
+  int32_t (*bindConflictKeyName)(char *out, uint32_t outSize);
+  int32_t (*bindConflictOtherLabel)(char *out, uint32_t outSize);
+  void (*bindResolveConflict)(int32_t accept);
+  void (*bindClear)(int32_t actionIndex);
+  void (*bindRemove)(int32_t actionIndex, const char *keyName);
+  void (*bindResetDefaults)(void);
+  int32_t (*bindDirty)(void);
+  int32_t (*bindHasQueued)(void);
+  void (*bindApply)(void);
+  // Re-reads engine truth: 1 when any row state changed.
+  int32_t (*bindVerify)(void);
+
+  // --- display modes ---------------------------------------------------
+  // 0 when the model has no data at all.
+  int32_t (*videoFacts)(AbcUiVideoFacts *out);
+  int32_t (*videoModeAt)(int32_t index, int32_t *width, int32_t *height);
+  int32_t (*videoStageResolution)(int32_t width, int32_t height);
+  int32_t (*videoStageWindowed)(int32_t windowed);
+  void (*videoCancelStage)(void);
+  // The framework transaction (persist record, changed commands, restart);
+  // 1 when the batch was issued.
+  int32_t (*videoApply)(void);
+  // The confirmation window's two outcomes (inert unless a confirmation is
+  // outstanding and the kind allows it): keep clears the record, revert
+  // restores the previous mode.
+  int32_t (*videoKeep)(void);
+  int32_t (*videoRevert)(void);
+  // "1920 x 1080 windowed" (the model's own one-line description).
+  int32_t (*videoDescribe)(int32_t width, int32_t height, int32_t windowed,
+                           char *out, uint32_t outSize);
+
+  // --- microphone hardware ---------------------------------------------
+  int32_t (*voiceFacts)(AbcUiVoiceFacts *out);
+  void (*voiceSetVolumeDraft)(float value);
+  void (*voiceSetBoostDraft)(int32_t on);
+  void (*voiceStartTest)(void);
+  void (*voiceStopTest)(void);
+  // Applies the pending drafts; 1 applied, 0 a device write failed,
+  // -1 nothing to apply (unavailable or clean).
+  int32_t (*voiceApply)(void);
+
+  // --- player-model favorites ------------------------------------------
+  int32_t (*favoritesAvailable)(void); // the store accepts writes
+  uint32_t (*favoritesGeneration)(void);
+  int32_t (*favoriteCount)(void);
+  int32_t (*favoriteAt)(int32_t index, char *out, uint32_t outSize);
+  int32_t (*favoriteContains)(const char *model);
+  void (*favoriteSet)(const char *model, int32_t favorite);
+
+  // --- spray maker ------------------------------------------------------
+  // Starts the maker for one absolute image path (the framework decodes,
+  // encodes the WAD3 spray, writes it and uploads the preview). 1 when the
+  // request was accepted.
+  int32_t (*sprayMake)(const char *path);
+  // The last outcome line (localization token or text; empty before the
+  // first request).
+  int32_t (*sprayStatus)(char *out, uint32_t outSize);
+  // The Rml source of the preview texture of the spray just made (empty
+  // clears the preview).
+  int32_t (*sprayPreviewUri)(char *out, uint32_t outSize);
+} AbcUiSettingsApi;
+
 // ------------------------------------------------- module descriptor ------
 
 typedef struct AbcUiModuleDescriptor {
@@ -1545,6 +1897,7 @@ typedef struct AbcUiModuleApi {
   const AbcUiConsolePageApi *consolepage;
   const AbcUiServerBrowserApi *serverbrowser;
   const AbcUiConnectionApi *connection;
+  const AbcUiSettingsApi *settings;
 } AbcUiModuleApi;
 
 #ifdef __cplusplus

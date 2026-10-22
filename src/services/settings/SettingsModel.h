@@ -255,6 +255,11 @@ public:
   std::optional<ApplyResult> applyOne(const char *cvar);
 
   std::vector<RowView> rows() const;
+  // One row's projection by declaration index (the page iterates the table
+  // in order without materializing the whole vector); false when out of
+  // range.
+  int rowCount() const;
+  bool rowViewAt(int index, RowView &out) const;
   std::optional<RowView> find(const char *cvar) const;
 
   // True while anything would change (or failed to change) on Apply:

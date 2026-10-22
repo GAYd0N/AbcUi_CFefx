@@ -104,4 +104,14 @@ namespace ConnectionApi {
 const AbcUiConnectionApi *get();
 } // namespace ConnectionApi
 
+namespace SettingsApi {
+const AbcUiSettingsApi *get();
+// framework-internal (the menu owner's routed ESC): dispatches the settings
+// page's one-layer ESC guard and reports whether the page consumed the press.
+bool consumeEscape();
+// framework-internal: a change the section does not see through its own calls
+// (the captured key edge, a display-mode transition) moved the page model.
+void bumpRevision();
+} // namespace SettingsApi
+
 } // namespace framework

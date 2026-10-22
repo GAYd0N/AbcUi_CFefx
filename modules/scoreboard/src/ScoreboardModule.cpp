@@ -793,8 +793,6 @@ void panelReset(void *) {
   closeContextMenu();
 }
 
-int sectionsCount();
-
 void panelOnData(void *, double frameTime) {
   ClientTimeNow += frameTime;
 
@@ -875,36 +873,26 @@ void panelOnData(void *, double frameTime) {
     rebuildTable();
   }
 
-  // Vertical centering (old Resize): the box hugs its content height.
+  // Vertical centering: measure the laid-out box. The table carries a
+  // min-height (300dp) and the header/padding add to it, so deriving the
+  // content height from (rows + 1) * rowHeight left the box low and pushed
+  // its bottom off screen for small tables. The rebuild above lands on the
+  // layout in the same beat; a height change re-centers on the next one.
   if (AbcUiElement *box = query("box")) {
-    // RmlUi can report the content height only through the box itself; the
-    // module re-centers on row-height changes instead of every frame (the
-    // built-in panel's change gate measured the same number).
-    if (height != CenteredHeight) {
-      CenteredHeight = height;
-      const int rows = playerCount + static_cast<int>(sectionsCount());
-      const float contentHeight = static_cast<float>(rows + 1) * height;
+    float boxWidth = 0.0f;
+    float boxHeight = 0.0f;
+    if (Api->ui->elementOffsetSize(box, &boxWidth, &boxHeight) &&
+        boxHeight > 0.0f && boxHeight != CenteredHeight) {
+      CenteredHeight = boxHeight;
       if (screenHeight > 0) {
         const float top = std::max(
-            0.0f, (static_cast<float>(screenHeight) - contentHeight) * 0.5f);
+            0.0f, (static_cast<float>(screenHeight) - boxHeight) * 0.5f);
         char value[32];
         std::snprintf(value, sizeof(value), "%gpx", static_cast<double>(top));
         setProperty(box, "top", value);
       }
     }
   }
-}
-
-int sectionsCount() {
-  std::map<int, int> teams;
-  for (int index = 1; index <= ABCUI_MAX_PLAYERS; index++) {
-    AbcUiPlayerInfo info{};
-    info.structSize = sizeof(info);
-    if (Api->players->get(index, &info) && info.valid)
-      teams[info.team]++;
-  }
-  return static_cast<int>(teams.size()) > 1 ? static_cast<int>(teams.size())
-                                            : 0;
 }
 
 // ---- lifecycle ----

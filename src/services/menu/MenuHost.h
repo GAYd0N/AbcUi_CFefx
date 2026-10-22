@@ -47,6 +47,9 @@ struct Host {
   std::function<int32_t()> ensureUp;
   std::function<int32_t()> resume;
   std::function<void()> quit;
+  // Resolve the quit confirmation overlay (1 quit / 0 cancel); the page
+  // module's buttons call this through the sdk menu section.
+  std::function<void(int32_t)> quitResolve;
   std::function<void()> disconnect;
   std::function<void()> toggleConsole;
   // Toggles the direct-connect overlay (the shell's entry when declared).

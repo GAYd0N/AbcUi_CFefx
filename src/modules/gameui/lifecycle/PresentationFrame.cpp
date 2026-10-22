@@ -4,30 +4,13 @@
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Debugger.h>
 #include "modules/gameui/GameUiModule.h"
-#include "modules/gameui/GameUiPages.h"
 #include "modsys/ModuleDocuments.h"
 namespace gameui {
 void GameUiModule::pumpVisibleWork() {
-
-  // T11 bind verification beat: pfnClientCmd lands in the engine
-  // command buffer, which flushes between frames. kQueued rows resolve
-  // on the first tick after Apply; a change re-projects the page once.
-  if (SettingsView->presented() && Settings && BindModel.hasQueued()) {
-    if (BindModel.verify())
-      Settings->render();
-  }
-  // T13: the same beat covers the cvar model's kCommandToggle rows
-  // (+mlook/-mlook settle against IsKeyDown) and the mic-test meter
-  // (the level readout is the GetSpeakingVolume truth, one render per
-  // frame while the session is up - not an animation).
-  if (SettingsView->presented() && Settings &&
-      (SettingsModel.hasQueued() || VoiceModel.testing())) {
-    if (SettingsModel.hasQueued())
-      SettingsModel.snapshot();
-    Settings->renderVoiceSection();
-    if (SettingsModel.hasQueued())
-      Settings->render();
-  }
+  // The settings page's model beats (bind verification, the kCommandToggle
+  // settle, the mic-test meter) run page-side from the sdk settings section
+  // on the same paint beat, so the composition root no longer reaches into
+  // the page.
   // Per-frame focus guard (T09 step 5): while the menu is presented,
   // the context focus must stay inside one of the menu documents.
   // Foreign holders exist (the Rml debug hook document grabs the focus
@@ -56,47 +39,20 @@ void GameUiModule::pumpVisibleWork() {
        state.overlays.topIs(MenuOverlay::kDirectConnect));
   if (focus && !inputDialogUp) {
     Rml::ElementDocument *owner = focus->GetOwnerDocument();
-    // Only a VISIBLE menu document holds legitimate focus - a hidden
-    // one (stub/overlay just dismissed) is exactly the stale state
-    // this guard exists to repair.
+    // Only a VISIBLE module document holds legitimate focus - a hidden
+    // one (an overlay just dismissed) is exactly the stale state this
+    // guard exists to repair.
     if (owner && owner->IsVisible() &&
-        (framework::module_documents::ownsVisible(owner) ||
-         owner == (SubStub ? SubStub->document() : nullptr) ||
-         owner == (Settings ? Settings->document() : nullptr) ||
-         owner == (ConfirmQuit ? ConfirmQuit->document() : nullptr) ||
-         owner == (VideoConfirm ? VideoConfirm->document() : nullptr)))
+        framework::module_documents::ownsVisible(owner))
       return;
   }
-  // T12: the display-mode confirmation outranks every other surface -
-  // it holds the safe default focus while it is up.
-  if (Video->confirmPresented() && VideoConfirm) {
-    VideoConfirm->refocusDefault();
+  // T12: the display-mode confirmation outranks every other surface - it is
+  // a visible page module document that owns its own focus, so the guard
+  // never steals it while the confirmation is up.
+  if (Video->confirmPresented())
     return;
-  }
-  // T14 surfaces, top-most first (the same order the sync shows them).
-  if (state.overlays.contains(MenuOverlay::kConfirmQuit) && ConfirmQuit)
-    ConfirmQuit->refocusDefault();
-  else if (state.overlays.contains(MenuOverlay::kDirectConnect) ||
-           state.overlays.contains(MenuOverlay::kPassword) ||
-           state.overlays.contains(MenuOverlay::kConnectionError)) {
-    // The connection dialogs are module documents: each owns its field
-    // focus (the guard leaves a visible module document alone above).
-  } else if (state.overlays.contains(MenuOverlay::kConsole)) {
-    // The console page is a module document: it owns its editor focus.
-  } else if (!state.pages.empty()) {
-    if (state.pages.top() == MenuPage::kMain ||
-        state.pages.top() == MenuPage::kPause) {
-      // The menu home is a module document: it owns its entry focus (the
-      // guard leaves a visible module document alone above).
-    } else if (state.pages.top() == MenuPage::kSettings && Settings) {
-      Settings->refocusDefault();
-    } else if (state.pages.top() == MenuPage::kServers) {
-      // The browser page is a module document: it owns its focus.
-    } else if (state.pages.top() == MenuPage::kLoading) {
-      // The loading page is a module document: it owns its Cancel focus.
-    } else if (SubStub) {
-      SubStub->refocusDefault();
-    }
-  }
+  // Every surface is a module document now, and each one restores its own
+  // safe default when its layer closes (the settings/bind/quit paths already
+  // do); the framework only guards against a hidden owner keeping focus.
 }
 } // namespace gameui

@@ -191,6 +191,14 @@ typedef struct AbcUiVguiMenuEvent {
 // the HLSDK numpad block (K_KP_HOME 160..K_KP_PLUS 174).
 #define ABCUI_CHANNEL_MENU_COMMAND_KEY "menu.commandkey"
 
+// settings.escape - one ESC press the menu layer routed while the settings
+// page is on top. Veto channel: the page returns nonzero when it consumed
+// the press on one of its own layers (the unsaved-changes prompt, the spray
+// picker, the model picker's menu) and the menu owner then re-syncs instead
+// of popping the page. Payload is AbcUiKeyEvent (down 1, keynum
+// ABCUI_KEY_ESCAPE).
+#define ABCUI_CHANNEL_SETTINGS_ESCAPE "settings.escape"
+
 // input.key - one HUD key event. Veto channel: a sink returning nonzero
 // consumes the press so the engine binding chain never sees it (the vote
 // keys answer the vote instead of running their binding).

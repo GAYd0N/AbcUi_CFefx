@@ -8,6 +8,7 @@
 #include <new>
 #include <string>
 
+#include <RmlUi/Core/Core.h>
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementUtilities.h>
 #include <RmlUi/Core/Elements/ElementFormControl.h>
@@ -332,6 +333,10 @@ struct ModuleElementListener final : Rml::EventListener {
   AbcUiElementListener callback = nullptr;
   void *userdata = nullptr;
   uint64_t id = 0;
+  // Registered in the capture phase? The element's dispatcher keys entries by
+  // (event id, phase), so removal must use the same phase or it silently
+  // misses and leaves a dangling pointer behind.
+  bool capture = false;
 
   void ProcessEvent(Rml::Event &event) override {
     if (!callback)
@@ -376,6 +381,7 @@ uint64_t apiElementAddListener(AbcUiElement *element, const char *type,
   entry->callback = listener;
   entry->userdata = userdata;
   entry->id = id;
+  entry->capture = false;
   target->AddEventListener(type, entry, false);
   elementListeners()[id] = entry;
   return id;
@@ -394,6 +400,7 @@ uint64_t apiElementAddListenerCapture(AbcUiElement *element, const char *type,
   entry->callback = listener;
   entry->userdata = userdata;
   entry->id = id;
+  entry->capture = true;
   target->AddEventListener(type, entry, true);
   elementListeners()[id] = entry;
   return id;
@@ -408,7 +415,7 @@ void apiElementRemoveListener(AbcUiElement *element, const char *type,
   elementListeners().erase(itor);
   if (Rml::Element *target = elementOf(element)) {
     if (type && *type)
-      target->RemoveEventListener(type, entry, false);
+      target->RemoveEventListener(type, entry, entry->capture);
   }
   delete entry;
 }
@@ -753,6 +760,66 @@ int apiElementInnerRml(AbcUiElement *element, char *out, uint32_t outSize) {
   return static_cast<int>(inner.size());
 }
 
+AbcUiElement *apiElementFindTag(AbcUiElement *element, const char *tag) {
+  Rml::Element *target = elementOf(element);
+  if (!target || !tag || !*tag)
+    return nullptr;
+  // Widget parts (a range slider's thumb) are non-DOM children appended
+  // after the DOM ones, so the search must include them.
+  AbcUiElement *found = nullptr;
+  const int count = target->GetNumChildren(true);
+  for (int index = 0; index < count; ++index) {
+    Rml::Element *child = target->GetChild(index);
+    if (child && child->GetTagName() == tag)
+      found = reinterpret_cast<AbcUiElement *>(child);
+  }
+  return found;
+}
+
+void apiElementSetDisabled(AbcUiElement *element, int32_t disabled) {
+  Rml::Element *target = elementOf(element);
+  auto *control =
+      target ? rmlui_dynamic_cast<Rml::ElementFormControl *>(target) : nullptr;
+  if (control)
+    control->SetDisabled(disabled != 0);
+}
+
+void apiFormatHueColor(float value, char *out, uint32_t outSize) {
+  if (!out || outSize == 0)
+    return;
+  float rgb[3];
+  ColorUtil::playerHueColor(value, rgb);
+  copyOut(ColorUtil::format(rgb), out, outSize);
+}
+
+void apiReleaseTexture(const char *source) {
+  if (source && *source)
+    Rml::ReleaseTexture(source);
+}
+
+int32_t apiElementAppendChild(AbcUiElement *parent, AbcUiElement *child) {
+  Rml::Element *target = elementOf(parent);
+  Rml::Element *node = elementOf(child);
+  if (!target || !node || target == node)
+    return 0;
+  // Never let an element move under its own subtree.
+  for (Rml::Element *ancestor = target; ancestor;
+       ancestor = ancestor->GetParentNode()) {
+    if (ancestor == node)
+      return 0;
+  }
+  Rml::Element *previous = node->GetParentNode();
+  if (!previous)
+    return 0;
+  if (previous == target)
+    return 1;
+  Rml::ElementPtr owned = previous->RemoveChild(node);
+  if (!owned)
+    return 0;
+  target->AppendChild(std::move(owned));
+  return 1;
+}
+
 const AbcUiUiApi kUiApi = {
     sizeof(AbcUiUiApi),
     apiPanelDocument,
@@ -817,6 +884,11 @@ const AbcUiUiApi kUiApi = {
     apiDocumentScale,
     apiElementPseudoClassSet,
     apiElementProgressValue,
+    apiElementFindTag,
+    apiElementSetDisabled,
+    apiFormatHueColor,
+    apiReleaseTexture,
+    apiElementAppendChild,
 };
 
 } // namespace

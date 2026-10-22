@@ -1,14 +1,10 @@
 // Extracted from GameUiModule.cpp (UTF-8). Responsibility: lifecycle/Frame.
 #include "modules/gameui/GameUiModule.h"
-#include "modules/gameui/GameUiPages.h"
 #include <abc/CvarCmd.h>
 #include "modules/gameui/engine/VideoBindings.h"
 namespace gameui {
 using namespace engine;
 void GameUiModule::pumpBackgroundWork() {
-  // T21: degraded-page retry requests first (a click marks, this beat
-  // acts); cheap when nothing is degraded.
-  serviceEmergencyPages();
   // T14: the engine's loading stream is drained first and independently
   // of menu presentation - the controller transitions (attempt start,
   // loading, success/failure/password) must not wait for Rml readiness,
@@ -36,7 +32,7 @@ void GameUiModule::pumpBackgroundWork() {
   }
   // The queued confirmation raise never shares a frame with a restart
   // drain (see the DeferredVideoConfirmRaise note): one frame apart.
-  if (!restartDrained && DeferredVideoConfirmRaise && Context && VideoConfirm) {
+  if (!restartDrained && DeferredVideoConfirmRaise && Context) {
     DeferredVideoConfirmRaise = false;
     Video->raiseConfirmation();
   }
@@ -49,8 +45,6 @@ void GameUiModule::pumpBackgroundWork() {
     Video->tickTimeout();
     if (reverted || !VideoModel.awaitingConfirm())
       Video->syncConfirmPage();
-    else if (VideoConfirm)
-      VideoConfirm->render();
   }
 }
 } // namespace gameui

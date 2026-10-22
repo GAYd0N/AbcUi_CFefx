@@ -14,7 +14,7 @@
 //                   no module dispatch.
 //   HUD_Init        every cycle: netmsg::init (usermsg chain installed once)
 //                   + netmsg::refreshAfterClientLoad (re-chain only after a
-//                   client DLL reload) and PanelManager::installHudPanels
+//                   client DLL reload) and the HUD_Init panel install
 //                   when the list is empty (HUD_Shutdown cleared it). The
 //                   process-scoped block runs once: data-layer init ->
 //                   PanelManager::registerPanelCvars ->

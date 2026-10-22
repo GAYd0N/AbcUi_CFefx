@@ -132,6 +132,10 @@ public:
   int actionCount() const {
     return static_cast<int>(Actions_.size());
   }
+  // Rows the page iterates (the action list, headers included).
+  int rowCount() const {
+    return static_cast<int>(Rows_.size());
+  }
 
   // Re-reads engine truth for every action (keynum 0..255 scan). Drafts
   // are kept for rows the user already touched (the T10 reopen rule);

@@ -59,6 +59,12 @@ AbcUiSubscription PaintSubscription = 0;
 
 bool Prepared = false;
 
+// Reused copy-out buffers. Namespace scope rather than function-local statics:
+// the module image is mapped without static TLS support, and MSVC emits a TLS
+// directory for the thread-safe local-static guard.
+std::vector<AbcUiConsoleLine> InitialLines;
+std::vector<AbcUiConsoleLine> WindowLines;
+
 // --- selection model (panels::console::ConsoleSelection, ported) -----------
 
 struct SelectionPoint {
@@ -488,15 +494,14 @@ void render() {
     const uint64_t latest = Api->consolepage->latestSequence();
     if (latest > static_cast<uint64_t>(kInitialLines))
       since = latest - static_cast<uint64_t>(kInitialLines);
-    static std::vector<AbcUiConsoleLine> lines;
-    lines.resize(static_cast<size_t>(kInitialLines));
-    for (auto &line : lines)
+    InitialLines.resize(static_cast<size_t>(kInitialLines));
+    for (auto &line : InitialLines)
       line.structSize = sizeof(line);
     const int count = Api->consolepage->copySince(
-        since, lines.data(), static_cast<uint32_t>(kInitialLines));
+        since, InitialLines.data(), static_cast<uint32_t>(kInitialLines));
     for (int i = 0; i < count; ++i)
-      appendLine(lines[i].text, lines[i].developer != 0,
-                 lines[i].truncated != 0);
+      appendLine(InitialLines[i].text, InitialLines[i].developer != 0,
+                 InitialLines[i].truncated != 0);
     ProjectedSequence = Api->consolepage->latestSequence();
     trimDom();
     // A fresh view starts at the tail.
@@ -533,18 +538,18 @@ void render() {
       !Selection.hasAnchor() &&
       scrollTopBefore + clientHeight >= scrollHeightBefore - 1.0f;
 
-  static std::vector<AbcUiConsoleLine> window;
-  window.resize(static_cast<size_t>(kMaxDomLines));
-  for (auto &line : window)
+  WindowLines.resize(static_cast<size_t>(kMaxDomLines));
+  for (auto &line : WindowLines)
     line.structSize = sizeof(line);
   // The consumer window is bounded too: a long gap (the page was hidden
   // while output burst) pages from the newest tail, never from an
   // unbounded backlog.
-  const int count = Api->consolepage->copySince(
-      ProjectedSequence, window.data(), static_cast<uint32_t>(kMaxDomLines));
+  const int count =
+      Api->consolepage->copySince(ProjectedSequence, WindowLines.data(),
+                                  static_cast<uint32_t>(kMaxDomLines));
   for (int i = 0; i < count; ++i)
-    appendLine(window[i].text, window[i].developer != 0,
-               window[i].truncated != 0);
+    appendLine(WindowLines[i].text, WindowLines[i].developer != 0,
+               WindowLines[i].truncated != 0);
   ProjectedSequence = Api->consolepage->latestSequence();
   trimDom();
   if (atBottom) {

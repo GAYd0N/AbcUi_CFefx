@@ -1,11 +1,11 @@
-#include "services/filedialog/FileBrowser.h"
+#include "SettingsFileBrowser.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <filesystem>
 
-namespace services::filedialog {
+namespace settingspage::files {
 namespace {
 
 // A folder with more entries than this shows the first window and says so;
@@ -33,13 +33,16 @@ bool existsDirectory(const std::string &path) {
   return std::filesystem::is_directory(path, error);
 }
 
+// Namespace scope, not a function-local static: the module image is mapped
+// without static TLS support and MSVC's local-static guard needs a TLS slot.
+const std::vector<std::string> ImageExtensions = {
+    ".png", ".jpg", ".jpeg", ".bmp",  ".tga",
+    ".gif", ".pcx", ".tif",  ".tiff", ".webp"};
+
 } // namespace
 
 const std::vector<std::string> &FileBrowser::imageExtensions() {
-  static const std::vector<std::string> Extensions = {
-      ".png", ".jpg", ".jpeg", ".bmp",  ".tga",
-      ".gif", ".pcx", ".tif",  ".tiff", ".webp"};
-  return Extensions;
+  return ImageExtensions;
 }
 
 bool FileBrowser::isImageName(const std::string &name) {
@@ -145,4 +148,4 @@ bool FileBrowser::list(const std::string &directory) {
   return true;
 }
 
-} // namespace services::filedialog
+} // namespace settingspage::files

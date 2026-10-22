@@ -50,6 +50,12 @@ void apiQuit(void) {
     seam.quit();
 }
 
+void apiQuitResolve(int32_t confirmed) {
+  const services::menu::Host &seam = services::menu::host();
+  if (seam.quitResolve)
+    seam.quitResolve(confirmed);
+}
+
 void apiDisconnect(void) {
   const services::menu::Host &seam = services::menu::host();
   if (seam.disconnect)
@@ -69,9 +75,9 @@ void apiDirectConnect(void) {
 }
 
 const AbcUiMenuApi kMenuApi = {
-    sizeof(AbcUiMenuApi), apiState,         apiOpenPage, apiBack,
-    apiEnsureUp,          apiResume,        apiQuit,     apiDisconnect,
-    apiToggleConsole,     apiDirectConnect,
+    sizeof(AbcUiMenuApi), apiState,         apiOpenPage,    apiBack,
+    apiEnsureUp,          apiResume,        apiQuit,        apiDisconnect,
+    apiToggleConsole,     apiDirectConnect, apiQuitResolve,
 };
 
 } // namespace

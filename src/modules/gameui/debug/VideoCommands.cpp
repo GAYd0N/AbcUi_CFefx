@@ -3,10 +3,10 @@
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include "modules/gameui/GameUiModule.h"
-#include "modules/gameui/GameUiPages.h"
 #include "DebugCommands.h"
 #include <abc/Console.h>
 #include <abc/Plugin.h>
+#include "modsys/ApiTable.h"
 #include "rmlui/VGUI2ExtensionImport.h"
 #include <cstdlib>
 namespace gameui {
@@ -39,20 +39,10 @@ void DebugCommands::videoStatusCommand() {
 }
 
 void DebugCommands::videoScrollCommand() {
-  if (!currentModule() || !currentModule()->Settings ||
-      !currentModule()->Settings->document()) {
-    abc::ConsoleWarn("[AbcUi] settings page not open\n");
-    return;
-  }
-  Rml::Element *panel =
-      currentModule()->Settings->document()->GetElementById("panel");
-  if (!panel) {
-    abc::ConsoleWarn("[AbcUi] settings panel missing\n");
-    return;
-  }
-  panel->SetScrollTop(panel->GetScrollHeight());
-  abc::ConsolePrint("[AbcUi] video: panel scrollTop=%.1f height=%.1f\n",
-                    panel->GetScrollTop(), panel->GetScrollHeight());
+  // The settings page is a module document now: its scroll container is not
+  // reachable from the console.
+  abc::ConsoleWarn(
+      "[AbcUi] video: the settings page's scroll state is module-owned\n");
 }
 
 void DebugCommands::videoStageCommand() {
@@ -81,8 +71,7 @@ void DebugCommands::videoStageCommand() {
                     services::settings::VideoModeModel::describe(
                         self.VideoModel.stagedTarget())
                         .c_str());
-  if (self.Settings && self.SettingsView->presented())
-    self.Settings->render();
+  framework::SettingsApi::bumpRevision();
 }
 
 void DebugCommands::videoApplyCommand() {

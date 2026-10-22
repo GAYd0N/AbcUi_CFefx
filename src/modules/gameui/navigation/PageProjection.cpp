@@ -1,8 +1,8 @@
 // Extracted from GameUiModule.cpp (UTF-8). Responsibility:
 // navigation/PageProjection.
 #include "modules/gameui/GameUiModule.h"
-#include "modules/gameui/GameUiPages.h"
 #include <abc/Plugin.h>
+#include "services/settings/SettingsPageService.h"
 #include "modules/gameui/engine/MenuBindings.h"
 namespace gameui {
 using namespace engine;
@@ -21,20 +21,19 @@ void GameUiModule::projectMenuPresentation() {
   // the character card, the footer and the friends board from the sdk
   // menuconfig/social sections.
 
-  // Project each implemented page from navigation state. The stub is only
-  // the defensive default for a page without a registered projection;
-  // it never reopens a native window.
-  bool shellTop = false;
+  // Project each implemented page from navigation state. Every current page
+  // is a module document; the switch only routes the framework-owned flows
+  // (the server query, the diagnostic beats).
   if (!state.pages.empty()) {
     switch (state.pages.top()) {
     case MenuPage::kMain:
     case MenuPage::kPause:
       // The page is a module document: it presents itself from menu.state
       // once the page is on top (the entry focus defers to overlays).
-      shellTop = true;
       break;
     case MenuPage::kSettings:
-      SettingsView->present();
+      // The settings page is a module document (abcui.gameui): it presents
+      // itself from menu.state and projects from the sdk settings section.
       break;
     case MenuPage::kServers:
       // T18: the real browser replaced the T09 stub. tick() runs on
@@ -68,8 +67,7 @@ void GameUiModule::projectMenuPresentation() {
       // the drained model on the paint beat.
       break;
     default:
-      showStubPage(SubStub.get(), state.pages.top(), false);
-      break;
+      break; // every current page is module-owned
     }
   }
   // T17: the server page's query ownership. The T18 browser lives at
@@ -90,14 +88,13 @@ void GameUiModule::projectMenuPresentation() {
     Server->logQueryChange();
   }
   ServerBrowser.Open = serverPageOpen;
-  if (shellTop)
-    SubStub->hide();
   if (state.pages.empty() || state.pages.top() != MenuPage::kSettings) {
-    SettingsView->hide();
-    // T13b: the mic test is a page-scoped device session - leaving
-    // the settings page stops it (the original's PageHide guarantee,
-    // extended to the controller-driven leave path).
+    // T13b: the mic test is a page-scoped device session - leaving the
+    // settings page stops it (the original's PageHide guarantee, extended to
+    // the controller-driven leave path). The page re-projects the state from
+    // the published generation.
     VoiceModel.stopTest();
+    services::settings::bumpPageRevision();
   }
   if (state.pages.empty() || state.pages.top() != MenuPage::kServers)
     Server->hide();
@@ -115,14 +112,11 @@ void GameUiModule::projectMenuPresentation() {
   // T14 overlays: the connection dialogs present from the bitmask; the
   // password dialog's re-prepare (a rejected retry clears the field) keys
   // on the model's per-generation prompt count.
-  if (state.overlays.contains(MenuOverlay::kConfirmQuit))
-    ConfirmQuit->show();
-  else
-    ConfirmQuit->hide();
-  // T12: the confirmation page is the top-most layer of all - a page
-  // sync while it is up must not raise another document over it.
-  if (Video->confirmPresented() && VideoConfirm)
-    VideoConfirm->show();
+  // The quit confirmation is a page module document now (abcui.gameui): it
+  // presents itself from the overlay bit in menu.state.
+  // T12: the display confirmation is a page module document now - it
+  // presents itself from the video facts at the top-most tier, so a page
+  // sync while it is up never raises another document over it.
   // T16 single truth: whenever the projection no longer holds the
   // console (routed ESC popped it, a force-dismiss cleared it), the
   // engine-facing answer must follow. hideConsole never notifies the sink,

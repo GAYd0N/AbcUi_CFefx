@@ -4,7 +4,6 @@
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include "modules/gameui/GameUiModule.h"
-#include "modules/gameui/GameUiPages.h"
 #include <abc/Console.h>
 #include "framework/Localization.h"
 #include "modsys/ModuleDocuments.h"
@@ -107,24 +106,16 @@ void GameUiModule::reconcilePhase() {
 }
 
 void GameUiModule::hideAllMenuDocuments() {
-  // Module pages join the layer (ABCUI_DOC_FLAG_MENU): the framework hides
-  // them with the built-in ones, so no page can outlive a lowered menu.
+  // Every menu surface joins the layer (ABCUI_DOC_FLAG_MENU): the framework
+  // hides them with the menu, so no page can outlive a lowered menu.
   framework::module_documents::hideMenu();
-  if (SubStub)
-    SubStub->hide();
-  if (Settings)
-    Settings->hide();
   Server->hide();
-  if (ConfirmQuit)
-    ConfirmQuit->hide();
   // T14 connection surfaces: module documents hidden with the menu (the
   // ABCUI_DOC_FLAG_MENU layer); a later present re-projects from the
   // state.
-  // The video confirmation is NOT hidden by a generic hide: it must
-  // stay up until confirmed/reverted (a dismissal cannot silently
-  // abandon a mode the user has not confirmed). dismissMenu() calls
-  // this, so keep it visibly module-owned.
-  SettingsView->setPresented(false);
+  // The display confirmation is NOT hidden by a generic hide: its document
+  // carries no menu flag, so it stays up until confirmed/reverted (a
+  // dismissal cannot silently abandon a mode the user has not confirmed).
 }
 
 void GameUiModule::focusLog(const char *phase) {
@@ -139,33 +130,6 @@ void GameUiModule::focusLog(const char *phase) {
 #else
   (void)phase;
 #endif
-}
-
-void GameUiModule::showStubPage(panels::menushared::MenuStubPage *stub,
-                                MenuPage page, bool console) {
-  if (!stub)
-    return;
-  if (!console && LastStubPage == page && stub->isVisible())
-    return; // same surface already presented: no text churn
-  LastStubPage = page;
-  using Resolve = framework::Localization;
-  std::string title, body;
-  const char *titleToken = "#MainMenu_StubTitle";
-  const char *bodyToken = "#MainMenu_StubSettings";
-  switch (page) {
-  case MenuPage::kLoading:
-    bodyToken = "#MainMenu_StubLoading";
-    break;
-  case MenuPage::kMain:
-    bodyToken = "#MainMenu_StubConsole";
-    break;
-  default:
-    break; // settings: the default tokens
-  }
-  Resolve::translate(title, titleToken + 1);
-  Resolve::translate(body, bodyToken + 1);
-  stub->showFor(title.c_str(), body.c_str());
-  stub->show();
 }
 
 // --- menu section backing (services::menu::Host) ---------------------------
@@ -236,8 +200,11 @@ int32_t GameUiModule::openMenuPage(int32_t page) {
   if (!ensureMenuUp())
     return 0;
   reconcilePhase();
-  if (Controller.state().phase != menu::BackendPhase::kInGame)
-    return 0; // the in-game pages never open over the home screen
+  // Sub pages are legal on the no-map home screen too: the shell offers the
+  // server browser, create game and settings entries there, and the
+  // controller's own openPage already refuses only the phases that must hold
+  // input (Connecting/Loading/Fatal). A kInGame-only gate here contradicted
+  // that home menu and left every entry except Quit inert.
   Controller.dispatch(menu::makeOpenPage(target));
   finishDispatch();
   return Controller.state().pages.topIs(target) ? 1 : 0;
@@ -252,6 +219,11 @@ void GameUiModule::menuQuit() {
   // The confirmation overlay is the controller's decision; a page module
   // presents its own document once the overlay is on the stack.
   Controller.dispatch(MenuEvent{EventKind::kQuitRequested});
+  finishDispatch();
+}
+
+void GameUiModule::menuQuitResolve(int32_t confirmed) {
+  Controller.dispatch(menu::makeQuitResolved(confirmed != 0));
   finishDispatch();
 }
 

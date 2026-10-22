@@ -20,7 +20,7 @@ class HudPanel;
 
 class PanelManager {
 public:
-  // Takes ownership of the ordered panel list. Called by HudPanelCatalog
+  // Takes ownership of the ordered panel list. Called by the HUD_Init path
   // before initAll(); a second call replaces the previous list.
   static void installPanels(std::vector<std::unique_ptr<HudPanel>> panels);
   // Loads every installed panel's document.

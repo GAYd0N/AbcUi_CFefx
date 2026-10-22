@@ -1,14 +1,14 @@
 <rml>
 <head>
-	<link type="text/rcss" href="../../rcss/base.rcss"/>
-	<link type="text/rcss" href="../../rcss/theme.rcss"/>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
 	<link type="text/rcss" href="../rcss/videoconfirm.rcss"/>
 </head>
 <!-- T12 display-mode confirmation. Headline states the ACTUAL mode the
      engine reports (never the requested one); the countdown restores the
-     previous mode on timeout. All dynamic text is injected escaped by
-     panels::settings::VideoConfirmPage. -->
+     previous mode on timeout. All dynamic text is injected escaped by the
+     abcui.gameui settings page module. -->
 <body id="videoconfirm">
 	<div id="videoconfirm-box">
 		<h1 id="videoconfirm-title">#VideoConfirm_Title</h1>

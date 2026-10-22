@@ -176,13 +176,14 @@ size_t boot() {
                        find.cFileName, error.c_str());
       continue;
     }
+    Candidate candidate;
+    candidate.image = std::move(image);
     PackageEntry manifestEntry;
-    if (!image->file().read("manifest.json", manifestEntry, &error)) {
+    if (!candidate.image->file().read("manifest.json", manifestEntry, &error)) {
       abc::ConsoleWarn("[AbcUi] module package \"%s\" skipped: %s\n",
                        find.cFileName, error.c_str());
       continue;
     }
-    Candidate candidate;
     if (!parseManifest(static_cast<const char *>(manifestEntry.data),
                        manifestEntry.size, candidate.manifest, &error)) {
       abc::ConsoleWarn("[AbcUi] module package \"%s\" skipped: %s\n",

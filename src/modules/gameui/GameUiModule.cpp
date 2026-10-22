@@ -1,9 +1,6 @@
 // Extracted from GameUiModule.cpp (UTF-8). Responsibility: GameUiModule.
 #include "modules/gameui/GameUiModule.h"
-#include "modules/gameui/GameUiPages.h"
-#include "../../panels/menushared/MenuShellWindows.h"
-#include "../../panels/settings/SettingsPage.h"
-#include "../../panels/settings/VideoConfirmPage.h"
+#include "modules/gameui/GameUiModule.h"
 
 #include "../../data/WeaponResource.h"
 #include "../../framework/ResourceLimits.h"
@@ -20,6 +17,7 @@
 #include "services/inventory/InventoryService.h"
 #include "services/serverbrowser/BlacklistFileStore.h"
 #include "services/playerlist/PlayerListService.h"
+#include "services/settings/SettingsPageService.h"
 #include "services/uiconfig/MenuShellService.h"
 #include "services/votemenu/VoteMenuService.h"
 #include "framework/Commands.h"
@@ -103,11 +101,9 @@ bool loadCommandMenuDefinition(services::commandmenu::Definition &definition,
 GameUiModule::GameUiModule()
     : Controller(&menuBackend()), CaptureOwner(this),
       Video(std::make_unique<VideoFlow>(MakeVideoHost(), VideoModel)),
-      Spray(std::make_unique<SprayMaker>([this](bool ok,
-                                                const std::string &message,
-                                                const std::string &previewUri) {
-        if (Settings)
-          Settings->setSprayResult(ok, message, previewUri);
+      Spray(std::make_unique<SprayMaker>([](bool ok, const std::string &message,
+                                            const std::string &previewUri) {
+        services::settings::setSprayResult(ok, message, previewUri);
       })),
       Vote(std::make_unique<VoteMenuFlow>(MakeVoteMenuHost(), voteMenuSeams())),
       Command(std::make_unique<CommandMenuFlow>(MakeCommandMenuHost())),
@@ -115,13 +111,39 @@ GameUiModule::GameUiModule()
       Create(std::make_unique<CreateGameFlow>(MakeCreateGameHost(),
                                               createGameSeams())),
       Server(std::make_unique<ServerBrowserFlow>(MakeServerBrowserHost(),
-                                                 ServerBrowser, Blacklist)),
-      SettingsView(std::make_unique<SettingsFlow>(SettingsModel, BindModel,
-                                                  VideoModel, VoiceModel)) {
+                                                 ServerBrowser, Blacklist)) {
   SettingsModel.setSeams(settingsSeams());
   BindModel.setSeams(bindSeams());
   VideoModel.setSeams(videoSeams());
   VoiceModel.setSeams(voiceSeams());
+  // The settings page is a module now: it reads the four models, the page
+  // tree and the favorite store through the sdk settings section, and acts
+  // back through the two edges this composition root owns (the display-mode
+  // transaction and the spray maker) plus the bind-capture session (the
+  // router token lives here).
+  services::settings::PageModels pageModels;
+  pageModels.rows = &SettingsModel;
+  pageModels.bind = &BindModel;
+  pageModels.video = &VideoModel;
+  pageModels.voice = &VoiceModel;
+  pageModels.favorites = &ModelFavorites;
+  pageModels.pages = &UiConfig.pages();
+  services::settings::setPageModels(pageModels);
+  services::settings::PageAccess pageAccess;
+  pageAccess.videoApply = [this] { return Video->applyChange(); };
+  pageAccess.videoKeep = [this] { return Video->confirmKeep(); };
+  pageAccess.videoRevert = [this] { return Video->confirmRevert(); };
+  pageAccess.sprayMake = [this](const std::string &path) {
+    Spray->run(path);
+    return true;
+  };
+  pageAccess.beginBindCapture = [this](int32_t actionIndex) {
+    if (!BindModel.beginCapture(static_cast<int>(actionIndex)))
+      return false;
+    startKeyCapture();
+    return BindModel.capturing();
+  };
+  services::settings::setPageAccess(pageAccess);
   // T19: the create-game launcher (typed cvar writes + the shipped
   // command sequence) and its backend relay. The thunk reaches the
   // module's request value object through the registry lookup, the
@@ -276,6 +298,9 @@ GameUiModule::GameUiModule()
   menuHost.ensureUp = [this] { return ensureMenuUp(); };
   menuHost.resume = [this] { return resumeFromMenu(); };
   menuHost.quit = [this] { menuQuit(); };
+  menuHost.quitResolve = [this](int32_t confirmed) {
+    menuQuitResolve(confirmed);
+  };
   menuHost.disconnect = [this] { menuDisconnect(); };
   menuHost.toggleConsole = [this] { menuToggleConsole(); };
   menuHost.directConnect = [this] {
@@ -291,17 +316,9 @@ VideoHost GameUiModule::MakeVideoHost() {
   host.menuPresented = [this] { return MenuPresented; };
   host.syncMenuPresentation = [this] { syncMenuPresentation(); };
   host.hideMenuDocuments = [this] {
-    // The home pages are module documents now; the settings page stays
-    // built-in until its own migration.
+    // Every page is a module document now; the display confirmation outlives
+    // a menu hide and stays up until it resolves.
     framework::module_documents::hideMenu();
-    if (SubStub)
-      SubStub->hide();
-    if (Settings)
-      Settings->hide();
-  };
-  host.renderSettings = [this] {
-    if (Settings)
-      Settings->render();
   };
   return host;
 }
@@ -725,20 +742,14 @@ void GameUiModule::onShutdown() {
   PageToken.release();
   // Stop callbacks and release queries before any observing document dies.
   ServerBrowser.closeContext();
-  SubStub.reset();
-  SettingsView->shutdown();
-  Settings.reset();
   Server->shutdown();
   Create->shutdown();
   Vote->shutdown();
   Command->shutdown();
   Inventory->shutdown();
   Video->shutdown();
-  VideoConfirm.reset();
-  ConfirmQuit.reset();
   Context = nullptr;
   MenuPresented = false;
-  LastStubPage = MenuPage::kMain;
 }
 
 namespace {

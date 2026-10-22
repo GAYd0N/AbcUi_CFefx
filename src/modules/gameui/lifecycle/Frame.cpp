@@ -1,6 +1,5 @@
 // Composition root of frame execution: services first, presentation second.
 #include "modules/gameui/GameUiModule.h"
-#include "modules/gameui/GameUiPages.h"
 #include "FramePump.h"
 #include "services/menumusic/MenuMusic.h"
 #include "services/steam/SteamAPI.h"

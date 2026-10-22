@@ -382,7 +382,7 @@ void onModuleInit() {
 
 void onModuleShutdown() {
   // The document dies with the context. The old panel object was rebuilt by
-  // every installHudPanels cycle, so its buffer/page/mission-brief state died
+  // every HUD_Init install cycle, so its buffer/page/mission-brief state died
   // with the document as well; do the same here instead of carrying a
   // half-built MOTD into the next cycle.
   Buffer.clear();

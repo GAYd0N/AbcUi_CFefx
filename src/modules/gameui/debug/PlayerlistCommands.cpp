@@ -4,7 +4,6 @@
 // menu.paint beat.
 #ifndef NDEBUG
 #include "modules/gameui/GameUiModule.h"
-#include "modules/gameui/GameUiPages.h"
 #include "DebugCommands.h"
 #include <abc/Console.h>
 #include <abc/Plugin.h>

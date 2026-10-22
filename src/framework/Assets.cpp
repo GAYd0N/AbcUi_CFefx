@@ -35,18 +35,9 @@ void verifyInstalled() {
       // cfefx score sound still ships with the framework.
       {"sound/abc/cfefx/UI_SPECIALKILL2.wav", "cfefx score sound"},
       // Batch D (render depth panels).
-      // T05 interactive documents. The main menu document moved into the
-      // abcui.gameui package; its stylesheet stays until the last menu page
-      // moves (the built-in documents share it).
-      {"abc/abcui/gameui/rcss/mainmenu.rcss", "main menu stylesheet"},
-      // T10 settings page.
-      {"abc/abcui/gameui/rml/settings.rml", "settings document"},
-      {"abc/abcui/gameui/rcss/settings.rcss", "settings stylesheet"},
-      // T12 video confirmation dialog.
-      {"abc/abcui/gameui/rml/videoconfirm.rml", "video confirm document"},
-      {"abc/abcui/gameui/rcss/videoconfirm.rcss", "video confirm stylesheet"},
-      // The command menu (+commandmenu replacement) moved into the
-      // abcui.gameui package with its page.
+      // Every UI document, page stylesheet and panel asset now ships inside
+      // its module package (abcui.*.zip); the framework validates only the
+      // assets the framework itself loads.
   };
   for (const auto &check : checks) {
     if (!fileExists(check.Path))

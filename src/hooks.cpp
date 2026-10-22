@@ -20,11 +20,11 @@
 #include "data/PlayerTrace.h"
 #include "data/TextFeed.h"
 #include "data/WeaponResource.h"
+#include "framework/Commands.h"
 #include "framework/PanelManager.h"
 #include "framework/ScoreSeat.h"
 #include "modsys/EventBus.h"
 #include "modsys/ModuleManager.h"
-#include "modules/HudPanelCatalog.h"
 #include "modules/Module.h"
 #include "rmlui/InputBridge.h"
 #include "rmlui/RmlUiModule.h"
@@ -107,7 +107,7 @@ static void H_HUD_Init() {
   // module-registered panels join the first HUD_Init cycle.
   framework::modmanager::boot();
   if (framework::PanelManager::panels().empty())
-    modules::installHudPanels();
+    framework::PanelManager::installPanels(framework::modmanager::takePanels());
   // Process-scoped registration (cvars/commands survive HUD_Shutdown).
   static bool CommandsRegistered = false;
   if (!CommandsRegistered) {
@@ -117,7 +117,7 @@ static void H_HUD_Init() {
     weaponres::init();
     playerres::init();
     textfeed::init();
-    modules::registerHudPanelCvars();
+    commands::registerAll();
     rmlui::registerCommands();
     modules::registry().initAll();
   }
