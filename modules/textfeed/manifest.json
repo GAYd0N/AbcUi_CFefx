@@ -1,0 +1,12 @@
+{
+  "id": "abcui.textfeed",
+  "name": "Text Feed",
+  "description": "Centerprint and notify text panels with the keep-time countdown (moved from the built-in HUD).",
+  "author": "DrAbc",
+  "version": "1.0.0",
+  "abi": 1,
+  "minAbcUi": "0.8.0",
+  "entry": "entry/abcui_textfeed.dll",
+  "dependencies": [],
+  "conflicts": []
+}

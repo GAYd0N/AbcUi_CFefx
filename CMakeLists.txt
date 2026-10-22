@@ -68,6 +68,10 @@ add_subdirectory(thirdparty/RmlUi EXCLUDE_FROM_ALL)
 # runtime FreeImage.dll; AbcUi must not publish a second copy. MetaHook's
 # launcher appends every metahook/dlls/* subdirectory to PATH, so the loader
 # resolves the Renderer-provided DLL at runtime.
+# Note: the vendored FreeImage CMake also forces /MT on its own objects (see
+# the WebP note below). That stays an exception to the family-wide /MD rule:
+# the DLL owns its heap and exposes a C-style API only, so no allocator,
+# handle or C++ object crosses the boundary.
 add_subdirectory(thirdparty/FreeImage EXCLUDE_FROM_ALL)
 
 # --- Animated WebP decode backend -------------------------------------------
@@ -107,10 +111,37 @@ target_compile_options(abcui_webp PRIVATE
     $<$<CONFIG:Debug>:/MDd>
     $<$<NOT:$<CONFIG:Debug>>:/MD>)
 
+# --- miniz (module package reader) -------------------------------------------
+# Read-only zip support for UI module packages. Memory-image reads only: the
+# writer, stdio and time-conversion surfaces are compiled out.
+set(ABCUI_MINIZ_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/miniz")
+add_library(abcui_miniz STATIC
+    "${ABCUI_MINIZ_DIR}/miniz.c"
+    "${ABCUI_MINIZ_DIR}/miniz_tdef.c"
+    "${ABCUI_MINIZ_DIR}/miniz_tinfl.c"
+    "${ABCUI_MINIZ_DIR}/miniz_zip.c")
+target_include_directories(abcui_miniz PUBLIC "${ABCUI_MINIZ_DIR}")
+target_compile_definitions(abcui_miniz PRIVATE
+    MINIZ_NO_STDIO MINIZ_NO_TIME MINIZ_NO_ARCHIVE_WRITING_APIS)
+# miniz 3.x includes a generated visibility header; a static build only needs
+# MINIZ_EXPORT to expand to nothing (what upstream CMake does for static libs).
+set(ABCUI_MINIZ_GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/miniz-gen")
+file(WRITE "${ABCUI_MINIZ_GEN_DIR}/miniz_export.h"
+    "#pragma once\n#ifndef MINIZ_EXPORT\n#define MINIZ_EXPORT\n#endif\n")
+target_include_directories(abcui_miniz PUBLIC "${ABCUI_MINIZ_GEN_DIR}")
+set_target_properties(abcui_miniz PROPERTIES
+    C_STANDARD 99
+    C_STANDARD_REQUIRED ON
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+target_compile_options(abcui_miniz PRIVATE
+    $<$<CONFIG:Debug>:/MDd>
+    $<$<NOT:$<CONFIG:Debug>>:/MD>)
+
 add_library(abc_ui_config STATIC
     src/services/uiconfig/UiDefinitions.cpp
     src/services/uiconfig/ConfigRepository.cpp
     src/services/commandmenu/CommandMenuModel.cpp
+    src/services/commandmenu/CommandMenuService.cpp
     src/services/serverbrowser/ServerBlacklist.cpp
     src/services/serverbrowser/BlacklistFileStore.cpp)
 target_include_directories(abc_ui_config PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
@@ -121,7 +152,35 @@ add_library(AbcUi MODULE
     src/plugins.cpp
     src/CoreGlobals.cpp
     src/hooks.cpp
+    src/modsys/EventBus.cpp
+    src/modsys/PackageFile.cpp
+    src/modsys/PackageImage.cpp
+    src/modsys/ModuleVfs.cpp
+    src/modsys/MemoryDll.cpp
+    src/modsys/ModuleManifest.cpp
+    src/modsys/ModulePanel.cpp
+    src/modsys/ApiTable.cpp
+    src/modsys/ModuleManager.cpp
+    src/modsys/ApiSections.cpp
+    src/modsys/ApiWeapons.cpp
+    src/modsys/ApiPlayers.cpp
+    src/modsys/ApiServices.cpp
+    src/modsys/ApiInput.cpp
+    src/modsys/ApiDocuments.cpp
+    src/modsys/ApiMenu.cpp
+    src/modsys/ApiVoteMenu.cpp
+    src/modsys/ApiPlayerList.cpp
+    src/modsys/ApiCommandMenu.cpp
+    src/modsys/ApiMenuConfig.cpp
+    src/modsys/ApiSocial.cpp
+    src/modsys/ApiInventory.cpp
+    src/modsys/ApiCreateGame.cpp
+    src/modsys/ApiConsolePage.cpp
+    src/modsys/ApiServerBrowser.cpp
+    src/modsys/ApiConnection.cpp
+    src/modsys/ModuleDocuments.cpp
     src/render/Render.cpp
+    src/render/RadarRender.cpp
     src/render/ScreenMetrics.cpp
     src/rmlui/AbcRenderInterface.cpp
     src/rmlui/model/ElementModel.cpp
@@ -169,6 +228,7 @@ add_library(AbcUi MODULE
     src/framework/FatalExit.cpp
     src/framework/TextEncoding.cpp
     src/framework/HudPanel.cpp
+    src/framework/ScoreSeat.cpp
     src/framework/ImageLoader.cpp
     src/framework/MenuBackdrop.cpp
     src/framework/PreviewImage.cpp
@@ -202,7 +262,6 @@ add_library(AbcUi MODULE
     src/modules/gameui/settings/VideoFlow.cpp
     src/modules/gameui/serverbrowser/ServerBrowserFlow.cpp
     src/modules/gameui/creategame/CreateGameFlow.cpp
-    src/modules/gameui/playerlist/PlayerListFlow.cpp
     src/modules/gameui/votemenu/VoteMenuFlow.cpp
     src/modules/gameui/commandmenu/CommandMenuFlow.cpp
     src/modules/gameui/inventory/InventoryFlow.cpp
@@ -223,23 +282,33 @@ add_library(AbcUi MODULE
     src/modules/gameui/settings/SettingsResources.cpp
     src/modules/gameui/navigation/MenuController.cpp
     src/services/GameUiBridge.cpp
+    src/services/menu/MenuHost.cpp
+    src/services/uiconfig/MenuShellService.cpp
+    src/services/friends/FriendsService.cpp
+    src/services/votemenu/VoteMenuService.cpp
     src/services/steam/RuntimeAccess.cpp
     src/services/EngineUiBackend.cpp
     src/services/console/ConsoleBuffer.cpp
     src/services/console/ConsoleBackend.cpp
+    src/services/console/ConsolePageService.cpp
     src/services/serverbrowser/ServerQuery.cpp
     src/services/serverbrowser/ServerBrowserSession.cpp
+    src/services/serverbrowser/ServerBrowserService.cpp
     src/services/serverbrowser/ServerQuerySteam.cpp
     src/services/serverbrowser/ServerListModel.cpp
     src/services/serverbrowser/ServerFavorites.cpp
     src/services/creategame/CreateGameModel.cpp
+    src/services/creategame/CreateGameService.cpp
     src/services/creategame/ServerOptions.cpp
     src/services/playerlist/PlayerListModel.cpp
     src/services/playerlist/MuteBackend.cpp
+    src/services/playerlist/PlayerListService.cpp
     src/services/votemenu/VoteMenuModel.cpp
     src/services/inventory/InventoryModel.cpp
+    src/services/inventory/InventoryService.cpp
     src/services/loading/LoadingModel.cpp
     src/services/loading/AutoRetryGate.cpp
+    src/services/loading/ConnectionService.cpp
     src/services/settings/SettingsModel.cpp
     src/services/settings/UserScrParser.cpp
     src/services/settings/ModelFavorites.cpp
@@ -253,37 +322,9 @@ add_library(AbcUi MODULE
     src/framework/PanelManager.cpp
     src/framework/PanelManagerLifecycle.cpp
     src/framework/Theme.cpp
-    src/framework/StackBase.cpp
     src/framework/GlyphText.cpp
     src/framework/Projection.cpp
-    src/panels/ammostack/AmmoStackPanel.cpp
-    src/panels/ammobar/AmmoBarPanel.cpp
-    src/panels/chat/ChatMessage.cpp
-    src/panels/chat/ChatPanel.cpp
-    src/panels/crosshair/CrosshairPanel.cpp
-    src/panels/deadmsg/DeadMsgPanel.cpp
-    src/panels/dmgtiles/DmgTilesPanel.cpp
-    src/panels/effect/EffectPanel.cpp
-    src/panels/gindicator/GIndicatorPanel.cpp
-    src/panels/indicator/IndicatorPanel.cpp
-    src/panels/itemhighlight/ItemHighlightPanel.cpp
-    src/panels/notice/NoticePanel.cpp
-    src/panels/playerboard/PlayerBoardPanel.cpp
-    src/panels/vote/VotePanel.cpp
-    src/panels/motd/MotdPanel.cpp
-    src/panels/mainmenu/MainMenuPage.cpp
     src/panels/menushared/MenuShellWindows.cpp
-    src/panels/loading/LoadingWindows.cpp
-    src/panels/console/ConsolePage.cpp
-    src/panels/console/ConsoleSelection.cpp
-    src/panels/serverbrowser/ServerBrowserPage.cpp
-    src/panels/serverbrowser/ServerBrowserControls.cpp
-    src/panels/creategame/CreateGamePage.cpp
-    src/panels/creategame/CreateGameOptions.cpp
-    src/panels/playerlist/PlayerListPage.cpp
-    src/panels/votemenu/VoteMenuPage.cpp
-    src/panels/commandmenu/CommandMenuPage.cpp
-    src/panels/inventory/InventoryPage.cpp
     src/panels/settings/SettingsUi.cpp
     src/panels/settings/sections/VideoSection.cpp
     src/panels/settings/sections/VoiceSection.cpp
@@ -298,27 +339,80 @@ add_library(AbcUi MODULE
     src/panels/settings/sections/ColorRows.cpp
     src/panels/settings/sections/BindingRows.cpp
     src/panels/settings/VideoConfirmPage.cpp
-    src/panels/scoreboard/ScoreboardPanel.cpp
-    src/panels/weaponchoose/WeaponChoosePanel.cpp
-    src/panels/popnum/PopNumPanel.cpp
-    src/panels/cfefx/CfefxPanel.cpp
-    src/panels/radar/RadarPanel.cpp
-    src/panels/sidetext/SideTextPanel.cpp
-    src/panels/textmenu/TextMenuPanel.cpp
-    src/panels/flashlight/FlashlightPanel.cpp
-    src/panels/health/HealthPanel.cpp
-    src/panels/itemstack/ItemStackPanel.cpp
-    src/panels/weaponstack/WeaponStackPanel.cpp
     # Generic CreateInterface export (EXPOSE_SINGLE_INTERFACE implementation)
     "${METAHOOK_INCLUDE_DIR}/HLSDK/common/interface.cpp"
 )
 target_compile_definitions(AbcUi PRIVATE WIN32 _WINDOWS _USRDLL _CRT_SECURE_NO_WARNINGS NOMINMAX)
 target_compile_options(AbcUi PRIVATE /W4)
 target_compile_options(AbcUi PRIVATE /FIabc/ForceImport.h)
+# The module SDK and the module manifest's JSON parser.
+target_include_directories(AbcUi PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/sdk"
+    "${ABC_CORE_DIR}/thirdparty/MetaHook/thirdparty/rapidjson/include")
 # imm32: T07 IME placement/cancel (ImmSetCompositionWindow / ImmNotifyIME).
-target_compile_definitions(AbcUi PRIVATE ABC_CORE_STATIC)
 target_link_libraries(AbcUi PRIVATE Abc::Core RmlUi::RmlUi FreeImage abcui_webp
-    imm32 abc_ui_config)
+    abcui_miniz imm32 abc_ui_config)
+
+# First-party UI modules (each its own DLL + package; see modules/<id>/).
+add_subdirectory(modules/demo)
+add_subdirectory(modules/flashlight)
+add_subdirectory(modules/textmenu)
+add_subdirectory(modules/ammo)
+add_subdirectory(modules/chat)
+add_subdirectory(modules/crosshair)
+add_subdirectory(modules/damage)
+add_subdirectory(modules/cfefx)
+add_subdirectory(modules/health)
+add_subdirectory(modules/hudeffects)
+add_subdirectory(modules/itemhighlight)
+add_subdirectory(modules/playerboard)
+add_subdirectory(modules/radar)
+add_subdirectory(modules/scoreboard)
+add_subdirectory(modules/killfeed)
+add_subdirectory(modules/motd)
+add_subdirectory(modules/sidetext)
+add_subdirectory(modules/textfeed)
+add_subdirectory(modules/weaponchoose)
+add_subdirectory(modules/vote)
+add_subdirectory(modules/gameui)
+
+# --- Module packages ---------------------------------------------------------
+# Every modules/<id>/ CMakeLists registers one MODULE target. Collect them so
+# the pack target builds the DLLs before zipping (a plain `--target dist`
+# would otherwise ship stale or missing module entries).
+set(ABCUI_MODULE_TARGETS "")
+get_property(ABCUI_SUBDIRECTORIES DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    PROPERTY SUBDIRECTORIES)
+foreach(ABCUI_SUBDIR IN LISTS ABCUI_SUBDIRECTORIES)
+    if(ABCUI_SUBDIR MATCHES "/modules/")
+        get_property(ABCUI_DIR_TARGETS DIRECTORY "${ABCUI_SUBDIR}"
+            PROPERTY BUILDSYSTEM_TARGETS)
+        list(APPEND ABCUI_MODULE_TARGETS ${ABCUI_DIR_TARGETS})
+    endif()
+endforeach()
+
+set(ABCUI_MODULE_PACK_DIR "${CMAKE_BINARY_DIR}/dist/modules")
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_custom_target(pack_modules
+        COMMAND "${CMAKE_COMMAND}" -E rm -rf "${ABCUI_MODULE_PACK_DIR}"
+        COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/pack.py"
+            --source-dir "${CMAKE_CURRENT_SOURCE_DIR}"
+            --build-dir "${CMAKE_BINARY_DIR}"
+            --config "$<CONFIG>"
+            --out-dir "${ABCUI_MODULE_PACK_DIR}"
+        DEPENDS AbcUi ${ABCUI_MODULE_TARGETS}
+        COMMENT "Packing UI module packages")
+else()
+    message(WARNING "Python3 not found: the pack_modules and dist module "
+        "packages will not be produced")
+    add_custom_target(pack_modules
+        COMMAND "${CMAKE_COMMAND}" -E echo
+            "python3 not found: skipping module packages")
+endif()
+# The dist/deploy commands copy this directory unconditionally; keep it.
+file(MAKE_DIRECTORY "${ABCUI_MODULE_PACK_DIR}")
 
 # Renderer's gl_common constants are the source of truth for the render vertex
 # layouts. Fail the build when AbcUi's copied table drifts from the pin.
@@ -335,6 +429,9 @@ add_dependencies(AbcUi check-rendercommon-sync)
 # bare name (<VGUI.h>, <Color.h>, <mathlib/vector2d.h>).
 target_include_directories(AbcUi PRIVATE
     "${ABCUI_MILE_FFMPEG_SDK}/Include"
+    # Resolves the /FIabc/ForceImport.h forced include explicitly instead of
+    # relying on Abc::Core's transitive include directory.
+    "${ABC_CORE_DIR}/include"
     "${STEAMSDK_DIR}"
     "${VGUI2EXTENSION_INCLUDE_DIR}"
     "${VGUI2EXTENSION_INCLUDE_DIR}/Interface"
@@ -359,14 +456,18 @@ if(ABC_GAME_DIR)
     endif()
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/sound")
         # Engine-played effects resolve under <mod>/sound/ (pfnPlaySoundByName
-        # prefixes sound/), so cfefx's score WAV lives outside abc/abcui.
+        # prefixes sound/), so the cfefx score WAV lives outside abc/abcui and
+        # outside the cfefx module package.
         install(DIRECTORY assets/sound DESTINATION "${ABC_GAME_DIR}/svencoop")
     endif()
+    # Module packages produced by tools/pack.py (build a Release pack first).
+    install(DIRECTORY "${ABCUI_MODULE_PACK_DIR}/"
+        DESTINATION "${ABC_GAME_DIR}/svencoop/abc/abcui/modules")
     # The menu score ships inside abc/abcui/gameui/scence/audio (installed with
     # the tree above). MenuMusic drives the engine's mp3 player with the
     # mod-relative path selected by abc_ui_menu_music.
     add_custom_target(deploy
-        DEPENDS AbcUi
+        DEPENDS AbcUi pack_modules
         COMMAND "${CMAKE_COMMAND}" --install "${CMAKE_BINARY_DIR}" --config "$<CONFIG>"
         COMMENT "Deploying AbcUi.dll and assets to ${ABC_GAME_DIR}")
 endif()
@@ -381,12 +482,12 @@ endif()
 #   README.md
 # The target is named `dist` because `package` is reserved by the CPack
 # configuration that thirdparty/FreeImage pulls in.
-file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins.cpp" ABC_UI_VERSION_LINE
-    REGEX "CAbcPluginBase\\(\"AbcUi\"")
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/modsys/FrameworkVersion.h" ABC_UI_VERSION_LINE
+    REGEX "kFrameworkVersion")
 string(REGEX MATCH "\"([0-9]+\\.[0-9]+\\.[0-9]+)\"" ABC_UI_VERSION "${ABC_UI_VERSION_LINE}")
 set(ABC_UI_VERSION "${CMAKE_MATCH_1}")
 if(NOT ABC_UI_VERSION)
-    message(WARNING "Could not parse the AbcUi version from src/plugins.cpp; packaging as 0.0.0")
+    message(WARNING "Could not parse the AbcUi version from src/modsys/FrameworkVersion.h; packaging as 0.0.0")
     set(ABC_UI_VERSION "0.0.0")
 endif()
 set(ABC_UI_STAGE_DIR "${CMAKE_BINARY_DIR}/dist/AbcUi-${ABC_UI_VERSION}")
@@ -407,10 +508,14 @@ add_custom_target(dist
         "${ABC_UI_STAGE_DIR}/svencoop/sound"
     COMMAND "${CMAKE_COMMAND}" -E rm -f "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/.gitkeep"
     COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/README.md" "${ABC_UI_STAGE_DIR}/"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory
+        "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/modules"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${ABCUI_MODULE_PACK_DIR}"
+        "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/modules"
     COMMAND "${CMAKE_COMMAND}" -E chdir "${ABC_UI_STAGE_DIR}"
         "${CMAKE_COMMAND}" -E tar cfv
         "${CMAKE_BINARY_DIR}/dist/AbcUi-${ABC_UI_VERSION}.zip"
         --format=zip -- svencoop README.md
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/dist"
-    DEPENDS AbcUi
+    DEPENDS AbcUi pack_modules
     COMMENT "Packaging AbcUi-${ABC_UI_VERSION}.zip")

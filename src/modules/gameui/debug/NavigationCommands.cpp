@@ -8,8 +8,7 @@
 #include <abc/Console.h>
 namespace gameui {
 void DebugCommands::menuPageCommand() {
-  if (!currentModule() || !currentModule()->Shell ||
-      !currentModule()->Context) {
+  if (!currentModule() || !currentModule()->Context) {
     abc::ConsoleWarn("[AbcUi] menu not available\n");
     return;
   }
@@ -27,46 +26,12 @@ void DebugCommands::menuPageCommand() {
                     bridge.menuUp() ? 1 : 0);
 }
 
-// abc_ui_menu_model [<attribute> <value...>] - live tuning of the character
-// card's preview view (camera, fov, animation) while the menu is up; with no
-// arguments it dumps the current view. Debug-only calibration seam.
+// abc_ui_menu_model - the character card's preview view moved into the
+// abcui.gameui module with its page (the DOM is module-owned); the command
+// remains registered so old calibration scripts fail with a clear note.
 void DebugCommands::menuModelCommand() {
-  GameUiModule *module = currentModule();
-  if (!module || !module->Shell || !module->Context) {
-    abc::ConsoleWarn("[AbcUi] menu not available\n");
-    return;
-  }
-  Rml::ElementDocument *document = module->Shell->document();
-  Rml::Element *model =
-      document ? document->GetElementById("player-model") : nullptr;
-  abc::ConsolePrint("[AbcUi] menu facts: presented=%d shellVisible=%d "
-                    "context=%d frameTime=%.4f\n",
-                    module->MenuPresented ? 1 : 0,
-                    module->Shell->isVisible() ? 1 : 0, module->Context ? 1 : 0,
-                    module->LastFrameTime);
-  if (!model) {
-    abc::ConsoleWarn("[AbcUi] player card model element not found\n");
-    return;
-  }
-  // argv(1) = attribute, argv(2..) = value (no subcommand level).
-  if (gEngfuncs.Cmd_Argc() >= 3) {
-    std::string value = gEngfuncs.Cmd_Argv(2);
-    for (int i = 3; i < gEngfuncs.Cmd_Argc(); ++i)
-      value += std::string(" ") + gEngfuncs.Cmd_Argv(i);
-    model->SetAttribute(gEngfuncs.Cmd_Argv(1), value);
-    abc::ConsolePrint("[AbcUi] menu model %s = %s\n", gEngfuncs.Cmd_Argv(1),
-                      value.c_str());
-    return;
-  }
-  for (const auto &[name, attr] : model->GetAttributes()) {
-    if (name == "src" || name == "id" || name == "class" || name == "style")
-      continue;
-    abc::ConsolePrint("[AbcUi] menu model %s = %s\n", name.c_str(),
-                      attr.Get<Rml::String>().c_str());
-  }
-  abc::ConsolePrint("[AbcUi] menu model box=%.1fx%.1f abs=(%.1f,%.1f)\n",
-                    model->GetOffsetWidth(), model->GetOffsetHeight(),
-                    model->GetAbsoluteLeft(), model->GetAbsoluteTop());
+  abc::ConsoleWarn("[AbcUi] menu model: the home page is module-owned; the "
+                   "preview element is no longer reachable from the console\n");
 }
 
 // abc_ui_friends_test [clear | add <name> <address> | open <index>] -
@@ -120,38 +85,17 @@ void DebugCommands::friendsTestCommand() {
                       entry.Name.c_str(), entry.Connect.c_str());
     return;
   }
-  if (action == "open" && gEngfuncs.Cmd_Argc() >= 3) {
-    GameUiModule *module = currentModule();
-    Rml::ElementDocument *document =
-        module && module->Shell ? module->Shell->document() : nullptr;
-    const int index = atoi(gEngfuncs.Cmd_Argv(2));
-    if (!document) {
-      abc::ConsoleWarn("[AbcUi] friends test: no menu document\n");
-      return;
-    }
-    Rml::Element *list = document->GetElementById("friends-list");
-    Rml::Element *row = list && index >= 0 && index < list->GetNumChildren()
-                            ? list->GetChild(index)
-                            : nullptr;
-    if (!row) {
-      abc::ConsoleWarn("[AbcUi] friends test: no row %d\n", index);
-      return;
-    }
-    module->Shell->debugOpenFriendMenu(row, 300, 200);
-    abc::ConsolePrint("[AbcUi] friends test: menu opened for row %d\n", index);
+  if (action == "open" || action == "join") {
+    // The row DOM and its context menu moved into the abcui.gameui module
+    // with the shell page; injected rows still project (the module reads
+    // the model through the sdk social section), but the menu cannot be
+    // poked from the console anymore.
+    abc::ConsoleWarn("[AbcUi] friends test: '%s' needs the module page's DOM "
+                     "and is no longer available\n",
+                     action.c_str());
     return;
   }
-  if (action == "join" && gEngfuncs.Cmd_Argc() >= 3) {
-    GameUiModule *module = currentModule();
-    if (!module || !module->Shell) {
-      abc::ConsoleWarn("[AbcUi] friends test: no menu\n");
-      return;
-    }
-    module->Shell->debugJoinFriend(gEngfuncs.Cmd_Argv(2));
-    return;
-  }
-  abc::ConsolePrint("[AbcUi] friends test: clear | add <name> <address> | open "
-                    "<index> | join <steamid>\n");
+  abc::ConsolePrint("[AbcUi] friends test: clear | add <name> <address>\n");
 }
 
 // abc_ui_settings_page <pageId> - Debug-only: open one settings page without

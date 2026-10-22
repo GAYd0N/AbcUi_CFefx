@@ -1,23 +1,23 @@
 #pragma once
 
-// gameui::ServerBrowserFlow - query lifecycle, connect/favorite intents,
-// pending join-history and the page presented latch.
+// gameui::ServerBrowserFlow - the server browser's query lifecycle and
+// intent boundaries.
 //
-// The session and blacklist stay owned by GameUiModule (debug probes and
-// page wiring use them directly) and are injected here; the composition root
-// supplies the connect dispatch, finishDispatch and the auto-retry reset.
+// The page became a module (abcui.gameui, sdk serverbrowser section): the
+// flow keeps the session ownership (fresh-open filter sampling, the
+// released queries on leave), the Steam favorites/history edges and the
+// intent boundaries the section maps 1:1. The connect address validation
+// and the join-success history record stay here. The session and blacklist
+// stay owned by GameUiModule (debug probes use them directly) and are
+// injected here; the composition root supplies the connect dispatch,
+// finishDispatch and the auto-retry reset.
 
 #include "../../../services/serverbrowser/ServerBlacklist.h"
 #include "../../../services/serverbrowser/ServerBrowserSession.h"
 #include "../../../services/serverbrowser/ServerFavorites.h"
-#include "../navigation/MenuAction.h"
 
 #include <functional>
 #include <string>
-
-namespace panels::serverbrowser {
-class ServerBrowserPage;
-}
 
 namespace gameui {
 
@@ -33,7 +33,6 @@ public:
                     services::serverbrowser::ServerBrowserSession &session,
                     services::serverbrowser::ServerBlacklist &blacklist);
 
-  void setPage(panels::serverbrowser::ServerBrowserPage *page);
   void shutdown();
   bool presented() const {
     return Session.Presented;
@@ -51,13 +50,15 @@ public:
   void logQueryChange();
   void recordPendingHistory();
   void discardPendingHistory();
-  void handleAction(navigation::ActionKind kind);
+  // The intent boundaries (the section maps its calls 1:1).
+  void applyFiltersQuery();
+  void refreshOrStop();
+  void stop();
 
 private:
   ServerBrowserHost Host;
   services::serverbrowser::ServerBrowserSession &Session;
   services::serverbrowser::ServerBlacklist &Blacklist;
-  panels::serverbrowser::ServerBrowserPage *Page = nullptr;
   services::serverbrowser::FavoriteKey PendingHistory;
   bool PendingHistoryValid = false;
 };

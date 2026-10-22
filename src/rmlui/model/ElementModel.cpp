@@ -52,6 +52,17 @@ ElementModel::ElementModel(const Rml::String &Tag)
 
 ElementModel::~ElementModel() {
   std::erase(elements(), this);
+  // The document-level mousemove/mouseup listeners hold a raw pointer to
+  // this element's Listener; the vendored EventDispatcher does not clear
+  // them when the element dies. Symmetric with ElementColorPicker's
+  // destructor (the whole-document close path happens to destroy the
+  // dispatcher first, but a standalone element teardown would dangle).
+  RemoveEventListener("mousedown", &Listener, false);
+  if (ListenedDocument) {
+    ListenedDocument->RemoveEventListener("mousemove", &Listener, false);
+    ListenedDocument->RemoveEventListener("mouseup", &Listener, false);
+    ListenedDocument = nullptr;
+  }
 }
 
 void ElementModel::OnAttributeChange(const Rml::ElementAttributes &Changed) {
@@ -178,3 +189,5 @@ void renderPreviews() {
     Context->Update();
 }
 } // namespace rmlui::model
+
+RMLUI_RTTI_Define(rmlui::model::ElementModel)

@@ -198,10 +198,16 @@ bool Target::render(const Options &Config, int Width, int Height) {
       reinterpret_cast<const mstudioseqdesc_t *>(
           reinterpret_cast<const byte *>(Header) + Header->seqindex) +
       State.sequence;
-  if (Config.Animate && Data->LastTime > 0 && Sequence->numframes > 1) {
+  // The .mdl sequence descriptor is asset data: a garbage fps (0, 1e30,
+  // NaN) must not stop the animation or push inf/NaN into the render state.
+  const float SequenceFps = std::isfinite(Sequence->fps)
+                                ? std::clamp(Sequence->fps, 0.0f, 240.0f)
+                                : 0.0f;
+  if (Config.Animate && Data->LastTime > 0 && Sequence->numframes > 1 &&
+      SequenceFps > 0.0f) {
     const double Delta = std::clamp(Time - Data->LastTime, 0.0, 0.1);
     Data->AnimationFrame += static_cast<float>(Delta) * Config.FrameRate *
-                            Sequence->fps * 256.0f / (Sequence->numframes - 1);
+                            SequenceFps * 256.0f / (Sequence->numframes - 1);
     Data->AnimationFrame = std::fmod(Data->AnimationFrame, 256.0f);
     if (Data->AnimationFrame < 0)
       Data->AnimationFrame += 256;
@@ -257,9 +263,9 @@ bool Target::render(const Options &Config, int Width, int Height) {
   Views->EndView();
   ++Data->Frames;
   if (auto *Interface = rmlui::renderInterface())
-    Interface->registerExternalTexture(
-        Data->Uri, Data->Fbo.s_hBackBufferTex, Width, Height, nullptr,
-        rmlui::TextureBlend::PremultipliedAlpha);
+    Interface->registerExternalTexture(Data->Uri, Data->Fbo.s_hBackBufferTex,
+                                       Width, Height, nullptr,
+                                       rmlui::TextureBlend::PremultipliedAlpha);
   return true;
 }
 

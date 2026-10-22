@@ -1,10 +1,11 @@
 // gameui::CommandMenuFlow implementation - see CommandMenuFlow.h.
 #include "CommandMenuFlow.h"
 
-#include "../../../panels/commandmenu/CommandMenuPage.h"
+#include <abcui/events.h>
+
+#include "../../../modsys/EventBus.h"
 #include "../../../services/GameUiBridge.h"
 #include "../engine/MenuBindings.h"
-#include "rmlui/KeyMap.h"
 #include "rmlui/VGUI2ExtensionImport.h"
 
 #include <abc/Console.h>
@@ -18,20 +19,12 @@ namespace gameui {
 CommandMenuFlow::CommandMenuFlow(CommandMenuHost host)
     : Host(std::move(host)) {}
 
-void CommandMenuFlow::setPage(panels::commandmenu::CommandMenuPage *page) {
-  Page = page;
-  if (Page)
-    Page->setModel(&Model);
-}
-
 void CommandMenuFlow::setDefinition(
     services::commandmenu::Definition definition) {
   Model.setDefinition(std::move(definition));
 }
 
 void CommandMenuFlow::shutdown() {
-  Page = nullptr;
-  Presented = false;
   Requested = false;
   RaisedMenu = false;
 }
@@ -47,17 +40,9 @@ void CommandMenuFlow::cancelPending() {
   RaisedMenu = false;
 }
 
-void CommandMenuFlow::hide() {
-  if (Page)
-    Page->hide();
-  Presented = false;
-  RaisedMenu = false;
-}
-
 void CommandMenuFlow::resetForWorld() {
   Requested = false;
   RaisedMenu = false;
-  hide();
 }
 
 void CommandMenuFlow::toggle() {
@@ -67,7 +52,7 @@ void CommandMenuFlow::toggle() {
     Requested = false;
     return;
   }
-  if (Page && Page->isVisible()) {
+  if (Host.pageOnTop()) {
     close();
     return;
   }
@@ -75,7 +60,7 @@ void CommandMenuFlow::toggle() {
 }
 
 void CommandMenuFlow::open() {
-  if (!Host.shellReady() || !Page) {
+  if (!Host.shellReady()) {
     // HUD_Init can observe the command before the first HUD_Frame builds the
     // Rml context. Replay the intent once context assembly finishes.
     Requested = true;
@@ -91,11 +76,6 @@ void CommandMenuFlow::open() {
         "[AbcUi] commandmenu.json is unavailable; command menu not opened\n");
     return;
   }
-  if (Page->isDegraded()) {
-    abc::ConsoleWarn(
-        "[AbcUi] commandmenu page is degraded; command menu not opened\n");
-    return;
-  }
 
   bool raisedMenu = false;
   if (!Host.ensureMenu(raisedMenu))
@@ -109,31 +89,20 @@ void CommandMenuFlow::open() {
     return;
   }
 
-  Page->prepare(engine::currentMapName());
+  // Fresh opening for the live map: reset to the root. The page module
+  // projects the reset through menu.state (map filters re-resolve here).
+  Model.open(engine::currentMapName());
   Host.dispatchOpen();
   Requested = false;
   Host.finishDispatch();
-}
-
-void CommandMenuFlow::present() {
-  if (!Page)
-    return;
-  const bool wasVisible = Page->isVisible();
-  Page->render();
-  Page->show();
-  if (!wasVisible)
-    Page->refocusDefault();
-  Presented = true;
 }
 
 void CommandMenuFlow::close() {
   Requested = false;
   const bool raisedMenu = RaisedMenu;
   RaisedMenu = false;
-  if (Page) {
-    Page->hide();
-    Presented = false;
-  }
+  // The page module follows the stack pop through menu.state; the
+  // raised-menu recovery (close + resume) stays framework-side.
   Host.closeNavigation(raisedMenu);
   Host.finishDispatch();
 }
@@ -150,7 +119,7 @@ void CommandMenuFlow::handleCommand(const std::string &command) {
 }
 
 bool CommandMenuFlow::handleKey(int keynum) {
-  if (!Page || !Page->isVisible())
+  if (!Host.pageOnTop())
     return false;
 
   // While the Rml page owns input the engine never dispatches the +command
@@ -161,10 +130,13 @@ bool CommandMenuFlow::handleKey(int keynum) {
     return true;
   }
 
-  const Rml::Input::KeyIdentifier key = rmlui::mapKeyCode(keynum);
-  if (key == Rml::Input::KI_UNKNOWN)
-    return false;
-  return Page->handleKey(key);
+  // The page interprets the edge (model navigation and its own dismiss);
+  // a nonzero aggregate vote means consumed.
+  AbcUiKeyEvent event{};
+  event.down = 1;
+  event.keynum = keynum;
+  return framework::eventBus().publishVetoAggregate(
+      ABCUI_CHANNEL_MENU_COMMAND_KEY, event);
 }
 
 } // namespace gameui

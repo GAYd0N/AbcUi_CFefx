@@ -1,0 +1,16 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/ammobar.rcss"/>
+</head>
+<body id="ammobar">
+	<!-- HL2-inspired ammo readout: one pool per ammo type, each a single
+	     inline line (ammo sprite, large clip value, small reserve) written by
+	     AmmoBarPanel, packed against the bottom-right corner. Inline content
+	     is what keeps the icon and the two type sizes on one baseline; the
+	     body is a flex row so a hidden pool does not leave a gap. -->
+	<div id="ammo1" class="pool"></div>
+	<div id="pool-sep"></div>
+	<div id="ammo2" class="pool"></div>
+</body>
+</rml>

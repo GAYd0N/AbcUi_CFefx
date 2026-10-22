@@ -19,6 +19,8 @@
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -36,11 +38,18 @@ constexpr const char *kOutlineIds[services::crosshair::kPartCount] = {
 
 constexpr const char *kTransparent = "rgba(0, 0, 0, 0)";
 
+int channel(float value) {
+  // Draft values are edits of a float setting; inf/NaN and out-of-range
+  // drafts must not reach the static_cast (undefined) or the parser.
+  if (!std::isfinite(value))
+    return 0;
+  return std::clamp(static_cast<int>(std::lround(value)), 0, 255);
+}
+
 std::string rgba(float red, float green, float blue, float alpha) {
   char Buffer[48];
-  std::snprintf(Buffer, sizeof(Buffer), "rgba(%d, %d, %d, %d)",
-                static_cast<int>(red), static_cast<int>(green),
-                static_cast<int>(blue), static_cast<int>(alpha));
+  std::snprintf(Buffer, sizeof(Buffer), "rgba(%d, %d, %d, %d)", channel(red),
+                channel(green), channel(blue), channel(alpha));
   return Buffer;
 }
 

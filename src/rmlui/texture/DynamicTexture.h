@@ -22,9 +22,9 @@ public:
   // texture registry). `blend` is the draw program the texture registers
   // with: the animated image element animates old kRenderTransAdd sprites, so
   // it asks for Additive; video/spray keep straight alpha.
-  explicit DynamicTexture(std::string prefix,
-                          rmlui::TextureBlend blend =
-                              rmlui::TextureBlend::StraightAlpha);
+  explicit DynamicTexture(
+      std::string prefix,
+      rmlui::TextureBlend blend = rmlui::TextureBlend::StraightAlpha);
   ~DynamicTexture();
   DynamicTexture(const DynamicTexture &) = delete;
   DynamicTexture &operator=(const DynamicTexture &) = delete;

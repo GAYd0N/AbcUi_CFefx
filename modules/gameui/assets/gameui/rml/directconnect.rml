@@ -1,0 +1,23 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
+	<link type="text/rcss" href="../rcss/loading.rcss"/>
+</head>
+<!-- T14 direct connect (basic address entry, "不等待服务器浏览器"):
+     host or host:port. The address is validated by the model's grammar
+     before any engine call; refusals show the inline hint. -->
+<body id="menudirectconnect">
+	<div id="directconnect-box">
+		<h1 id="directconnect-title">#Loading_DirectConnectTitle</h1>
+		<p id="directconnect-lead">#Loading_DirectConnectLead</p>
+		<input id="directconnect-field" type="text" autofocus="autofocus" data-label="#Loading_AddressField"/>
+		<p id="directconnect-hint" class="loading-sub"></p>
+		<div id="directconnect-actions">
+			<button id="directconnect-connect" data-action="directconnect-connect" data-label="#Loading_Connect">#Loading_Connect</button>
+			<button id="directconnect-cancel" data-action="directconnect-cancel" data-label="#Loading_Return">#Loading_Return</button>
+		</div>
+	</div>
+</body>
+</rml>

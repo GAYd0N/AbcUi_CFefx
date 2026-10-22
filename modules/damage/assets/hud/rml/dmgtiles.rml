@@ -1,0 +1,23 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/dmgtiles.rcss"/>
+</head>
+<body id="dmgtiles">
+	<!-- Old CDmgTilesPanel (100x100 bottom-left, rs1.6 anchor = bottom edge
+	     60dp up: y = parentH - tall*1.6). Tiles pack bottom-up; the localized
+	     labels are filled in by DmgTilesPanel::onDocumentReady. -->
+	<div id="tiles">
+		<div id="tile-poison" class="tile"><img class="icon" src="mod://abcui.damage/hud/img/icon_poison.png"/><div id="label-poison" class="label font-default">DMGTiles_Poison</div></div>
+		<div id="tile-acid" class="tile"><img class="icon" src="mod://abcui.damage/hud/img/icon_acid.png"/><div id="label-acid" class="label font-default">DMGTiles_Acid</div></div>
+		<div id="tile-freeze" class="tile"><img class="icon" src="mod://abcui.damage/hud/img/icon_freeze.png"/><div id="label-freeze" class="label font-default">DMGTiles_Freeze</div></div>
+		<div id="tile-drown" class="tile"><img class="icon" src="mod://abcui.damage/hud/img/icon_drown.png"/><div id="label-drown" class="label font-default">DMGTiles_Drown</div></div>
+		<div id="tile-burn" class="tile"><img class="icon" src="mod://abcui.damage/hud/img/icon_burn.png"/><div id="label-burn" class="label font-default">DMGTiles_Burn</div></div>
+		<div id="tile-gas" class="tile"><img class="icon" src="mod://abcui.damage/hud/img/icon_gas.png"/><div id="label-gas" class="label font-default">DMGTiles_Gas</div></div>
+		<div id="tile-radiation" class="tile"><img class="icon" src="mod://abcui.damage/hud/img/icon_radiation.png"/><div id="label-radiation" class="label font-default">DMGTiles_Radiation</div></div>
+		<div id="tile-shock" class="tile"><img class="icon" src="mod://abcui.damage/hud/img/icon_shock.png"/><div id="label-shock" class="label font-default">DMGTiles_Shock</div></div>
+		<div id="tile-beam" class="tile"><img class="icon" src="mod://abcui.damage/hud/img/icon_beam.png"/><div id="label-beam" class="label font-default">DMGTiles_Energybeam</div></div>
+		<div id="tile-sonic" class="tile"><img class="icon" src="mod://abcui.damage/hud/img/icon_sonic.png"/><div id="label-sonic" class="label font-default">DMGTiles_Sonic</div></div>
+	</div>
+</body>
+</rml>

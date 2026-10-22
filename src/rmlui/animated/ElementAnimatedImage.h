@@ -51,7 +51,7 @@ class ElementAnimatedImage : public Rml::Element {
 public:
   RMLUI_RTTI_DeclareWithParent(ElementAnimatedImage, Rml::Element)
 
-  explicit ElementAnimatedImage(const Rml::String &Tag);
+      explicit ElementAnimatedImage(const Rml::String &Tag);
   ~ElementAnimatedImage() override;
 
   // Back to frame 0, playing, texture fed - the water splash's OUT_WATER edge.

@@ -1,0 +1,9 @@
+/* abcui.demo - smoke panel style (see hud/rml/demo.rml). */
+#demo {
+	position: absolute;
+	left: 12dp;
+	bottom: 120dp;
+	font-family: Verdana;
+	font-size: 14dp;
+	color: #ffb000;
+}

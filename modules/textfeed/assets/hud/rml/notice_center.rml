@@ -1,0 +1,9 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/notice.rcss"/>
+</head>
+<body id="notice-center">
+	<div id="message" class="font-defaultsmall"></div>
+</body>
+</rml>

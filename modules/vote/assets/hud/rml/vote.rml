@@ -1,0 +1,22 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/vote.rcss"/>
+</head>
+<body id="vote">
+	<!-- Old CVotePanel (VotePanel.res): 122x183 box right of center
+	     (c+96, c-96); title strip, wrapped content, yes/no rows with icons. -->
+	<div id="box">
+		<div id="title"></div>
+		<div id="content"></div>
+		<div id="row-yes">
+			<img src="mod://abcui.vote/hud/img/vote_yes.png"/>
+			<div id="yes-text"></div>
+		</div>
+		<div id="row-no">
+			<img src="mod://abcui.vote/hud/img/vote_no.png"/>
+			<div id="no-text"></div>
+		</div>
+	</div>
+</body>
+</rml>

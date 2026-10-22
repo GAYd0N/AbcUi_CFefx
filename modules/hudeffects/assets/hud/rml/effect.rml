@@ -1,0 +1,18 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/effect.rcss"/>
+</head>
+<body id="effect">
+	<!-- Old CEffectPanel (fullscreen): two ImageSprPanel water splashes
+	     (kRenderTransAdd, framerate 10) - now one animated WebP each, played by
+	     the <animimg> element (10 fps from the container, additive blend);
+	     the underwater tint and the danger vignette (efx_darkround.png). -->
+	<animimg id="left-water" src="mod://abcui.hudeffects/hud/img/water/face_rainleft.webp"
+	         blend="add" loop="false" autoplay="false"/>
+	<animimg id="right-water" src="mod://abcui.hudeffects/hud/img/water/face_rainright.webp"
+	         blend="add" loop="false" autoplay="false"/>
+	<img id="under-water" src="mod://abcui.hudeffects/hud/img/efx_darkround.png"/>
+	<img id="danger" src="mod://abcui.hudeffects/hud/img/efx_darkround.png"/>
+</body>
+</rml>

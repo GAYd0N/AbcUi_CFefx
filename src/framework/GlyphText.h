@@ -34,8 +34,7 @@ constexpr const char *kAccentTint = "rgb(255, 176, 0)";
 constexpr const char *kAccentDimTint = "rgba(255, 176, 0, 125)";
 
 // Additive meter strip (white, alpha kept) for bar fills.
-constexpr const char *kMeterUri =
-    "texadd://abc/abcui/hud/img/glyph/meter.png";
+constexpr const char *kMeterUri = "texadd://abc/abcui/hud/img/glyph/meter.png";
 
 // True when every character of `text` has an additive glyph.
 bool supports(const std::string &text);

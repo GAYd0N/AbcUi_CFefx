@@ -1,0 +1,20 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/radar.rcss"/>
+</head>
+<body id="radar">
+	<!-- Route 2 (05 §7): the plate art + marks are Rml elements; #map shows
+	     the live radar FBO as an external texture (radarfbo:// URI, drawn
+	     with the square/round mask by AbcRenderInterface); #avatars is
+	     rebuilt per frame by RadarPanel::onData (old 32-slot fleet). -->
+	<div id="plate">
+		<img id="plate-square" src="mod://abcui.radar/hud/img/radar/radar_background.png"/>
+		<img id="plate-round" src="mod://abcui.radar/hud/img/radar/radar_roundbackground.png"/>
+		<img id="map"/>
+		<img id="north" src="mod://abcui.radar/hud/img/radar/radar_north.png"/>
+		<img id="aim" src="mod://abcui.radar/hud/img/radar/radar_viewangle.png"/>
+		<div id="avatars"></div>
+	</div>
+</body>
+</rml>

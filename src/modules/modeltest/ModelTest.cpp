@@ -7,6 +7,7 @@
 #include "../../rmlui/modelpreview/Target.h"
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
+#include <RmlUi/Core/Traits.h>
 #include <abc/Console.h>
 #include <abc/CvarCmd.h>
 #include <string>
@@ -69,7 +70,7 @@ void command() {
                     modelpreview::hasWorld(), Document != nullptr);
   if (Document) {
     for (const char *Id : {"front", "side"}) {
-      auto *Element = static_cast<rmlui::model::ElementModel *>(
+      auto *Element = rmlui_dynamic_cast<rmlui::model::ElementModel *>(
           Document->GetElementById(Id));
       if (Element)
         abc::ConsolePrint("[AbcUi model] %s texture=%u frames=%u\n", Id,

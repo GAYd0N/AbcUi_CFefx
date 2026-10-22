@@ -109,10 +109,11 @@ public:
   // suffix and re-registers). `blend` selects the draw program: the animated
   // image element registers its frames additive (old kRenderTransAdd
   // sprites), everything else keeps the straight-alpha default.
-  void registerExternalTexture(
-      const Rml::String &uriPrefix, Rml::TextureHandle texture, int width,
-      int height, const int *maskSlot,
-      TextureBlend blend = TextureBlend::StraightAlpha);
+  void
+  registerExternalTexture(const Rml::String &uriPrefix,
+                          Rml::TextureHandle texture, int width, int height,
+                          const int *maskSlot,
+                          TextureBlend blend = TextureBlend::StraightAlpha);
   void unregisterExternalTexture(const Rml::String &uriPrefix);
 
 private:
@@ -149,6 +150,10 @@ private:
   // result to the VGUI2 surface texture channel.
   Rml::TextureHandle loadFileTexture(Rml::Vector2i &dimensions,
                                      const Rml::String &source);
+  // mod:// and modadd:// twin: decodes a module package image through the
+  // module VFS entry view.
+  Rml::TextureHandle loadModuleTexture(Rml::Vector2i &dimensions,
+                                       const Rml::String &uri, bool additive);
   // Uploads pixels through the VGUI2 surface texture channel, ending any
   // active 2D pass first (surface uploads are not re-entrant with the
   // renderer's batched pass - see the .cpp note). 0 = upload unavailable.

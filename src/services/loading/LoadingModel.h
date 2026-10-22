@@ -92,6 +92,14 @@ public:
   // issued once by the controller path.
   bool requestCancel(uint32_t generation);
 
+  // The server password prompt of the live attempt (IGameUI +0x58). The
+  // per-generation count is the lead line's truth: the first prompt means
+  // "required", any later one means the previous password was rejected.
+  void notePasswordPrompt(uint32_t generation);
+  int passwordPrompts() const {
+    return PasswordPrompts_;
+  }
+
   uint32_t generation() const {
     return Generation;
   }
@@ -129,6 +137,7 @@ private:
   }
 
   uint32_t Generation = 0;
+  int PasswordPrompts_ = 0;
   std::string Address;
   bool Canceled = false;
   bool LevelStarted = false;  // LoadingStarted("level") seen

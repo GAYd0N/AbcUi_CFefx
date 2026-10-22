@@ -34,6 +34,12 @@ public:
   explicit ElementColorPicker(const Rml::String &Tag);
   ~ElementColorPicker() override;
 
+  // Dispatches the queued `change` events for every live picker. Called from
+  // the frame pump, never from the drag/event stack: the page's handler may
+  // destroy the picker (or another one), which is only safe once the element
+  // event dispatch has returned to the frame loop.
+  static void pumpChanges();
+
 protected:
   void OnAttributeChange(const Rml::ElementAttributes &Changed) override;
   void OnRender() override;
@@ -85,6 +91,11 @@ private:
   float Saturation = 1.0f;
   float Value = 1.0f;
   int Alpha = 255;
+
+  // Latest value whose `change` event has not been dispatched yet; queued by
+  // applyColor and drained by pumpChanges.
+  bool ChangePending = false;
+  Rml::String PendingValue;
 };
 
 void registerElement();

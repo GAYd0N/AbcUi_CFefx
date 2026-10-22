@@ -1,9 +1,0 @@
-<rml>
-<head>
-	<link type="text/rcss" href="../../rcss/base.rcss"/>
-	<link type="text/rcss" href="../rcss/deadmsg.rcss"/>
-</head>
-<body id="deadmsg">
-	<div id="feed"></div>
-</body>
-</rml>

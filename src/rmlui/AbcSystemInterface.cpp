@@ -11,6 +11,7 @@
 #include "framework/ResourceFile.h"
 #include "framework/DocumentLoadGuard.h"
 #include "framework/Localization.h"
+#include "modsys/ModuleVfs.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -134,6 +135,12 @@ namespace {
 struct ResourceHandle {
   FileHandle_t EngineFile = nullptr;
   FILE *LocalFile = nullptr;
+  // mod:// entries: a view into the mounted package. ModuleEntry keeps the
+  // (possibly extracted) bytes alive for the handle's lifetime.
+  const unsigned char *ModuleData = nullptr;
+  size_t ModuleSize = 0;
+  size_t ModulePos = 0;
+  framework::PackageEntry ModuleEntry;
 };
 
 ResourceHandle *handleFor(Rml::FileHandle handle) {
@@ -143,15 +150,40 @@ ResourceHandle *handleFor(Rml::FileHandle handle) {
 } // namespace
 
 Rml::FileHandle AbcFileInterface::Open(const Rml::String &path) {
+  // engine://<engine path> lets a package document reference a framework
+  // shared asset (the base stylesheet, shared lang tables) by its absolute
+  // engine path, which relative mod:// links cannot reach.
+  Rml::String resolved = path;
+  if (resolved.rfind("engine://", 0) == 0)
+    resolved = resolved.substr(9);
+
+  // Module packages: "mod://<module-id>/<path>" resolves through the module
+  // VFS (zero-copy into the mapped zip for STORED entries). Rml keeps the
+  // scheme when joining relative document references, so package-internal
+  // links and images land here too.
+  if (framework::ModuleVfs::isModuleUri(resolved)) {
+    framework::PackageEntry entry;
+    if (!framework::ModuleVfs::open(resolved.c_str(), entry, nullptr))
+      return 0;
+    auto *resource = new (std::nothrow) ResourceHandle{};
+    if (!resource)
+      return 0;
+    resource->ModuleData = static_cast<const unsigned char *>(entry.data);
+    resource->ModuleSize = entry.size;
+    resource->ModulePos = 0;
+    resource->ModuleEntry = std::move(entry);
+    return reinterpret_cast<Rml::FileHandle>(resource);
+  }
+
   // Rml documents and their resources follow the engine mount order, which
   // is the same IFileSystem VGUI2Extension uses. This also keeps paths such
   // as "abc/abcui/..." independent of the process CWD.
-  const bool absolute =
-      (path.size() >= 2 && path[1] == ':') ||
-      (!path.empty() && (path.front() == '/' || path.front() == '\\'));
+  const bool absolute = (resolved.size() >= 2 && resolved[1] == ':') ||
+                        (!resolved.empty() &&
+                         (resolved.front() == '/' || resolved.front() == '\\'));
   if (absolute) {
     FILE *local = nullptr;
-    if (fopen_s(&local, path.c_str(), "rb") != 0 || !local)
+    if (fopen_s(&local, resolved.c_str(), "rb") != 0 || !local)
       return 0;
     auto *resource = new (std::nothrow) ResourceHandle{nullptr, local};
     if (!resource) {
@@ -163,7 +195,7 @@ Rml::FileHandle AbcFileInterface::Open(const Rml::String &path) {
 
   std::string normalized;
   if (!abc::g_pFileSystem ||
-      !framework::ResourceFile::normalize(path, normalized))
+      !framework::ResourceFile::normalize(resolved, normalized))
     return 0;
   FileHandle_t file = abc::g_pFileSystem->Open(normalized.c_str(), "rb");
   if (!file)
@@ -191,6 +223,15 @@ size_t AbcFileInterface::Read(void *buffer, size_t size, Rml::FileHandle file) {
   ResourceHandle *resource = handleFor(file);
   if (!resource || !buffer)
     return 0;
+  if (resource->ModuleData) {
+    if (resource->ModulePos >= resource->ModuleSize)
+      return 0;
+    const size_t remaining = resource->ModuleSize - resource->ModulePos;
+    const size_t count = (std::min)(size, remaining);
+    std::memcpy(buffer, resource->ModuleData + resource->ModulePos, count);
+    resource->ModulePos += count;
+    return count;
+  }
   if (resource->LocalFile)
     return fread(buffer, 1, size, resource->LocalFile);
   if (!abc::g_pFileSystem || !resource->EngineFile)
@@ -215,6 +256,27 @@ bool AbcFileInterface::Seek(Rml::FileHandle file, long offset, int origin) {
   ResourceHandle *resource = handleFor(file);
   if (!resource)
     return false;
+  if (resource->ModuleData) {
+    long long base = 0;
+    switch (origin) {
+    case SEEK_SET:
+      base = 0;
+      break;
+    case SEEK_CUR:
+      base = static_cast<long long>(resource->ModulePos);
+      break;
+    case SEEK_END:
+      base = static_cast<long long>(resource->ModuleSize);
+      break;
+    default:
+      return false;
+    }
+    const long long target = base + offset;
+    if (target < 0 || target > static_cast<long long>(resource->ModuleSize))
+      return false;
+    resource->ModulePos = static_cast<size_t>(target);
+    return true;
+  }
   if (resource->LocalFile)
     return _fseeki64(resource->LocalFile, offset, origin) == 0;
   if (!abc::g_pFileSystem || !resource->EngineFile)
@@ -245,6 +307,8 @@ size_t AbcFileInterface::Tell(Rml::FileHandle file) {
   ResourceHandle *resource = handleFor(file);
   if (!resource)
     return 0;
+  if (resource->ModuleData)
+    return resource->ModulePos;
   if (resource->LocalFile)
     return static_cast<size_t>(_ftelli64(resource->LocalFile));
   if (!abc::g_pFileSystem || !resource->EngineFile)

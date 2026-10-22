@@ -1,0 +1,38 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/scoreboard.rcss"/>
+</head>
+<body id="scoreboard">
+	<!-- Old CScorePanel (ScorePanel.res): centered 552-wide frame; header
+	     labels (server name, map, player count, next map, time end); one
+	     table rebuilt from playerres/teamres (rows sorted by frags within
+	     score-sorted team sections). Rows carry data-client for the context
+	     menu; the menu and mouse pointer land with the panel controller.
+	     #box stays the positioning/context-menu anchor; #panel carries the
+	     TextMenu-style 5dp rounded surface. -->
+	<div id="box">
+		<div id="panel">
+			<div id="header">
+				<div id="server-name"></div>
+				<div id="map-name"></div>
+				<div id="player-count"></div>
+				<div id="next-map"></div>
+				<div id="time-end"></div>
+			</div>
+			<div id="table-scroll">
+				<div id="table"></div>
+			</div>
+		</div>
+		<div id="menu">
+			<div class="item" id="menu-profile"></div>
+			<div class="item" id="menu-copy-url"></div>
+			<div class="item" id="menu-copy-name"></div>
+			<div class="item" id="menu-copy-name-raw"></div>
+			<div class="item" id="menu-copy-steamid"></div>
+			<div class="item" id="menu-copy-steamid64"></div>
+			<div class="item" id="menu-mute"></div>
+		</div>
+	</div>
+</body>
+</rml>

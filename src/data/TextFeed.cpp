@@ -14,9 +14,12 @@
 
 #include <abc/Format.h>
 
+#include <abcui/events.h>
+
 #include "NetworkMessages.h"
 
 #include "../framework/Localization.h"
+#include "../modsys/EventBus.h"
 
 // Windows.h min/max macros fight std::min (old repo precedent).
 #undef max
@@ -43,6 +46,13 @@ const std::regex &playerPattern() {
 
 std::string matchPrefix(const std::smatch &match) {
   return match.prefix().str();
+}
+
+// Module-facing mirror of the typed kill feed; strings are dispatch-scoped.
+void publishKillFeed(const char *victim, const char *attacker,
+                     const char *inflictor) {
+  const AbcUiKillFeedEvent event{victim, attacker, inflictor};
+  framework::eventBus().publish(ABCUI_CHANNEL_TEXTFEED_KILL_FEED, event);
 }
 
 // Leading-# tokens resolve through the plugin language table (the table keys
@@ -151,26 +161,33 @@ int onTextMsg(int target, const char *msg, const char *param1,
       return out;
     };
     if (std::regex_search(text, match, suicidePattern())) {
-      KillFeed(matchPrefix(match).c_str(), "",
-               localized("DeathMsg_Suicide").c_str());
+      const std::string victim = matchPrefix(match);
+      const std::string inflictor = localized("DeathMsg_Suicide");
+      KillFeed(victim.c_str(), "", inflictor.c_str());
+      publishKillFeed(victim.c_str(), "", inflictor.c_str());
       return false;
     }
     if (std::regex_search(text, match, killedPattern())) {
+      const std::string victim = matchPrefix(match);
       std::string killer = match.suffix().str();
       // Old: k.erase(k.end() - 2) erased only the second-to-last char
       // (the '.'), leaving the '\n' (old quirk, fixed per D-17): the
       // port trims the whole ".\n" tail.
       if (killer.size() >= 2)
         killer.erase(killer.size() - 2);
-      KillFeed(matchPrefix(match).c_str(), killer.c_str(),
-               localized("DeathMsg_MonsterKill").c_str());
+      const std::string inflictor = localized("DeathMsg_MonsterKill");
+      KillFeed(victim.c_str(), killer.c_str(), inflictor.c_str());
+      publishKillFeed(victim.c_str(), killer.c_str(), inflictor.c_str());
       return false;
     }
     if (std::regex_search(text, match, playerPattern())) {
       // Old: inflictor = the " : X : " in-between group, attacker =
       // prefix, victim = suffix.
-      KillFeed(match.suffix().str().c_str(), matchPrefix(match).c_str(),
-               match[1].str().c_str());
+      const std::string victim = match.suffix().str();
+      const std::string attacker = matchPrefix(match);
+      const std::string inflictor = match[1].str();
+      KillFeed(victim.c_str(), attacker.c_str(), inflictor.c_str());
+      publishKillFeed(victim.c_str(), attacker.c_str(), inflictor.c_str());
       return false;
     }
   }
@@ -183,6 +200,8 @@ int onTextMsg(int target, const char *msg, const char *param1,
   if (formatted.empty())
     return true;
   Notice(target, formatted.c_str());
+  const AbcUiNoticeEvent notice{target, formatted.c_str()};
+  framework::eventBus().publish(ABCUI_CHANNEL_TEXTFEED_NOTICE, notice);
   return false;
 }
 

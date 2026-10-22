@@ -1,7 +1,8 @@
 // Debug-only playerlist commands; extracted without changing command names.
+// The page is a module document (abcui.gameui): these commands drive the
+// framework-side model only, so the module's projection follows on its own
+// menu.paint beat.
 #ifndef NDEBUG
-#include <RmlUi/Core/Element.h>
-#include <RmlUi/Core/ElementDocument.h>
 #include "modules/gameui/GameUiModule.h"
 #include "modules/gameui/GameUiPages.h"
 #include "DebugCommands.h"
@@ -30,18 +31,6 @@ void DebugCommands::playerListUiCommand() {
                       entry.local ? 1 : 0, entry.bot ? 1 : 0,
                       entry.spectating ? 1 : 0, entry.muted ? 1 : 0);
   }
-  if (self.PlayerListPage_ && self.PlayerListPage_->document()) {
-    Rml::ElementDocument *doc = self.PlayerListPage_->document();
-    Rml::Element *list = doc->GetElementById("pl-list");
-    abc::ConsolePrint("[AbcUi] playerlist-ui: doc=%s list=%s rows=%d\n",
-                      doc->IsVisible() ? "visible" : "hidden",
-                      list ? "found" : "missing",
-                      list ? list->GetNumChildren() : -1);
-    if (Rml::Element *mute = doc->GetElementById("pl-mute"))
-      abc::ConsolePrint("[AbcUi] playerlist-ui: muteLabel='%s' disabled=%d\n",
-                        mute->GetInnerRML().c_str(),
-                        mute->IsClassSet("pl-disabled") ? 1 : 0);
-  }
 }
 
 void DebugCommands::playerListSelectCommand() {
@@ -62,8 +51,6 @@ void DebugCommands::playerListSelectCommand() {
     self.PlayerList.select(services::playerlist::SelectionKey::forEntry(entry));
     abc::ConsolePrint("[AbcUi] playerlist select idx=%d name=\"%s\"\n",
                       entry.index, entry.name.c_str());
-    if (self.PlayerListPage_)
-      self.PlayerListPage_->render();
     return;
   }
   abc::ConsoleWarn("[AbcUi] playerlist: no player at index %d\n", index);
@@ -79,13 +66,9 @@ void DebugCommands::playerListOpenCommand() {
     services::nativeUiBridge().requestMenuUp(services::NativeUiOrigin::kOwnUi);
   self.Controller.dispatch(gameui::menu::makeOpenPage(MenuPage::kPlayerList));
   self.finishDispatch();
-  abc::ConsolePrint("[AbcUi] playerlist open: pages=%d presented=%d doc=%s\n",
+  abc::ConsolePrint("[AbcUi] playerlist open: pages=%d page=%d\n",
                     static_cast<int>(self.Controller.state().pages.size()),
-                    self.Player->presented() ? 1 : 0,
-                    (self.PlayerListPage_ && self.PlayerListPage_->document() &&
-                     self.PlayerListPage_->document()->IsVisible())
-                        ? "visible"
-                        : "hidden");
+                    static_cast<int>(self.Controller.state().pages.top()));
   playerListUiCommand();
 }
 
@@ -94,7 +77,36 @@ void DebugCommands::playerListMuteCommand() {
     abc::ConsoleWarn("[AbcUi] no module instance\n");
     return;
   }
-  currentModule()->Player->toggleMute();
+  GameUiModule &self = *currentModule();
+  bool mutedAfter = false;
+  const auto result = self.PlayerList.toggleMuted(mutedAfter);
+  switch (result) {
+  case services::playerlist::ToggleError::kNone:
+    abc::ConsolePrint("[AbcUi] player mute %s\n",
+                      mutedAfter ? "MUTED" : "UNMUTED");
+    break;
+  case services::playerlist::ToggleError::kUnavailable:
+    abc::ConsoleWarn("[AbcUi] player mute unavailable (voice service not "
+                     "initialized)\n");
+    break;
+  case services::playerlist::ToggleError::kNoSelection:
+    abc::ConsoleWarn("[AbcUi] player mute refused (no selection)\n");
+    break;
+  case services::playerlist::ToggleError::kIdentityChanged:
+    abc::ConsoleWarn(
+        "[AbcUi] player mute refused (selected player left or is a bot)\n");
+    break;
+  case services::playerlist::ToggleError::kReadbackFailed:
+    abc::ConsoleWarn(
+        "[AbcUi] player mute refused (backend did not change state)\n");
+    break;
+  case services::playerlist::ToggleError::kLocalPlayer:
+    abc::ConsoleWarn("[AbcUi] player mute refused (local player)\n");
+    break;
+  case services::playerlist::ToggleError::kStale:
+    abc::ConsoleWarn("[AbcUi] player mute refused (stale snapshot)\n");
+    break;
+  }
   playerListUiCommand();
 }
 

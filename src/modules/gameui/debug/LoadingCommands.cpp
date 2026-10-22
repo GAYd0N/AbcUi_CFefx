@@ -87,11 +87,10 @@ void DebugCommands::loadingStatusCommand() {
       self.LoadingModelState.generation(),
       self.LoadingModelState.canceled() ? 1 : 0,
       self.LoadingModelState.address().c_str());
-  abc::ConsolePrint("[AbcUi] loading: pages=%d overlays=%d menuPresented=%d "
-                    "loadingVisible=%d\n",
+  abc::ConsolePrint("[AbcUi] loading: pages=%d overlays=%d menuPresented=%d\n",
                     static_cast<int>(state.pages.size()),
                     static_cast<int>(state.overlays.size()),
-                    self.MenuPresented ? 1 : 0, self.LoadingVisible ? 1 : 0);
+                    self.MenuPresented ? 1 : 0);
   {
     std::string stack = "pages=[";
     for (const MenuPage page : state.pages)
@@ -119,7 +118,8 @@ void DebugCommands::loadingStatusCommand() {
                     "passwordInvalid=%d prompts=%d\n",
                     services::nativeUiBridge().hasLevel() ? 1 : 0,
                     services::loadingFeed().dropped(),
-                    self.PasswordInvalid ? 1 : 0, self.PasswordPrompts);
+                    (self.LoadingModelState.passwordPrompts() >= 2) ? 1 : 0,
+                    self.LoadingModelState.passwordPrompts());
   abc::ConsolePrint("[AbcUi] loading: hookSlot22=%d\n",
                     vgui2ext::gameUiLoadingHookInstalled() ? 1 : 0);
 }

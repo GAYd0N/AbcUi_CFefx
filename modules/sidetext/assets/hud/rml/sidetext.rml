@@ -1,0 +1,12 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/sidetext.rcss"/>
+</head>
+<body id="sidetext">
+	<!-- Side readout (old SidePanel): just the value template, HL2-style -
+	     no plate, no money prefix, no icon; the panel rewrites #message from
+	     the {SCORE}/{SPEED}/{MAXSPEED} template as additive glyph ink. -->
+	<div id="message">{SCORE}</div>
+</body>
+</rml>

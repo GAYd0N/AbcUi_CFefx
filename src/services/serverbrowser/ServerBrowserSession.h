@@ -27,6 +27,10 @@ public:
   ServerListModel List;
   bool Presented = false;
   bool Open = false;
+  // 自动重试 (the action bar's toggle): the page module owns the switch and
+  // publishes it here; the framework's retry path reads this copy when a
+  // join fails.
+  bool AutoRetryJoin = false;
   QueryStatus LastStatus = QueryStatus::Idle;
 
 private:

@@ -99,6 +99,11 @@ Rml::Input::KeyIdentifier mapKeyCode(int keynum) {
     return Rml::Input::KI_NUMPADENTER;
   case K_KP_INS:
     return Rml::Input::KI_NUMPAD0;
+  case K_KP_DEL:
+    // NumLock-off decimal key: the scancode table below maps it to
+    // K_KP_DEL, but without this case the key fell through to KI_UNKNOWN
+    // and did nothing in a text box.
+    return Rml::Input::KI_DELETE;
   case K_KP_END:
     return Rml::Input::KI_NUMPAD1;
   case K_KP_DOWNARROW:

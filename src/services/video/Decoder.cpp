@@ -119,6 +119,12 @@ struct Decoder::State {
   AVPacket *Packet = nullptr;
   int StreamIndex = -1;
   SwsContext *Sws = nullptr;
+  // Dimensions/format the current Sws was created for; a mid-stream
+  // resolution change must rebuild it (the old context would read the new
+  // plane layout with stale strides).
+  int SwsSourceWidth = 0;
+  int SwsSourceHeight = 0;
+  int SwsSourceFormat = -1;
   int OutputWidth = 0;
   int OutputHeight = 0;
   std::vector<unsigned char> Output;
@@ -211,6 +217,12 @@ struct Decoder::State {
 
   // Converts Frame into the RGBA output buffer. Returns false on error.
   bool convertPending() {
+    if (Sws &&
+        (SwsSourceWidth != Frame->width || SwsSourceHeight != Frame->height ||
+         SwsSourceFormat != Frame->format)) {
+      Api.sws_freeContext(Sws);
+      Sws = nullptr;
+    }
     if (!Sws) {
       Sws = Api.sws_getContext(Frame->width, Frame->height,
                                static_cast<AVPixelFormat>(Frame->format),
@@ -218,6 +230,9 @@ struct Decoder::State {
                                SWS_BILINEAR, nullptr, nullptr, nullptr);
       if (!Sws)
         return fail("cannot create the video scaler");
+      SwsSourceWidth = Frame->width;
+      SwsSourceHeight = Frame->height;
+      SwsSourceFormat = Frame->format;
     }
     unsigned char *destination[4] = {Output.data(), nullptr, nullptr, nullptr};
     int strides[4] = {OutputWidth * 4, 0, 0, 0};

@@ -66,6 +66,7 @@ void LoadingModel::startAttempt(uint32_t generation, const char *address) {
   Generation = generation;
   Address.assign(address ? address : "");
   Canceled = false;
+  PasswordPrompts_ = 0;
   LevelStarted = false;
   LevelFinished = false;
   Primary = LoadingProgress{};
@@ -172,6 +173,12 @@ bool LoadingModel::requestCancel(uint32_t generation) {
     return false;
   Canceled = true;
   return true;
+}
+
+void LoadingModel::notePasswordPrompt(uint32_t generation) {
+  if (!live(generation))
+    return;
+  ++PasswordPrompts_;
 }
 
 } // namespace loading

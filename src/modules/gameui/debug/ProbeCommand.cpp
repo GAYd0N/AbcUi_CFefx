@@ -10,22 +10,20 @@
 
 #include <abc/Console.h>
 #include <abc/CvarCmd.h>
-#include <abc/Format.h>
 
 #include <keydefs.h>
 #include <abc/Math.h>
 
 #include "../../../data/HudState.h"
 #include "../../../framework/PanelManager.h"
+#include "../../../framework/HudPanel.h"
+#include "../../../framework/ScoreSeat.h"
+#include "../../../render/RadarRender.h"
 #include "../../../rmlui/texture/Avatars.h"
 #include "../../../data/NetworkMessages.h"
 #include "../../../data/PlayerResource.h"
 #include "../../../rmlui/texture/SpriteResource.h"
 #include "../../../data/WeaponResource.h"
-#include "../../../panels/cfefx/CfefxPanel.h"
-#include "../../../panels/itemhighlight/ItemHighlightPanel.h"
-#include "../../../panels/radar/RadarPanel.h"
-#include "../../../panels/scoreboard/ScoreboardPanel.h"
 
 #include "../../../services/steam/SteamAPI.h"
 
@@ -41,9 +39,6 @@
 #include "../../../services/console/ConsoleBackend.h"
 #include "../../../services/console/ConsoleBuffer.h"
 
-#include <algorithm>
-#include <cstring>
-#include <string>
 #include <string_view>
 #include <vector>
 namespace panels::scoreboard {}
@@ -294,17 +289,6 @@ void probeCommand() {
                         name, doc->IsVisible() ? 1 : 0,
                         doc->GetProperty("display")->ToString().c_str());
   }
-  if (Rml::ElementDocument *flashlight = context->GetDocument("flashlight")) {
-    if (Rml::Element *off = flashlight->GetElementById("off-image")) {
-      const Rml::Box box = off->GetBox();
-      const Rml::Vector2f content = box.GetSize();
-      abc::ConsolePrint("[AbcUi] probe: flashlight off-image src='%s' "
-                        "visibility='%s' computed=%.2fx%.2f\n",
-                        off->GetAttribute<Rml::String>("src", "<none>").c_str(),
-                        off->GetProperty("visibility")->ToString().c_str(),
-                        content.x, content.y);
-    }
-  }
   // Batch B ground truth: the popnum doc's live children with their inline
   // and absolute positions (projection chain: netmsg -> element -> layout).
   if (Rml::ElementDocument *popnum = context->GetDocument("popnum")) {
@@ -419,8 +403,7 @@ void probeCommand() {
       }
     }
     abc::ConsolePrint(
-        "[AbcUi] probe: itemhighlight tracked=%d markers=%d doc-visible=%d\n",
-        panels::itemhighlight::debugTrackedCount(), markers,
+        "[AbcUi] probe: itemhighlight markers=%d doc-visible=%d\n", markers,
         ih->IsVisible() ? 1 : 0);
   }
   // Radar ground truth (batch D): FBO readiness + plate state + live
@@ -431,8 +414,9 @@ void probeCommand() {
     if (Rml::Element *container = radar->GetElementById("avatars"))
       avatars = container->GetNumChildren();
     abc::ConsolePrint(
-        "[AbcUi] probe: radar fbo-tex=%d doc-visible=%d avatars=%d\n",
-        panels::radar::debugFboTexture(), radar->IsVisible() ? 1 : 0, avatars);
+        "[AbcUi] probe: radar fbo-ready=%d doc-visible=%d avatars=%d\n",
+        framework::radarrender::ready() ? 1 : 0, radar->IsVisible() ? 1 : 0,
+        avatars);
     if (Rml::Element *map = radar->GetElementById("map")) {
       abc::ConsolePrint("[AbcUi] probe: radar map src='%s' abs=(%.1f %.1f)\n",
                         map->GetAttribute<Rml::String>("src", "<none>").c_str(),
@@ -495,7 +479,7 @@ void probeCommand() {
                       cursor ? 1 : 0, vgui2ext::isCursorVisible() ? 1 : 0, cx,
                       cy, vgui2ext::uiCallbacksRegistered() ? 1 : 0,
                       rmlui::uiMouseOwner() ? 1 : 0,
-                      panels::scoreboard::wantsWheel() ? 1 : 0);
+                      framework::scoreseat::wantsWheel() ? 1 : 0);
   }
   const char *rml =
       "<rml>"
@@ -603,168 +587,6 @@ void feedbackCommand() {
                     "poison+burn+shock) + Health(20) + PopNum(12345)\n");
 }
 
-// cfefx manual trigger: fires the wire event the panel subscribes to
-// (netmsg::PopNum) instead of poking its private accumulator, so the whole
-// chain - subscription, tier split, mark fade, star flight, score pop, the
-// engine sound - runs exactly like a live server hit. The ids below are the
-// document ids CfefxPanel queries; they are listed only here, in a Debug
-// translation unit, so the production surface stays uncoupled (same rule as
-// the probe fields).
-constexpr const char *kCfefxMarkIds[9] = {
-    "dmg-mark-one",   "dmg-mark-two",   "dmg-mark-three",
-    "dmg-mark-four",  "dmg-mark-five",  "dmg-mark-six",
-    "dmg-mark-seven", "dmg-mark-eight", "dmg-mark-nine",
-};
-constexpr const char *kCfefxStarIds[9] = {
-    "star-one", "star-two",   "star-three", "star-four", "star-five",
-    "star-six", "star-seven", "star-eight", "star-nine",
-};
-
-panels::CfefxPanel *cfefxPanel() {
-  for (const auto &panel : framework::PanelManager::panels()) {
-    if (panel->getName() != "cfefx")
-      continue;
-    return dynamic_cast<panels::CfefxPanel *>(panel.get());
-  }
-  return nullptr;
-}
-
-// One POPNUMBER package 80u ahead of the view: the same point shape the
-// server addon sends, so PopNum also reacts to it and the hud_popnumber
-// decoupling can be watched side by side (`hud_popnumber 0` must leave the
-// cfefx marks running).
-bool cfefxInject(int value) {
-  const cl_entity_t *local = gEngfuncs.GetLocalPlayer();
-  if (!local) {
-    abc::ConsoleWarn("[AbcUi] cfefx: no local player - nothing to inject\n");
-    return false;
-  }
-  vec3_t angles{}, forward{};
-  gEngfuncs.GetViewAngles(angles);
-  abc::math::AngleVectors(angles, forward, nullptr, nullptr);
-
-  netmsg::PopNumData popnum;
-  for (int i = 0; i < 3; i++)
-    popnum.origin[i] = local->curstate.origin[i] + forward[i] * 80.0f;
-  popnum.origin[2] += 16.0f;
-  popnum.value = value;
-  popnum.color[0] = 255;
-  popnum.color[1] = 210;
-  popnum.color[2] = 80;
-  popnum.color[3] = 255;
-  netmsg::PopNum(popnum);
-  return true;
-}
-
-void cfefxDump(const char *label) {
-  panels::CfefxPanel *panel = cfefxPanel();
-  if (!panel) {
-    abc::ConsoleWarn("[AbcUi] cfefx: panel not registered\n");
-    return;
-  }
-  const panels::CfefxPanel::DebugState state = panel->debugState();
-  abc::ConsolePrint("[AbcUi] cfefx: %s enabled=%d active=%d visible=%d "
-                    "damage=%llu step=%d tier=%d score=%d "
-                    "lastScore=%.2fs scoreAge=%.2fs volume=%.2f popNum=%.0f\n",
-                    label, state.enabled ? 1 : 0, state.active ? 1 : 0,
-                    state.visible ? 1 : 0,
-                    static_cast<unsigned long long>(state.damage), state.step,
-                    static_cast<int>(state.tier), static_cast<int>(state.score),
-                    state.lastScoreAge, state.scoreAge, state.volume,
-                    gEngfuncs.pfnGetCvarFloat("hud_popnumber"));
-  if (!state.active)
-    abc::ConsoleWarn("[AbcUi] cfefx: inactive (no live player, health 0 or HUD "
-                     "hidden) - the "
-                     "injection ran but nothing draws\n");
-
-  Rml::ElementDocument *doc = panel->getDocument();
-  if (!doc) {
-    abc::ConsoleWarn("[AbcUi] cfefx: document not loaded\n");
-    return;
-  }
-  std::string marks;
-  std::string stars;
-  for (int i = 0; i < 9; i++) {
-    if (Rml::Element *mark = doc->GetElementById(kCfefxMarkIds[i]))
-      marks +=
-          abc::Format("{0}:{1} ", i, mark->GetProperty("opacity")->ToString());
-    if (Rml::Element *star = doc->GetElementById(kCfefxStarIds[i]))
-      stars +=
-          abc::Format("{0}:{1} ", i, star->GetProperty("opacity")->ToString());
-  }
-  abc::ConsolePrint("[AbcUi] cfefx: mark-alpha %s| star-alpha %s\n",
-                    marks.c_str(), stars.c_str());
-  if (Rml::Element *score = doc->GetElementById("score-mark"))
-    abc::ConsolePrint(
-        "[AbcUi] cfefx: score src='%s' opacity='%s' | document display='%s'\n",
-        score->GetAttribute<Rml::String>("src", "<none>").c_str(),
-        score->GetProperty("opacity")->ToString().c_str(),
-        doc->GetProperty("display")->ToString().c_str());
-}
-
-void cfefxUsage() {
-  abc::ConsolePrint("[AbcUi] cfefx: abc_ui_cfefx hit [value] | tier <1..9> | "
-                    "score [count] | sound | "
-                    "reset | status\n"
-                    "[AbcUi] cfefx: hit defaults to one mark of hud_cfefx_max; "
-                    "ten marks = one score pop\n");
-}
-
-void cfefxCommand() {
-  panels::CfefxPanel *panel = cfefxPanel();
-  if (!panel) {
-    abc::ConsoleWarn("[AbcUi] cfefx: panel not registered\n");
-    return;
-  }
-  if (!panel->getDocument()) {
-    abc::ConsoleWarn("[AbcUi] cfefx: document not loaded (in a map yet?)\n");
-    return;
-  }
-  const panels::CfefxPanel::DebugState state = panel->debugState();
-  if (state.step <= 0) {
-    abc::ConsoleWarn("[AbcUi] cfefx: hud_cfefx_max not registered yet\n");
-    return;
-  }
-  const char *sub = gEngfuncs.Cmd_Argc() > 1 ? gEngfuncs.Cmd_Argv(1) : "status";
-
-  if (!strcmp(sub, "hit")) {
-    const int requested =
-        gEngfuncs.Cmd_Argc() > 2 ? atoi(gEngfuncs.Cmd_Argv(2)) : state.step;
-    if (!cfefxInject(requested))
-      return;
-    cfefxDump("hit");
-  } else if (!strcmp(sub, "tier")) {
-    const int target = std::clamp(
-        gEngfuncs.Cmd_Argc() > 2 ? atoi(gEngfuncs.Cmd_Argv(2)) : 1, 1, 9);
-    panel->reset();
-    if (!cfefxInject(target * state.step))
-      return;
-    cfefxDump("tier");
-  } else if (!strcmp(sub, "score")) {
-    const int count = std::clamp(
-        gEngfuncs.Cmd_Argc() > 2 ? atoi(gEngfuncs.Cmd_Argv(2)) : 1, 1, 10);
-    for (int i = 0; i < count; i++) {
-      // A full accumulator: the tenth mark triggers the score pop and
-      // clears the marks, the same edge a live 1000-damage run hits.
-      if (!cfefxInject(state.step * 10))
-        return;
-    }
-    cfefxDump("score");
-  } else if (!strcmp(sub, "sound")) {
-    panel->debugPlayScoreSound();
-    abc::ConsolePrint("[AbcUi] cfefx: sound requested at volume %.2f "
-                      "(abc/cfefx/UI_SPECIALKILL2.wav)\n",
-                      state.volume);
-  } else if (!strcmp(sub, "reset")) {
-    panel->reset();
-    cfefxDump("reset");
-  } else if (!strcmp(sub, "status")) {
-    cfefxDump("status");
-  } else {
-    cfefxUsage();
-  }
-}
-
 // Batch C full-occupancy board instrument: pins 31 fake playerres slots
 // (mixed teams/health/donor/admin) so a local session can drive the
 // scoreboard table/scroll/context-menu at 32 occupancy. The wire-parse
@@ -790,12 +612,12 @@ void boardCommand() {
 // (P6 acceptance finding - real hardware does), so the driver flips the
 // pointer mode and pumps the wheel directly.
 void pointerOnCommand() {
-  panels::scoreboard::setPointerMode(true);
+  framework::scoreseat::setPointerMode(true);
   abc::ConsolePrint("[AbcUi] pointer: on\n");
 }
 
 void pointerOffCommand() {
-  panels::scoreboard::setPointerMode(false);
+  framework::scoreseat::setPointerMode(false);
   abc::ConsolePrint("[AbcUi] pointer: off\n");
 }
 
@@ -819,7 +641,7 @@ void mouseKeyCommand() {
                     "cursor=%d wheel=%d\n",
                     key, down, result, uiMouseOwner(),
                     vgui2ext::isCursorVisible(),
-                    panels::scoreboard::wantsWheel());
+                    framework::scoreseat::wantsWheel());
 }
 
 // T07 text seams: the same entry points the engine AppProc events
@@ -995,8 +817,7 @@ void domAtCommand() {
 
 void inputRegressionCommand() {
   auto *ctx = rmlui::context();
-  auto *panel = static_cast<panels::ScoreboardPanel *>(
-      framework::PanelManager::find("scoreboard"));
+  framework::HudPanel *panel = framework::PanelManager::find("scoreboard");
   if (!ctx || !panel)
     return;
   int failures = 0;
@@ -1009,7 +830,7 @@ void inputRegressionCommand() {
   panel->reset();
   check(hooks::debugKeyEvent(1, K_MOUSE2) == 1 && !uiMouseOwner(),
         "hidden right passes");
-  panels::scoreboard::setIntermission(true);
+  framework::scoreseat::setIntermission(true);
   check(hooks::debugKeyEvent(1, K_MOUSE2) == 0 && uiMouseOwner(),
         "first right enters");
   hooks::debugKeyEvent(0, K_MOUSE2);
@@ -1019,11 +840,11 @@ void inputRegressionCommand() {
   hooks::debugKeyEvent(0, K_MOUSE2);
   check(hooks::debugKeyEvent(1, K_MOUSE1) == 0, "left attack consumed");
   hooks::debugKeyEvent(0, K_MOUSE1);
-  panels::scoreboard::setIntermission(false);
-  check(!uiMouseOwner() && !panels::scoreboard::wantsWheel(),
+  framework::scoreseat::setIntermission(false);
+  check(!uiMouseOwner() && !framework::scoreseat::wantsWheel(),
         "intermission hide releases");
   check(hooks::debugKeyEvent(1, K_MOUSE2) == 1, "closed right passes again");
-  panels::scoreboard::setIntermission(true);
+  framework::scoreseat::setIntermission(true);
   hooks::debugKeyEvent(1, K_MOUSE2);
   hooks::debugKeyEvent(0, K_MOUSE2);
   panel->reset();
@@ -1057,7 +878,6 @@ void registerProbeCommand() {
   abc::ADD_COMMAND("abc_ui_probe", probeCommand);
   abc::ADD_COMMAND("abc_ui_menu", menuCommand);
   abc::ADD_COMMAND("abc_ui_feedback", feedbackCommand);
-  abc::ADD_COMMAND("abc_ui_cfefx", cfefxCommand);
   abc::ADD_COMMAND("abc_ui_board", boardCommand);
   abc::ADD_COMMAND("abc_ui_perf", perfCommand);
   abc::ADD_COMMAND("abc_ui_pointer_on", pointerOnCommand);

@@ -1,28 +1,30 @@
 // Extracted from GameUiModule.cpp (UTF-8). Responsibility: GameUiModule.
 #include "modules/gameui/GameUiModule.h"
 #include "modules/gameui/GameUiPages.h"
-#include "../../panels/commandmenu/CommandMenuPage.h"
-#include "../../panels/console/ConsolePage.h"
-#include "../../panels/creategame/CreateGamePage.h"
-#include "../../panels/inventory/InventoryPage.h"
-#include "../../panels/loading/LoadingWindows.h"
-#include "../../panels/mainmenu/MainMenuPage.h"
 #include "../../panels/menushared/MenuShellWindows.h"
-#include "../../panels/playerlist/PlayerListPage.h"
-#include "../../panels/serverbrowser/ServerBrowserPage.h"
 #include "../../panels/settings/SettingsPage.h"
 #include "../../panels/settings/VideoConfirmPage.h"
-#include "../../panels/votemenu/VoteMenuPage.h"
 
 #include "../../data/WeaponResource.h"
+#include "../../framework/ResourceLimits.h"
 #include "modules/gameui/settings/SettingsResources.h"
 #include "modules/gameui/debug/DebugCommands.h"
 #include <abc/Console.h>
 #include <abc/Paths.h>
 #include <abc/CvarCmd.h>
+#include "services/commandmenu/CommandMenuService.h"
+#include "services/creategame/CreateGameService.h"
+#include "services/console/ConsolePageService.h"
+#include "services/loading/ConnectionService.h"
+#include "services/friends/FriendsService.h"
+#include "services/inventory/InventoryService.h"
 #include "services/serverbrowser/BlacklistFileStore.h"
+#include "services/playerlist/PlayerListService.h"
+#include "services/uiconfig/MenuShellService.h"
+#include "services/votemenu/VoteMenuService.h"
 #include "framework/Commands.h"
 #include "data/NetworkMessages.h"
+#include "modsys/ModuleDocuments.h"
 #include "modules/gameui/engine/MenuBindings.h"
 #include "modules/gameui/engine/SettingsBindings.h"
 #include "modules/gameui/engine/VideoBindings.h"
@@ -33,6 +35,44 @@
 namespace gameui {
 using namespace engine;
 using namespace settings;
+
+// The menu section's page ids are ABI: pin the state-machine enum values to
+// the SDK constants so a reordered enum fails to compile instead of
+// misrouting a module page.
+static_assert(static_cast<int>(menu::MenuPage::kMain) == ABCUI_MENU_PAGE_MAIN);
+static_assert(static_cast<int>(menu::MenuPage::kPause) ==
+              ABCUI_MENU_PAGE_PAUSE);
+static_assert(static_cast<int>(menu::MenuPage::kSettings) ==
+              ABCUI_MENU_PAGE_SETTINGS);
+static_assert(static_cast<int>(menu::MenuPage::kServers) ==
+              ABCUI_MENU_PAGE_SERVERS);
+static_assert(static_cast<int>(menu::MenuPage::kCreateGame) ==
+              ABCUI_MENU_PAGE_CREATE_GAME);
+static_assert(static_cast<int>(menu::MenuPage::kPlayerList) ==
+              ABCUI_MENU_PAGE_PLAYER_LIST);
+static_assert(static_cast<int>(menu::MenuPage::kVoteMenu) ==
+              ABCUI_MENU_PAGE_VOTE);
+static_assert(static_cast<int>(menu::MenuPage::kCommandMenu) ==
+              ABCUI_MENU_PAGE_COMMAND);
+static_assert(static_cast<int>(menu::MenuPage::kInventory) ==
+              ABCUI_MENU_PAGE_INVENTORY);
+static_assert(static_cast<int>(menu::MenuPage::kLoading) ==
+              ABCUI_MENU_PAGE_LOADING);
+static_assert(static_cast<int>(menu::BackendPhase::kBooting) ==
+              ABCUI_MENU_PHASE_BOOTING);
+static_assert(static_cast<int>(menu::BackendPhase::kDisconnected) ==
+              ABCUI_MENU_PHASE_DISCONNECTED);
+static_assert(static_cast<int>(menu::BackendPhase::kConnecting) ==
+              ABCUI_MENU_PHASE_CONNECTING);
+static_assert(static_cast<int>(menu::BackendPhase::kLoading) ==
+              ABCUI_MENU_PHASE_LOADING);
+static_assert(static_cast<int>(menu::BackendPhase::kInGame) ==
+              ABCUI_MENU_PHASE_IN_GAME);
+static_assert(static_cast<int>(menu::BackendPhase::kShuttingDown) ==
+              ABCUI_MENU_PHASE_SHUTTING_DOWN);
+static_assert(static_cast<int>(menu::BackendPhase::kFatal) ==
+              ABCUI_MENU_PHASE_FATAL);
+
 namespace {
 
 bool loadCommandMenuDefinition(services::commandmenu::Definition &definition,
@@ -63,8 +103,6 @@ bool loadCommandMenuDefinition(services::commandmenu::Definition &definition,
 GameUiModule::GameUiModule()
     : Controller(&menuBackend()), CaptureOwner(this),
       Video(std::make_unique<VideoFlow>(MakeVideoHost(), VideoModel)),
-      Player(
-          std::make_unique<PlayerListFlow>(MakePlayerListHost(), PlayerList)),
       Spray(std::make_unique<SprayMaker>([this](bool ok,
                                                 const std::string &message,
                                                 const std::string &previewUri) {
@@ -92,6 +130,132 @@ GameUiModule::GameUiModule()
   // T20: the player-list model's roster/mute seams (playerres + the
   // voice service adapter, issue 17).
   PlayerList.setSeams(playerListSeams());
+  // The player-list page module reads this model through the sdk
+  // playerlist section.
+  services::playerlist::setModel(&PlayerList);
+  // The command-menu page module reads this model through the sdk
+  // commandmenu section; its command/dismiss boundaries run here (close
+  // first, then the engine send; the raised-menu close discipline). The
+  // seams are bare function pointers, so they resolve the module through
+  // the registry (the same shape the launcher thunk uses).
+  services::commandmenu::Access commandAccess;
+  commandAccess.model = &Command->model();
+  commandAccess.submitCommand = [](const char *command) {
+    if (GameUiModule *module = currentModule())
+      module->Command->handleCommand(command ? command : "");
+  };
+  commandAccess.dismiss = [] {
+    if (GameUiModule *module = currentModule())
+      module->Command->close();
+  };
+  services::commandmenu::setAccess(commandAccess);
+  // The menu-shell page module reads the definition and its engine facts
+  // through the sdk menuconfig section (the composition root owns the
+  // ConfigRepository and the engine reads).
+  services::uiconfig::MenuShellAccess shellAccess;
+  shellAccess.definition = &UiConfig.menu();
+  shellAccess.multiplayer = [] {
+    return engine::menuBackend().maxClientsFact() > 1;
+  };
+  shellAccess.playerCard = [](std::string &playerName, std::string &modelPath,
+                              std::string &modelLabel) {
+    const engine::PlayerCardFacts facts = engine::playerCardFacts();
+    playerName = facts.PlayerName;
+    modelPath = facts.ModelPath;
+    modelLabel = facts.ModelName;
+  };
+  shellAccess.buildNote = [](std::string &note) {
+    char build[64];
+    _snprintf_s(build, sizeof(build), _TRUNCATE, "Sven Co-op build %u",
+                abc::g_dwEngineBuildnum);
+    note = build;
+  };
+  services::uiconfig::setShellAccess(shellAccess);
+  // The shell's friends board join intent: validated here (the address
+  // grammar is the direct-connect one) before it becomes an attempt.
+  services::friends::JoinSeam joinSeam;
+  joinSeam.join = [](uint64_t steamId, const char *address) {
+    if (GameUiModule *module = currentModule())
+      module->onFriendJoin(steamId, address);
+  };
+  services::friends::setJoinSeam(joinSeam);
+  // The create-game page module reads the catalog/options through the sdk
+  // creategame section and submits its form fields once on Apply (this
+  // seam assembles, validates and dispatches them).
+  services::creategame::Access createGameAccess;
+  createGameAccess.model = &Create->model();
+  createGameAccess.submit =
+      [](const std::vector<std::pair<std::string, std::string>> &fields,
+         std::string &hint) {
+        if (GameUiModule *module = currentModule())
+          return module->Create->apply(fields, hint);
+        return false;
+      };
+  services::creategame::setAccess(createGameAccess);
+  // The inventory page module reads this model through the sdk inventory
+  // section; the actions' client commands run here (the window closes
+  // first, then the queued command). The seams resolve the module through
+  // the registry (the launcher-thunk shape).
+  services::inventory::Access inventoryAccess;
+  inventoryAccess.model = &Inventory->model();
+  inventoryAccess.dismiss = [] {
+    if (GameUiModule *module = currentModule())
+      module->Inventory->close();
+  };
+  services::inventory::setAccess(inventoryAccess);
+  // The console page module's close button lowers both truths (the bridge
+  // request path and the engine-side console flag) - the seams resolve the
+  // module through the registry (the launcher-thunk shape).
+  services::console::PageAccess consolePageAccess;
+  consolePageAccess.requestClose = [] {
+    if (GameUiModule *module = currentModule()) {
+      services::nativeUiBridge().requestConsoleClose(
+          services::NativeUiOrigin::kOwnUi);
+      services::nativeUiBridge().noteConsoleDismissed();
+      menuBackend().hideConsole();
+    }
+  };
+  services::console::setPageAccess(consolePageAccess);
+  // The connection pages module reads the drained attempt model and acts
+  // through these typed edges (the controller layer's decisions stay in the
+  // connectionXxx methods). The seams are bare function pointers: they
+  // resolve the module through the registry (the launcher-thunk shape).
+  services::loading::ConnectionAccess connectionAccess;
+  connectionAccess.model = &LoadingModelState;
+  connectionAccess.errorReason = [] {
+    if (GameUiModule *module = currentModule())
+      return module->Controller.state().errorReason;
+    return std::string();
+  };
+  connectionAccess.cancelLoading = [] {
+    if (GameUiModule *module = currentModule())
+      return module->connectionCancelLoading();
+    return false;
+  };
+  connectionAccess.retryFailed = [] {
+    if (GameUiModule *module = currentModule())
+      module->connectionRetryFailed();
+  };
+  connectionAccess.returnHome = [] {
+    if (GameUiModule *module = currentModule())
+      module->connectionReturnHome();
+  };
+  connectionAccess.submitPassword = [](const char *password) {
+    if (GameUiModule *module = currentModule())
+      return module->connectionSubmitPassword(password);
+    return false;
+  };
+  connectionAccess.passwordCancel = [] {
+    if (GameUiModule *module = currentModule())
+      module->connectionPasswordCancel();
+  };
+  connectionAccess.connectAddress = [](const char *address,
+                                       std::string &errorToken) {
+    if (GameUiModule *module = currentModule())
+      return module->connectionConnectAddress(address, errorToken);
+    return false;
+  };
+  services::loading::setConnectionAccess(connectionAccess);
   // Vote creation menu: the live player roster comes from the same
   // playerres mirror; maps arrive through the MapList user message.
   // WS4: the friends board's Steam provider (bound lazily; without Steam the
@@ -100,6 +264,25 @@ GameUiModule::GameUiModule()
       services::friends::steamFriendsProvider());
   modules::registry().add(this);
   services::nativeUiBridge().setMenuSink(this);
+  // The vote page module reads this model through the sdk votemenu section.
+  services::votemenu::setModel(&Vote->model());
+  // Menu section backing: the page modules act through these four entry
+  // points and read the settled state from menu.state/menu.paint. Bound once
+  // (the module object is process-lifetime).
+  services::menu::Host &menuHost = services::menu::host();
+  menuHost.snapshot = [this] { return menuSnapshot(); };
+  menuHost.openPage = [this](int32_t page) { return openMenuPage(page); };
+  menuHost.back = [this] { menuBack(); };
+  menuHost.ensureUp = [this] { return ensureMenuUp(); };
+  menuHost.resume = [this] { return resumeFromMenu(); };
+  menuHost.quit = [this] { menuQuit(); };
+  menuHost.disconnect = [this] { menuDisconnect(); };
+  menuHost.toggleConsole = [this] { menuToggleConsole(); };
+  menuHost.directConnect = [this] {
+    handleConnectionAction(navigation::ActionKind::kDirectConnect);
+    finishDispatch();
+  };
+  menuHost.quitNow = [this] { menuBackend().quitGame(); };
 }
 
 VideoHost GameUiModule::MakeVideoHost() {
@@ -108,12 +291,11 @@ VideoHost GameUiModule::MakeVideoHost() {
   host.menuPresented = [this] { return MenuPresented; };
   host.syncMenuPresentation = [this] { syncMenuPresentation(); };
   host.hideMenuDocuments = [this] {
-    if (Shell)
-      Shell->hide();
+    // The home pages are module documents now; the settings page stays
+    // built-in until its own migration.
+    framework::module_documents::hideMenu();
     if (SubStub)
       SubStub->hide();
-    if (Console)
-      Console->hide();
     if (Settings)
       Settings->hide();
   };
@@ -124,18 +306,9 @@ VideoHost GameUiModule::MakeVideoHost() {
   return host;
 }
 
-PlayerListHost GameUiModule::MakePlayerListHost() {
-  PlayerListHost host;
-  host.dispatchBack = [this] {
-    Controller.dispatch(MenuEvent{EventKind::kBack});
-  };
-  host.finishDispatch = [this] { finishDispatch(); };
-  return host;
-}
-
 VoteMenuHost GameUiModule::MakeVoteMenuHost() {
   VoteMenuHost host;
-  host.shellReady = [this] { return Shell && Context; };
+  host.shellReady = [this] { return Context != nullptr; };
   host.ensureMenu = [this] {
     if (!MenuPresented) {
       if (!services::nativeUiBridge().menuUp())
@@ -150,14 +323,8 @@ VoteMenuHost GameUiModule::MakeVoteMenuHost() {
     reconcilePhase();
     return Controller.state().phase == menu::BackendPhase::kInGame;
   };
-  host.pageOnTop = [this] {
-    return Controller.state().pages.topIs(MenuPage::kVoteMenu);
-  };
   host.dispatchOpen = [this] {
     Controller.dispatch(menu::makeOpenPage(MenuPage::kVoteMenu));
-  };
-  host.dispatchBack = [this] {
-    Controller.dispatch(MenuEvent{EventKind::kBack});
   };
   host.finishDispatch = [this] { finishDispatch(); };
   return host;
@@ -165,7 +332,10 @@ VoteMenuHost GameUiModule::MakeVoteMenuHost() {
 
 CommandMenuHost GameUiModule::MakeCommandMenuHost() {
   CommandMenuHost host;
-  host.shellReady = [this] { return Shell && Context; };
+  host.shellReady = [this] { return Context != nullptr; };
+  host.pageOnTop = [this] {
+    return Controller.state().pages.topIs(MenuPage::kCommandMenu);
+  };
   host.ensureMenu = [this](bool &raisedMenu) {
     const bool menuWasUp = MenuPresented;
     if (!menuWasUp) {
@@ -209,7 +379,10 @@ CommandMenuHost GameUiModule::MakeCommandMenuHost() {
 
 InventoryHost GameUiModule::MakeInventoryHost() {
   InventoryHost host;
-  host.shellReady = [this] { return Shell && Context; };
+  host.shellReady = [this] { return Context != nullptr; };
+  host.pageOnTop = [this] {
+    return Controller.state().pages.topIs(MenuPage::kInventory);
+  };
   host.ensureMenu = [this](bool &raisedMenu) {
     const bool menuWasUp = MenuPresented;
     if (!menuWasUp) {
@@ -256,9 +429,6 @@ CreateGameHost GameUiModule::MakeCreateGameHost() {
   host.dispatchCreate = [this](const std::string &map) {
     Controller.dispatch(menu::makeCreateGameRequest(map.c_str()));
   };
-  host.dispatchBack = [this] {
-    Controller.dispatch(MenuEvent{EventKind::kBack});
-  };
   host.finishDispatch = [this] { finishDispatch(); };
   host.resetAutoRetry = [this] { AutoRetry.reset(); };
   return host;
@@ -302,7 +472,9 @@ void GameUiModule::onInit() {
   // hud_fastswitch: the data registry only reports the selection; the
   // engine command is an engine-facing concern owned here.
   weaponres::FastSwitchWeapon.append([](const weaponres::Weapon *weapon) {
-    if (weapon)
+    // Same server-data boundary as WeaponChoosePanel: only an HLSDK-shaped
+    // weapon command token may reach the console.
+    if (weapon && framework::ResourceLimits::weaponCommandName(weapon->name))
       gEngfuncs.pfnServerCmd(weapon->name.c_str());
   });
   ServerBrowser.setProvider(services::serverbrowser::steamQueryProvider());
@@ -553,38 +725,19 @@ void GameUiModule::onShutdown() {
   PageToken.release();
   // Stop callbacks and release queries before any observing document dies.
   ServerBrowser.closeContext();
-  Shell.reset();
   SubStub.reset();
-  Console.reset();
   SettingsView->shutdown();
   Settings.reset();
   Server->shutdown();
-  Browser.reset();
   Create->shutdown();
-  CreateGamePage_.reset();
-  Player->shutdown();
-  PlayerListPage_.reset();
   Vote->shutdown();
-  VoteMenuPage_.reset();
   Command->shutdown();
-  CommandMenuPage_.reset();
   Inventory->shutdown();
-  InventoryPage_.reset();
   Video->shutdown();
   VideoConfirm.reset();
   ConfirmQuit.reset();
-  Loading.reset();
-  ConnError.reset();
-  Password.reset();
-  DirectConnect.reset();
   Context = nullptr;
   MenuPresented = false;
-  ConsolePresented = false;
-  LoadingVisible = false;
-  ErrorPresented = false;
-  PasswordPresented = false;
-  PasswordReprepare = false;
-  DirectConnectPresented = false;
   LastStubPage = MenuPage::kMain;
 }
 

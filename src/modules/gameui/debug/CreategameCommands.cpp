@@ -11,22 +11,17 @@
 #include <abc/Plugin.h>
 namespace gameui {
 void DebugCommands::createGameUiCommand() {
-  if (!currentModule() || !currentModule()->CreateGamePage_ ||
-      !currentModule()->CreateGamePage_->document()) {
-    abc::ConsoleWarn("[AbcUi] create-game page not open\n");
+  if (!currentModule()) {
+    abc::ConsoleWarn("[AbcUi] no module instance\n");
     return;
   }
+  // The form DOM moved into the abcui.gameui module; this dumps the
+  // framework-side model and the kept request.
   GameUiModule &self = *currentModule();
   const auto &catalog = self.Create->model().catalog();
   abc::ConsolePrint("[AbcUi] create-game-ui: maps=%d first=%s\n",
                     static_cast<int>(catalog.size()),
                     catalog.size() > 0 ? catalog.nameAt(0).c_str() : "(none)");
-  abc::ConsolePrint(
-      "[AbcUi] create-game-ui: map='%s' players='%s' name='%s' pw=%d\n",
-      self.CreateGamePage_->selectedMap().c_str(),
-      self.CreateGamePage_->playersText().c_str(),
-      self.CreateGamePage_->serverName().c_str(),
-      self.CreateGamePage_->password().empty() ? 0 : 1);
   abc::ConsolePrint("[AbcUi] create-game-ui: pending=%d map=%s lastLocal=%d\n",
                     self.Create->pendingValid() ? 1 : 0,
                     self.Create->pendingValid()
@@ -36,51 +31,11 @@ void DebugCommands::createGameUiCommand() {
 }
 
 void DebugCommands::createGameFillCommand() {
-  if (!currentModule() || !currentModule()->CreateGamePage_ ||
-      !currentModule()->CreateGamePage_->document()) {
-    abc::ConsoleWarn("[AbcUi] create-game page not open\n");
-    return;
-  }
-  if (gEngfuncs.Cmd_Argc() < 4) {
-    abc::ConsoleWarn("[AbcUi] usage: abc_ui_create_game_fill <map> <players> "
-                     "<name> [password]\n");
-    return;
-  }
-  GameUiModule &self = *currentModule();
-  Rml::ElementDocument *doc = self.CreateGamePage_->document();
-  if (Rml::ElementFormControlSelect *select =
-          rmlui_dynamic_cast<Rml::ElementFormControlSelect *>(
-              doc->GetElementById("cg-map"))) {
-    // Select by exact value when present, else refuse (the option set
-    // is the catalog - a fill cannot invent an entry).
-    bool found = false;
-    for (int i = 0; i < select->GetNumOptions() && !found; ++i) {
-      Rml::Element *option = select->GetOption(i);
-      if (option && option->GetAttribute<Rml::String>("value", "") ==
-                        gEngfuncs.Cmd_Argv(1)) {
-        select->SetSelection(i);
-        found = true;
-      }
-    }
-    if (!found)
-      abc::ConsoleWarn("[AbcUi] map '%s' is not an enumerated option\n",
-                       gEngfuncs.Cmd_Argv(1));
-  }
-  if (Rml::ElementFormControl *control =
-          rmlui_dynamic_cast<Rml::ElementFormControl *>(
-              doc->GetElementById("cg-players")))
-    control->SetValue(gEngfuncs.Cmd_Argv(2));
-  if (Rml::ElementFormControl *control =
-          rmlui_dynamic_cast<Rml::ElementFormControl *>(
-              doc->GetElementById("cg-name")))
-    control->SetValue(gEngfuncs.Cmd_Argv(3));
-  if (gEngfuncs.Cmd_Argc() >= 5) {
-    if (Rml::ElementFormControl *control =
-            rmlui_dynamic_cast<Rml::ElementFormControl *>(
-                doc->GetElementById("cg-password")))
-      control->SetValue(gEngfuncs.Cmd_Argv(4));
-  }
-  createGameUiCommand();
+  // The form fields moved into the abcui.gameui module with its page; a
+  // console-driven fill can no longer reach them (apply the real page or
+  // use abc_ui_create_game_probe for a direct request).
+  abc::ConsoleWarn("[AbcUi] create-game fill: the form is module-owned; use "
+                   "abc_ui_create_game_probe for a direct request\n");
 }
 
 void DebugCommands::createGameApplyCommand() {
@@ -88,11 +43,27 @@ void DebugCommands::createGameApplyCommand() {
     abc::ConsoleWarn("[AbcUi] no module instance\n");
     return;
   }
+  if (gEngfuncs.Cmd_Argc() < 4) {
+    abc::ConsoleWarn("[AbcUi] usage: abc_ui_create_game_apply <map> <players> "
+                     "<name> [password]\n");
+    return;
+  }
+  // The form DOM moved into the module; this drives the same apply
+  // boundary the page's Apply button uses (validate + dispatch).
   GameUiModule &self = *currentModule();
-  self.Create->apply();
+  std::vector<std::pair<std::string, std::string>> fields = {
+      {"map", gEngfuncs.Cmd_Argv(1)},
+      {"players", gEngfuncs.Cmd_Argv(2)},
+      {"name", gEngfuncs.Cmd_Argv(3)},
+      {"password", gEngfuncs.Cmd_Argc() >= 5 ? gEngfuncs.Cmd_Argv(4) : ""},
+      {"lan", "0"},
+  };
+  std::string hint;
+  const bool ok = self.Create->apply(fields, hint);
   abc::ConsolePrint(
-      "[AbcUi] create-game apply issued: phase=%d gen=%u map=%s pending=%d\n",
-      static_cast<int>(self.Controller.state().phase),
+      "[AbcUi] create-game apply: ok=%d hint='%s' phase=%d gen=%u map=%s "
+      "pending=%d\n",
+      ok ? 1 : 0, hint.c_str(), static_cast<int>(self.Controller.state().phase),
       self.Controller.state().connectGeneration,
       self.Controller.state().connectAddress.c_str(),
       self.Create->pendingValid() ? 1 : 0);

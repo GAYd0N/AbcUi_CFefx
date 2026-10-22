@@ -1,0 +1,299 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/playerboard.rcss"/>
+</head>
+<body id="playerboard">
+	<!-- Old CPlayerInfoPanel fleet (PlayerBoardPanel.res per-index SetId):
+	     one 80x16 world-anchored tile per player slot, positioned by the
+	     onRedraw projection. Empty slots stay display:none (near-zero cost). -->
+	<div class="tile" id="tile-1">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-2">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-3">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-4">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-5">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-6">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-7">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-8">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-9">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-10">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-11">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-12">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-13">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-14">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-15">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-16">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-17">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-18">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-19">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-20">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-21">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-22">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-23">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-24">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-25">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-26">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-27">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-28">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-29">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-30">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-31">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+	<div class="tile" id="tile-32">
+		<img class="background" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_background.png"/>
+		<div class="bar bar-health" id="bar-health"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_healthbar.png"/></div>
+		<div class="bar bar-armor" id="bar-armor"><img src="mod://abcui.playerboard/hud/img/playertitle/playertitle_armorbar.png"/></div>
+		<div class="name" id="name"></div>
+		<img class="icon icon-crouch" id="icon-crouch" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_crouchicon.png"/>
+		<img class="icon" id="icon-medkit" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_medkiticon.png"/>
+		<img class="icon" id="icon-dead" src="mod://abcui.playerboard/hud/img/playertitle/playertitle_deadicon.png"/>
+	</div>
+</body>
+</rml>

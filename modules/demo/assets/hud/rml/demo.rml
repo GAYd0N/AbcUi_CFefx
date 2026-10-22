@@ -1,0 +1,9 @@
+<rml>
+	<head>
+		<link rel="stylesheet" href="engine://abc/abcui/rcss/base.rcss"/>
+		<link rel="stylesheet" href="../rcss/demo.rcss"/>
+	</head>
+	<body>
+		<div id="demo">Hello from abcui.demo</div>
+	</body>
+</rml>

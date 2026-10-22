@@ -16,7 +16,7 @@ class ElementDocument;
 
 namespace services::settings {
 class SettingsModel;
-} // namespace settings
+} // namespace services::settings
 
 namespace panels::settings::sections {
 

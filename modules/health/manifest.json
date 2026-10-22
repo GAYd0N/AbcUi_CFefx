@@ -1,0 +1,12 @@
+{
+  "id": "abcui.health",
+  "name": "Health",
+  "description": "Health and armor bars with the danger hue shift plus the longjump indicator (moved from the built-in HUD).",
+  "author": "DrAbc",
+  "version": "1.0.0",
+  "abi": 1,
+  "minAbcUi": "0.8.0",
+  "entry": "entry/abcui_health.dll",
+  "dependencies": [],
+  "conflicts": []
+}

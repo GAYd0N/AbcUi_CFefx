@@ -92,7 +92,7 @@ struct PlayerInfo {
   // state, which a 0.5 s refresh must never do. Null mirror / invalid slot
   // keep the last known values; a negative engine value clamps to 0. The
   // mirror carries non-zero pings only while the client reports the score
-  // state (ScoreboardPanel's usercmd IN_SCORE).
+  // state (the score seat's usercmd IN_SCORE).
   void refreshPingLoss();
   void reset();
 };

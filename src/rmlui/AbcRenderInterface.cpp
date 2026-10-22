@@ -15,6 +15,7 @@
 #include "texture/Avatars.h"
 #include "texture/SpriteResource.h"
 #include "../framework/ImageLoader.h"
+#include "../modsys/ModuleVfs.h"
 #include "render/Render.h"
 #include "render/RenderCommon.h"
 #include "VGUI2ExtensionImport.h"
@@ -338,6 +339,15 @@ void AbcRenderInterface::registerExternalTexture(const Rml::String &uriPrefix,
                                                  TextureBlend blend) {
   if (uriPrefix.empty() || texture == 0)
     return;
+  // A recycled engine id must not stay marked as owned: if a live record for
+  // a file/font texture still carries the same id (possible after a
+  // frame-buffer regen recycles the GL texture name), releasing that record
+  // would delete a texture the external owner now controls.
+  for (auto &[handle, record] : Textures) {
+    (void)handle;
+    if (record.Owned && record.Id == static_cast<int>(texture))
+      record.Owned = false;
+  }
   ExternalTexture entry;
   entry.Texture = texture;
   entry.Width = width;
@@ -345,8 +355,6 @@ void AbcRenderInterface::registerExternalTexture(const Rml::String &uriPrefix,
   entry.MaskSlot = maskSlot;
   entry.Blend = blend;
   ExternalTextures[uriPrefix] = entry;
-  // A recycled handle must not stay marked as owned (a second
-  // registration of the same GL id after a frame-buffer regen).
 }
 
 void AbcRenderInterface::unregisterExternalTexture(
@@ -360,6 +368,10 @@ void AbcRenderInterface::ReleaseGeometry(Rml::CompiledGeometryHandle geometry) {
 
 Rml::TextureHandle AbcRenderInterface::LoadTexture(Rml::Vector2i &dimensions,
                                                    const Rml::String &source) {
+  // engine:// lets package documents reference shared framework art by its
+  // absolute engine path; the rest of the chain below speaks plain paths.
+  if (source.rfind("engine://", 0) == 0)
+    return loadFileTexture(dimensions, source.substr(9));
   if (source.rfind("preview://", 0) == 0) {
     framework::PreviewRequest Request;
     if (!framework::parsePreviewUri(source, Request) || !abc::g_pFileSystem)
@@ -444,6 +456,15 @@ Rml::TextureHandle AbcRenderInterface::LoadTexture(Rml::Vector2i &dimensions,
     // composed in code (the additive glyph stacks) resolves from anywhere.
     return loadFileTexture(dimensions, source.substr(6));
   }
+  if (source.rfind("mod://", 0) == 0) {
+    // Module package image: resolve through the module VFS, decode from the
+    // (zero-copy) entry view.
+    return loadModuleTexture(dimensions, source, false);
+  }
+  if (source.rfind("modadd://", 0) == 0) {
+    // Additive twin of mod:// - the package-internal flavor of texadd://.
+    return loadModuleTexture(dimensions, "mod://" + source.substr(9), true);
+  }
   if (source.rfind("texadd://", 0) == 0) {
     // Mod-relative file loaded additive (old kRenderTransAdd TGA panels -
     // the pain indicator arc). Shares the FreeImage path below.
@@ -476,6 +497,29 @@ AbcRenderInterface::loadFileTexture(Rml::Vector2i &dimensions,
     return 0;
   dimensions = Rml::Vector2i(image.Width, image.Height);
   return retainTexture(textureId, true);
+}
+
+Rml::TextureHandle
+AbcRenderInterface::loadModuleTexture(Rml::Vector2i &dimensions,
+                                      const Rml::String &uri, bool additive) {
+  // Module package image: resolve through the module VFS, decode from the
+  // (zero-copy) entry view.
+  framework::PackageEntry entry;
+  if (!framework::ModuleVfs::open(uri.c_str(), entry, nullptr))
+    return 0;
+  framework::ImageLoader::DecodedImage image;
+  if (!framework::ImageLoader::loadFromMemory(
+          static_cast<const unsigned char *>(entry.data), entry.size, image))
+    return 0;
+  const int textureId =
+      uploadSurfaceTexture(image.Pixels.data(), image.Width, image.Height);
+  if (!textureId)
+    return 0;
+  dimensions = Rml::Vector2i(image.Width, image.Height);
+  const Rml::TextureHandle handle = retainTexture(textureId, true);
+  if (handle && additive)
+    AdditiveTextures.insert(handle);
+  return handle;
 }
 
 Rml::TextureHandle

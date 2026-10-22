@@ -264,9 +264,8 @@ void DebugCommands::serverTimeoutCommand() {
 }
 
 void DebugCommands::serverSelectCommand() {
-  if (!currentModule() || !currentModule()->Browser ||
-      !currentModule()->Browser->document()) {
-    abc::ConsoleWarn("[AbcUi] browser page not open\n");
+  if (!currentModule()) {
+    abc::ConsoleWarn("[AbcUi] no module instance\n");
     return;
   }
   if (gEngfuncs.Cmd_Argc() < 2) {
@@ -290,33 +289,20 @@ void DebugCommands::serverSelectCommand() {
 }
 
 void DebugCommands::serverUiCommand() {
-  if (!currentModule() || !currentModule()->Browser ||
-      !currentModule()->Browser->document()) {
-    abc::ConsoleWarn("[AbcUi] browser page not open\n");
+  if (!currentModule()) {
+    abc::ConsoleWarn("[AbcUi] no module instance\n");
     return;
   }
-  Rml::ElementDocument *doc = currentModule()->Browser->document();
-  Rml::Element *list = doc->GetElementById("sb-list");
-  abc::ConsolePrint("[AbcUi] browser-ui: doc=%s list=%s\n",
-                    doc->IsVisible() ? "visible" : "hidden",
-                    list ? "found" : "missing");
-  if (list) {
-    abc::ConsolePrint(
-        "[AbcUi] browser-ui: rows=%d scroll=%d client=%.1fx%.1f\n",
-        list->GetNumChildren(), list->GetScrollTop(), list->GetClientWidth(),
-        list->GetClientHeight());
-    if (list->HasChildNodes()) {
-      Rml::Element *first = list->GetFirstChild();
-      abc::ConsolePrint("[AbcUi] browser-ui: first=<%s> pos=%.1f,%.1f "
-                        "size=%.1fx%.1f visible=%d\n",
-                        first->GetTagName().c_str(), first->GetAbsoluteLeft(),
-                        first->GetAbsoluteTop(), first->GetClientWidth(),
-                        first->GetClientHeight(), first->IsVisible() ? 1 : 0);
-    }
-  }
-  if (Rml::Element *status = doc->GetElementById("sb-status"))
-    abc::ConsolePrint("[AbcUi] browser-ui: status='%s'\n",
-                      status->GetInnerRML().c_str());
+  // The browser DOM moved into the abcui.gameui module; this dumps the
+  // framework-side query snapshot instead.
+  GameUiModule &self = *currentModule();
+  auto &query = self.ServerBrowser.Query;
+  abc::ConsolePrint(
+      "[AbcUi] browser-ui: status=%d kind=%d gen=%u count=%d rows=%d "
+      "page=%d/%d\n",
+      static_cast<int>(query.status()), static_cast<int>(query.kind()),
+      query.generation(), query.count(), self.ServerBrowser.List.rowCount(),
+      self.ServerBrowser.List.page() + 1, self.ServerBrowser.List.pageCount());
 }
 
 } // namespace gameui

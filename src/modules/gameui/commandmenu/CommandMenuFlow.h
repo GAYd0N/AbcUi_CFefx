@@ -1,26 +1,28 @@
 #pragma once
 
-// gameui::CommandMenuFlow - the in-game command menu page, request latch and
-// engine-command boundary.
+// gameui::CommandMenuFlow - the in-game command menu's open/close intents
+// and claimed-key feed.
 //
-// Owns the command-menu model and page pointer. The composition root supplies
-// higher-level navigation operations (ensure menu, reconcile, close with the
-// paused-menu recovery) so the flow does not know the MenuController.
+// The page became a module (abcui.gameui, sdk commandmenu section), so the
+// flow keeps what is framework-side: the model, the definition hand-off,
+// the request latch and the raised-menu discipline around open/close, and
+// the key-edge feed (the +commandmenu close rule, then the
+// menu.commandkey veto channel the page answers). Command execution stays
+// here too: the services::commandmenu access point hands the page's
+// activations to handleCommand (close first, then the engine send).
 
 #include "../../../services/commandmenu/CommandMenuModel.h"
-#include "../navigation/MenuAction.h"
 
 #include <functional>
 #include <string>
-
-namespace panels::commandmenu {
-class CommandMenuPage;
-}
 
 namespace gameui {
 
 struct CommandMenuHost {
   std::function<bool()> shellReady;
+  // The command page is on top of the menu stack (the module document is
+  // the presented surface).
+  std::function<bool()> pageOnTop;
   // Raises the menu when needed and reports whether this call did so.
   std::function<bool(bool &raisedMenu)> ensureMenu;
   std::function<void()> cancelRaisedMenu;
@@ -36,29 +38,25 @@ class CommandMenuFlow {
 public:
   explicit CommandMenuFlow(CommandMenuHost host);
 
-  void setPage(panels::commandmenu::CommandMenuPage *page);
   void setDefinition(services::commandmenu::Definition definition);
   void shutdown();
   bool consumeRequest();
-  void setPresented(bool presented) {
-    Presented = presented;
-  }
   void cancelPending();
   void resetForWorld();
-  void hide();
 
   void toggle();
   void open();
-  void present();
   void close();
   void handleCommand(const std::string &command);
   bool handleKey(int keynum);
 
+  services::commandmenu::Model &model() {
+    return Model;
+  }
+
 private:
   CommandMenuHost Host;
   services::commandmenu::Model Model;
-  panels::commandmenu::CommandMenuPage *Page = nullptr;
-  bool Presented = false;
   bool Requested = false;
   bool RaisedMenu = false;
 };

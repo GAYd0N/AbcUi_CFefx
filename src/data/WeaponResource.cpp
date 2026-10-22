@@ -18,6 +18,10 @@
 #include <abc/Console.h>
 #include <abc/CvarCmd.h>
 
+#include <abcui/events.h>
+
+#include "modsys/EventBus.h"
+
 #include "HudState.h"
 #include "NetworkMessages.h"
 #include "framework/ScreenMetrics.h"
@@ -31,6 +35,14 @@ abc::CallbackList<void(const Weapon *)> DropWeapon;
 abc::CallbackList<void()> DropAllWeapons;
 
 namespace {
+
+// Module-facing mirror of the typed ownership/highlight feeds. The payload
+// is the registry identity; a null weapon publishes slot -1 ("nothing").
+void publishWeapon(const char *channel, const Weapon *weapon) {
+  const AbcUiWeaponEvent event{weapon ? weapon->slot : -1,
+                               weapon ? weapon->slotPos : -1};
+  framework::eventBus().publish(channel, event);
+}
 
 constexpr int kMaxWeaponName = 128;
 constexpr int kMaxAmmoTypes =
@@ -130,6 +142,7 @@ void applySelection(const Weapon *weapon) {
   if (weapon && fastSwitchOn())
     FastSwitchWeapon(weapon);
   ChooseWeapon(weapon);
+  publishWeapon(ABCUI_CHANNEL_HUD_CHOOSE_WEAPON, weapon);
 }
 
 // client_sprite_t* lookup by name + res (old GetSpriteList helper).
@@ -228,8 +241,10 @@ void addWeapon(Weapon &&incoming) {
   slot.positions[weapon.slotPos] = id;
   slot.updateMinMax();
   loadWeaponSprites(weapon, nullptr);
-  if (wasOwned)
+  if (wasOwned) {
     PickupWeapon(&weapon);
+    publishWeapon(ABCUI_CHANNEL_HUD_PICKUP_WEAPON, &weapon);
+  }
 }
 
 void dropAllWeapons() {
@@ -240,6 +255,7 @@ void dropAllWeapons() {
   RegistryState.selected = nullptr;
   RegistryState.selectedSlotId = kInvalidWeaponSlot;
   DropAllWeapons();
+  framework::eventBus().publishRaw(ABCUI_CHANNEL_HUD_DROP_ALL_WEAPONS, nullptr);
 }
 
 // Ownership signals for ids outside the dense prediction array. WeapPickup
@@ -250,8 +266,10 @@ void markOwned(int id) {
   if (id <= 0 || !RegistryState.owned.insert(id).second)
     return;
   const auto itor = RegistryState.byId.find(id);
-  if (itor != RegistryState.byId.end())
+  if (itor != RegistryState.byId.end()) {
     PickupWeapon(&itor->second);
+    publishWeapon(ABCUI_CHANNEL_HUD_PICKUP_WEAPON, &itor->second);
+  }
 }
 
 #pragma region netmsg handlers
@@ -262,9 +280,13 @@ void onAmmoX(int index, int count) {
 }
 
 void onWeaponList(const netmsg::WeaponListData &data) {
+  // The name is server-controlled and is later sent verbatim to the engine
+  // console by WeaponChoosePanel::confirmSelection; it is also the sprite
+  // base name. Accept only a command-safe identifier (AbcEssential applies
+  // the same rule to its signal feed).
   if (data.id <= 0 || data.slot < 0 ||
       data.slot >= static_cast<int>(kMaxWeaponSlot) || data.slotPos < 0 ||
-      !framework::ResourceLimits::resourceName(data.name))
+      !framework::ResourceLimits::identifierName(data.name))
     return;
   if (const auto itor = RegistryState.byId.find(data.id);
       itor != RegistryState.byId.end()) {
@@ -406,10 +428,14 @@ void onTxferPredictionData(const weapon_data_s *weaponDataArray) {
       RegistryState.byId[id].clip = data.m_iClip;
     }
   }
-  for (const Weapon *weapon : pickedUp)
+  for (const Weapon *weapon : pickedUp) {
     PickupWeapon(weapon);
-  for (const Weapon *weapon : dropped)
+    publishWeapon(ABCUI_CHANNEL_HUD_PICKUP_WEAPON, weapon);
+  }
+  for (const Weapon *weapon : dropped) {
     DropWeapon(weapon);
+    publishWeapon(ABCUI_CHANNEL_HUD_DROP_WEAPON, weapon);
+  }
   if (!dropped.empty() && RegistryState.owned.empty()) {
     dropAllWeapons();
     return;

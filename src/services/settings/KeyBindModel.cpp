@@ -216,12 +216,23 @@ std::string KeyBindModel::decodeResourceText(const char *data, size_t size) {
   out.reserve(size / 2);
   for (size_t offset = 2; offset + 1 < size; offset += 2) {
     unsigned code = readUnit(offset);
-    if (code >= 0xd800 && code <= 0xdbff && offset + 3 < size) {
-      const unsigned low = readUnit(offset + 2);
-      if (low >= 0xdc00 && low <= 0xdfff) {
-        code = 0x10000 + ((code - 0xd800) << 10) + (low - 0xdc00);
-        offset += 2;
+    if (code >= 0xd800 && code <= 0xdbff) {
+      // High surrogate: only a following low surrogate forms a code point.
+      // Anything else (end of string, lone high/low surrogate) maps to
+      // U+FFFD instead of emitting an invalid UTF-8 sequence.
+      if (offset + 3 < size) {
+        const unsigned low = readUnit(offset + 2);
+        if (low >= 0xdc00 && low <= 0xdfff) {
+          code = 0x10000 + ((code - 0xd800) << 10) + (low - 0xdc00);
+          offset += 2;
+        } else {
+          code = 0xfffd;
+        }
+      } else {
+        code = 0xfffd;
       }
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      code = 0xfffd;
     }
     appendUtf8(out, code);
   }

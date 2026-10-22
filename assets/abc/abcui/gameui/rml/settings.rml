@@ -59,7 +59,7 @@
 				</div>
 			</div>
 			<div class="settings-widget" id="widget-spray-preview">
-				<div class="preview-box preview-box-square">
+				<div class="preview-box">
 					<img id="spray-preview"/>
 					<div id="spray-preview-hint">#Settings_SprayPreviewHint</div>
 				</div>
@@ -69,7 +69,7 @@
 				     decodes it (FreeImage), encodes the WAD3 spray and writes
 				     tempdecal.wad; this block shows the result preview and
 				     the outcome line. -->
-				<div class="preview-box preview-box-square">
+				<div class="preview-box">
 					<img id="spray-made-preview"/>
 					<div id="spray-maker-hint">#Settings_SprayMakerHintTitle</div>
 					<button id="spray-maker-choose" data-action="spray-choose">#Settings_SprayMakerChoose</button>
@@ -82,7 +82,7 @@
 				     services::crosshair::Geometry math from the draft cvar
 				     values (1:1 pixel geometry, no drift - the preview shows
 				     the configured shape, not the aim spread). -->
-				<div class="preview-box preview-box-square">
+				<div class="preview-box">
 					<div id="crosshair-preview">
 						<div id="cx-outline-center" class="cx-outline"></div>
 						<div id="cx-outline-top" class="cx-outline"></div>

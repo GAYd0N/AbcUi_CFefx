@@ -1,0 +1,33 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/cfefx.rcss"/>
+</head>
+<body id="cfefx">
+	<!-- Legacy z-order: stars under marks (panel creation order), score mark
+	     and score effect above both (old zpos 998/999). The panel controller
+	     positions the animated elements per frame; static marks use RCSS. -->
+	<img id="star-one" class="star" src="../img/cfefx/NoBossStar.png"/>
+	<img id="star-two" class="star" src="../img/cfefx/NoBossStar.png"/>
+	<img id="star-three" class="star" src="../img/cfefx/NoBossStar.png"/>
+	<img id="star-four" class="star" src="../img/cfefx/NoBossStar.png"/>
+	<img id="star-five" class="star" src="../img/cfefx/NoBossStar.png"/>
+	<img id="star-six" class="star" src="../img/cfefx/NoBossStar.png"/>
+	<img id="star-seven" class="star" src="../img/cfefx/NoBossStar.png"/>
+	<img id="star-eight" class="star" src="../img/cfefx/NoBossStar.png"/>
+	<img id="star-nine" class="star" src="../img/cfefx/NoBossStar.png"/>
+
+	<img id="dmg-mark-one" class="mark" src="../img/cfefx/NoBossSide100.png"/>
+	<img id="dmg-mark-two" class="mark" src="../img/cfefx/NoBossSide100.png"/>
+	<img id="dmg-mark-three" class="mark" src="../img/cfefx/NoBossSide100.png"/>
+	<img id="dmg-mark-four" class="mark" src="../img/cfefx/NoBossSide100.png"/>
+	<img id="dmg-mark-five" class="mark" src="../img/cfefx/NoBossSide500.png"/>
+	<img id="dmg-mark-six" class="mark" src="../img/cfefx/NoBossSide100.png"/>
+	<img id="dmg-mark-seven" class="mark" src="../img/cfefx/NoBossSide100.png"/>
+	<img id="dmg-mark-eight" class="mark" src="../img/cfefx/NoBossSide100.png"/>
+	<img id="dmg-mark-nine" class="mark" src="../img/cfefx/NoBossSide100.png"/>
+
+	<img id="score-mark" class="score" src="../img/cfefx/NanoDamege1.png"/>
+	<img id="score-effect" class="score" src="../img/cfefx/NoBossEffect.png"/>
+</body>
+</rml>

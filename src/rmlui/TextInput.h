@@ -33,10 +33,11 @@
 // every event below is ignored - half a pinyin string can never become a
 // command.
 
-// The engine include order drags Windows.h in before this header
-// (metahook.h first), and winnt.h's `Assert` macro collides with RmlUi's
+// The engine include order drags SourceSDK's tier0/dbg.h in before this
+// header (metahook.h first), whose `Assert(...)` macro collides with RmlUi's
 // own `Rml::Assert` declaration inside its headers - drop the macro before
-// any Rml include, for the rest of the translation unit.
+// any Rml include, for the rest of the translation unit. (Not winnt.h: that
+// header has no Assert macro; dbg.h is the conflicting definition.)
 #ifdef Assert
 #undef Assert
 #endif

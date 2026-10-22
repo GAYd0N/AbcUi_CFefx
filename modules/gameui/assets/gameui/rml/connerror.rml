@@ -1,0 +1,21 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
+	<link type="text/rcss" href="../rcss/loading.rcss"/>
+</head>
+<!-- T14 connection-error overlay (kConnectionError): the plain-text failure
+     reason plus Retry (new attempt generation) and Return (no-map home). The
+     reason is escaped by panels::loading::ConnectionErrorOverlay. -->
+<body id="menuconnerror">
+	<div id="connerror-box">
+		<h1 id="connerror-title">#Loading_ErrorTitle</h1>
+		<p id="connerror-reason"></p>
+		<div id="connerror-actions">
+			<button id="connerror-retry" data-action="error-retry" data-label="#Loading_Retry">#Loading_Retry</button>
+			<button id="connerror-return" data-action="error-return" data-label="#Loading_Return" autofocus="autofocus">#Loading_Return</button>
+		</div>
+	</div>
+</body>
+</rml>

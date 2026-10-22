@@ -3,14 +3,14 @@
 // rmlui - abc_ui_probe / abc_ui_menu, Debug builds only.
 //
 // abc_ui_probe is a live diagnostic cross-section for acceptance and triage:
-// dumps hudstate, per-document visibility and hardcoded panel element states
-// (armor-bar-wrap, flashlight off-image), then opens a font-pipeline document.
+// dumps hudstate and per-document visibility, then opens a font-pipeline
+// document.
 // abc_ui_menu injects a canned netmsg::ShowMenu so drivers without a live
 // server menu stream can exercise the TextMenu chain (open, slot-key gate,
-// menuselect, re-show). abc_ui_cfefx injects canned netmsg::PopNum packages
-// (hit / tier / score / sound / reset / status) so the cfefx damage loop is
-// drivable without a server-side addon. The element ids and panel names these
-// probe are deliberately listed only here, in a Debug translation unit - the
+// menuselect, re-show). The cfefx family is drivable through the module's own
+// abc_ui_cfefx_* debug commands (modules/cfefx), which live with the panel;
+// the element ids and panel names these probe are deliberately listed only
+// here, in a Debug translation unit - the
 // production surface must not couple to them.
 
 namespace rmlui {

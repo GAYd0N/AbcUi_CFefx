@@ -7,6 +7,7 @@
 #include "modules/gameui/GameUiPages.h"
 #include <abc/Console.h>
 #include "framework/Localization.h"
+#include "modsys/ModuleDocuments.h"
 #include "rmlui/InputBridge.h"
 #include <string>
 #include "modules/gameui/engine/MenuBindings.h"
@@ -34,8 +35,10 @@ void GameUiModule::onNativeConsoleClose() {
     syncMenuPresentation();
 }
 
+// The home pages are module documents; Rml assembly (the context) is the
+// readiness fact the takeover and every page flow's shellReady seam use.
 void GameUiModule::presentMenu() {
-  if (!Shell || !Context || MenuPresented)
+  if (!Context || MenuPresented)
     return;
   MenuPresented = true;
   // Real ownership token (T06): the menu claims keys/wheel; mouse
@@ -85,6 +88,7 @@ void GameUiModule::dismissMenu() {
     services::nativeUiBridge().notePageHidden();
   }
   focusLog("dismissed");
+  publishMenuPresentation();
 }
 
 void GameUiModule::reconcilePhase() {
@@ -103,39 +107,19 @@ void GameUiModule::reconcilePhase() {
 }
 
 void GameUiModule::hideAllMenuDocuments() {
-  if (Shell)
-    Shell->hide();
+  // Module pages join the layer (ABCUI_DOC_FLAG_MENU): the framework hides
+  // them with the built-in ones, so no page can outlive a lowered menu.
+  framework::module_documents::hideMenu();
   if (SubStub)
     SubStub->hide();
-  if (Console) {
-    Console->hide();
-    ConsolePresented = false;
-  }
   if (Settings)
     Settings->hide();
   Server->hide();
-  Create->hide();
-  Player->hide();
-  Vote->hide();
-  Command->hide();
-  Inventory->hide();
   if (ConfirmQuit)
     ConfirmQuit->hide();
-  // T14 connection surfaces: hidden with the menu; a later present
-  // re-projects from the state (the latches reset here).
-  if (Loading)
-    Loading->hide();
-  if (ConnError)
-    ConnError->hide();
-  if (Password)
-    Password->hide();
-  if (DirectConnect)
-    DirectConnect->hide();
-  ErrorPresented = false;
-  PasswordPresented = false;
-  PasswordReprepare = false;
-  DirectConnectPresented = false;
-  LoadingVisible = false;
+  // T14 connection surfaces: module documents hidden with the menu (the
+  // ABCUI_DOC_FLAG_MENU layer); a later present re-projects from the
+  // state.
   // The video confirmation is NOT hidden by a generic hide: it must
   // stay up until confirmed/reverted (a dismissal cannot silently
   // abandon a mode the user has not confirmed). dismissMenu() calls
@@ -182,6 +166,118 @@ void GameUiModule::showStubPage(panels::menushared::MenuStubPage *stub,
   Resolve::translate(body, bodyToken + 1);
   stub->showFor(title.c_str(), body.c_str());
   stub->show();
+}
+
+// --- menu section backing (services::menu::Host) ---------------------------
+// The pages are modules: they act through the menu section and learn the
+// settled state from menu.state. These four entry points are the exact
+// orchestrations the page flows used to reach through host lambdas
+// (ensure the menu, reconcile the phase, dispatch the intent, finish).
+
+services::menu::Snapshot GameUiModule::menuSnapshot() const {
+  services::menu::Snapshot snapshot;
+  const menu::MenuState &state = Controller.state();
+  snapshot.phase = static_cast<int32_t>(state.phase);
+  snapshot.page = state.pages.empty() ? ABCUI_MENU_PAGE_NONE
+                                      : static_cast<int32_t>(state.pages.top());
+  snapshot.up = MenuPresented ? 1 : 0;
+  snapshot.loading = (state.phase == menu::BackendPhase::kConnecting ||
+                      state.phase == menu::BackendPhase::kLoading)
+                         ? 1
+                         : 0;
+  snapshot.consoleOpen = state.overlays.contains(MenuOverlay::kConsole) ? 1 : 0;
+  snapshot.hasLevel = services::nativeUiBridge().hasLevel() ? 1 : 0;
+  snapshot.canClose = state.canCloseMenu() ? 1 : 0;
+  snapshot.generation = state.connectGeneration;
+  if (state.overlays.contains(MenuOverlay::kConsole))
+    snapshot.overlays |= ABCUI_MENU_OVERLAY_CONSOLE;
+  if (state.overlays.contains(MenuOverlay::kConfirmQuit))
+    snapshot.overlays |= ABCUI_MENU_OVERLAY_CONFIRM_QUIT;
+  if (state.overlays.contains(MenuOverlay::kPassword))
+    snapshot.overlays |= ABCUI_MENU_OVERLAY_PASSWORD;
+  if (state.overlays.contains(MenuOverlay::kConnectionError))
+    snapshot.overlays |= ABCUI_MENU_OVERLAY_CONNECTION_ERROR;
+  if (state.overlays.contains(MenuOverlay::kDirectConnect))
+    snapshot.overlays |= ABCUI_MENU_OVERLAY_DIRECT_CONNECT;
+  switch (state.attemptKind) {
+  case menu::AttemptKind::kConnect:
+    snapshot.attemptKind = ABCUI_MENU_ATTEMPT_CONNECT;
+    break;
+  case menu::AttemptKind::kLocalGame:
+    snapshot.attemptKind = ABCUI_MENU_ATTEMPT_LOCAL_GAME;
+    break;
+  case menu::AttemptKind::kMapLoad:
+    snapshot.attemptKind = ABCUI_MENU_ATTEMPT_MAP_LOAD;
+    break;
+  default:
+    snapshot.attemptKind = ABCUI_MENU_ATTEMPT_NONE;
+    break;
+  }
+  return snapshot;
+}
+
+int32_t GameUiModule::ensureMenuUp() {
+  if (!Context)
+    return 0; // the command landed before Rml assembly
+  if (!MenuPresented) {
+    if (!services::nativeUiBridge().menuUp())
+      services::nativeUiBridge().requestMenuUp(
+          services::NativeUiOrigin::kOwnUi);
+    if (!MenuPresented)
+      presentMenu();
+  }
+  return MenuPresented ? 1 : 0;
+}
+
+int32_t GameUiModule::openMenuPage(int32_t page) {
+  if (page < ABCUI_MENU_PAGE_MAIN || page > ABCUI_MENU_PAGE_LOADING)
+    return 0;
+  const MenuPage target = static_cast<MenuPage>(page);
+  if (!ensureMenuUp())
+    return 0;
+  reconcilePhase();
+  if (Controller.state().phase != menu::BackendPhase::kInGame)
+    return 0; // the in-game pages never open over the home screen
+  Controller.dispatch(menu::makeOpenPage(target));
+  finishDispatch();
+  return Controller.state().pages.topIs(target) ? 1 : 0;
+}
+
+void GameUiModule::menuBack() {
+  Controller.dispatch(MenuEvent{EventKind::kBack});
+  finishDispatch();
+}
+
+void GameUiModule::menuQuit() {
+  // The confirmation overlay is the controller's decision; a page module
+  // presents its own document once the overlay is on the stack.
+  Controller.dispatch(MenuEvent{EventKind::kQuitRequested});
+  finishDispatch();
+}
+
+void GameUiModule::menuDisconnect() {
+  Controller.dispatch(MenuEvent{EventKind::kDisconnectRequested});
+  finishDispatch();
+}
+
+void GameUiModule::menuToggleConsole() {
+  // Same shape the shell's console entry uses: close is idempotent and never
+  // reopens, otherwise open through the bridge (which raises the menu when
+  // needed and notifies the sink).
+  services::NativeUiBridge &bridge = services::nativeUiBridge();
+  if (bridge.consoleRequested())
+    bridge.requestConsoleClose(services::NativeUiOrigin::kOwnUi);
+  else
+    bridge.requestConsoleOpen(services::NativeUiOrigin::kOwnUi);
+  finishDispatch();
+}
+
+int32_t GameUiModule::resumeFromMenu() {
+  if (Controller.state().phase != menu::BackendPhase::kInGame)
+    return 0;
+  Controller.dispatch(MenuEvent{EventKind::kResume});
+  finishDispatch();
+  return Controller.isMenuActive() ? 0 : 1;
 }
 
 } // namespace gameui

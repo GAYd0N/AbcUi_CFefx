@@ -1,0 +1,15 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/indicator.rcss"/>
+</head>
+<body id="indicator">
+	<!-- Old CIndicatorPanel (400x400 centered): 4 cycling image slots; each
+	     rotor is a full-viewport div rotated around the screen center, the
+	     img inside carries the old res offsets (30/40/50/50). -->
+	<div id="rotor-1" class="rotor"><img class="pain" src="modadd://abcui.damage/hud/img/pain_indicator.png"/></div>
+	<div id="rotor-2" class="rotor"><img class="pain" src="modadd://abcui.damage/hud/img/pain_indicator.png"/></div>
+	<div id="rotor-3" class="rotor"><img class="pain" src="modadd://abcui.damage/hud/img/pain_indicator.png"/></div>
+	<div id="rotor-4" class="rotor"><img class="pain" src="modadd://abcui.damage/hud/img/pain_indicator.png"/></div>
+</body>
+</rml>

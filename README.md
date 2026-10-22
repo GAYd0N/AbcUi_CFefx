@@ -31,6 +31,7 @@ cmake --build --preset win32-release --target deploy
 - UI assets go to `<game>/svencoop/abc/abcui/`, split by surface: GameUI documents, page styles, config and menu media live under `gameui/`; HUD documents, sprites and page art live under `hud/`; the cross-surface stylesheets (`rcss/base.rcss`, `rcss/theme.rcss`), language tables and shared art stay at the `abcui/` root.
 - The Cfefx score sound is engine-played and therefore lives under the engine's sound root: `<game>/svencoop/sound/abc/cfefx/UI_SPECIALKILL2.wav`.
 - `AbcUi.dll` goes to `<game>/svencoop/metahook/plugins/`.
+- UI module packages go to `<game>/svencoop/abc/abcui/modules/*.zip` (built by the `pack_modules` target; `deploy` installs them too when `ABC_GAME_DIR` is set).
 - `FreeImage.dll` and `Mile.FFmpeg.dll` are provided by MetaHookSV/Renderer; AbcUi does not install or package a second copy.
 
 ## Packaging
@@ -40,7 +41,10 @@ cmake --build --preset win32-release --target dist
 ```
 
 Produces `AbcUi-<version>.zip` under `build/<preset>/dist/` (plugin DLL,
-`abc/abcui` assets, README). `AbcCore.dll` and the shared gamedata catalog are
+`abc/abcui` assets, the packed UI modules under `abc/abcui/modules/`, README).
+The module archives themselves are produced by `--target pack_modules`
+(`build/<preset>/dist/modules/<id>-<version>.zip`) from the manifests and the
+built module DLLs. `AbcCore.dll` and the shared gamedata catalog are
 provided by the aggregate `ABCEnchance-<tag>.zip` / `AbcCore-<version>.zip`,
 not by this module package. The archive contains `svencoop/` at its root: extract it directly into
 the Sven Co-op root, with no extra version folder to copy.
@@ -82,10 +86,57 @@ Limits: 1 MiB per file, 100 items per menu and 40 nested levels.
 }
 ```
 
+## UI modules
+
+AbcUi is a UI-free framework plus loadable UI-module packages. Every HUD panel
+that has been migrated lives in `modules/<id>/` in this repository and ships as
+one zip package installed at `svencoop/abc/abcui/modules/<id>-<version>.zip`
+(real files, never inside a VPK). Packages are mapped with
+`CreateFileMapping`; entries are stored uncompressed so the manifest, RML,
+RCSS, art and the entry DLL are served as zero-copy views (DEFLATED entries
+from third-party packages are inflated through miniz).
+
+A package contains:
+
+```text
+manifest.json            id, name, description, author, version, abi,
+                         minAbcUi, entry, dependencies, conflicts
+entry/<abcui_id>.dll     the module DLL (Win32 x86, /MD)
+hud/...                  the module's rml/rcss/img/lang tree
+```
+
+The framework scans the module directory once per process during `HUD_Init`,
+validates every manifest (ABI, `minAbcUi`, dependencies, conflicts), loads the
+packages in deterministic dependency order (ties broken by id), maps each entry
+DLL by hand (no `LoadLibrary`) and drives it through the same lifecycle points
+the built-in modules used: `onLoad`, `onInit`, `onContextReady`, `onFrame`,
+`onVidInit`, `onShutdown`, and `onUnload` in reverse order at process
+teardown. A module that fails validation is skipped together with its
+dependents; the rest keep working.
+
+Modules talk to the framework through the pure-C `AbcUiModuleApi` table
+(`sdk/abcui/`): versioned, append-only sections for console/cvars, the
+priority event bus, package files, HUD panels, interactive page documents,
+the replacement menu's presentation state, the HUD data snapshot, Rml
+documents and elements, chained commands, the weapon registry and the player
+resource. Modules include `<abcui/module_api.h>`, export exactly one symbol
+(`AbcUiModule_Main`), must not include RmlUi headers or link the framework's
+static libraries, and must avoid static TLS and delay-loaded imports.
+
+First-party modules in this repository: flashlight, textmenu, vote, motd,
+weaponchoose, killfeed, textfeed, sidetext, health, ammo, hudeffects,
+crosshair, damage, cfefx, itemhighlight, playerboard, radar, scoreboard, chat
+and `abcui.gameui` (the replacement game-menu pages: the shell, the console,
+the server browser, the connection surfaces and the vote creation, player
+list, command menu, inventory and create-game pages have moved so far);
+`demo` is the minimal example. `tools/pack.py` validates each manifest and
+writes the archives. The settings page still ships in `AbcUi.dll` and
+moves into the same `abcui.gameui` package as the final page commit.
+
 ## Feature overview
 
 - HUD panels: Health / Flashlight / AmmoBar / AmmoStack / ItemStack / WeaponStack / Notice / DeadMsg / SideText / TextMenu / DamageTiles / PopNum / Cfefx / Indicator / player board / scoreboard / vote / MOTD / weapon choose / item highlight / Radar / chat and more; the HUD palette is the Half-Life amber (`#ffb000`, the old scheme's "Orange") defined once as `--abc-hud-*` tokens in `rcss/base.rcss`, matching the amber menu accent; the health/armor vitals follow the Half-Life 2 readout - an amber icon plus one large value drawn straight on the scene - while the bar meters under each value are kept as the at-a-glance indicator; the value ink and the meters are additive (`texadd://` glyph and meter textures composed by `framework::glyphs`, styled by the reusable `.hud-glyph` / `.hud-meter` classes in `base.rcss`), so they glow into the scene exactly like the HUD sprite icons and need no outline or black meter well; the ammo readout is the matching HL2 pool line - a large clip value, a stepped-down `/reserve`, the ammo sprite standing on the same baseline, and the pools packed into the bottom-right corner; data layer with NetworkMessages / WeaponResource / HudState / TextFeed, and the resource layer under `src/rmlui/texture/` with SpriteResource (GoldSrc .spr decode + hud.txt), animated images through the generic `<animimg>` element (`src/rmlui/animated/`: a format-backend table decodes the container into one dynamic texture per element - animated WebP today, APNG for Steam animated avatars later), which the water-exit splash uses (two additive animated WebP files at 10 fps, a fraction of the old .spr size); the original HUD list is resolved through gamedata and its visible flag is stripped in the chained HUD_Redraw thunk.
-- Chat: the message-mode input and the player chat log are RmlUi panels (`src/panels/chat/`), with the native chat input and `CHudSayText` both retired. The chained `messagemode`/`messagemode2` commands open the input line instead of the native one (an argumented `say`/`messagemode` still chains to the engine), Enter submits through `say "<text>"` / `say_team "<text>"` with the payload stripped of quotes and control characters before assembly, Esc closes, and Up/Down walk a 32-entry send history; text, IME and the caret ride the shared input bridge, so a CJK composition commits into the same editor, and the composition/candidate panel is drawn by `src/rmlui/ImeOverlay.cpp` at the caret: RmlUi underlines the composing string inline while the overlay supplies the composition header and the candidate page the engine gives no window for, read from the IME's own list (`ImmGetCandidateListW`) as one horizontal row of at most nine entries, each prefixed with the number key that picks it and the selected row in amber; the open line also carries the active input method's short tag (`CN`/`TW`/`HK`/`JP`/`KR`) at its right edge and hides it when the layout has no IME. `SayText` is parsed in the data layer and swallowed so exactly one log is drawn: rows keep the server's colour control bytes (normal text, per-player name tint from the client's `GetClientColor`, location), split the client's `(TEAM)` / `*DEAD*` / `*SPEC*` decorations into their own run, honour positional `%s`/`%sN` substitution on HLSDK-shaped servers, and escape every server string before it reaches the DOM. The log sits bottom-left in the HUD palette (translucent row plates, amber channel ink), wraps long lines inside a 190dp column, grows upward from the input row, and shows a compact window of at most six rows (capped from `hud_saytext_lines`) over a 256-message scrollback: the thin scrollbar and the mouse wheel browse older lines while the input line is open (the wheel never switches weapons then), the tail follows new lines unless the reader scrolled up, and the whole block fades out one second after `hud_saytext_time` elapses; every line is also mirrored into the console the way the native handler did, and emoji render in colour through the Segoe UI Emoji fallback face (RmlUi asks FreeType for FT_LOAD_COLOR and uploads the RGBA glyph atlas); `hud_saytext 0` disables it and `hud_saytext_block_muted 1` drops lines from voice-muted players. Ownership is the input router's: the open input line holds an interactive-HUD token, and the engine is told the UI consumed the key at the CBaseUI key seam (`IVGUI2Extension_BaseUICallbacks::Key_Event`), which is the same route the native chat entry and CaptionMod's VGUI dialog use - the binding simply never runs, so WASD stops and no usercmd filtering is involved. Edges the router passes through for clean pairing (keys held when the line opened) are left to the engine. The token is released on Esc, focus loss, the pause menu or a map change.
+- Chat: the message-mode input and the player chat log are RmlUi panels (`src/panels/chat/`), with the native chat input and `CHudSayText` both retired. The chained `messagemode`/`messagemode2` commands open the input line instead of the native one (the command bridge carries no argv, so an argumented `messagemode` also opens the line; send text through `say`/`say_team` directly when a script needs it), Enter submits through `say "<text>"` / `say_team "<text>"` with the payload stripped of quotes and control characters before assembly, Esc closes, and Up/Down walk a 32-entry send history; text, IME and the caret ride the shared input bridge, so a CJK composition commits into the same editor, and the composition/candidate panel is drawn by `src/rmlui/ImeOverlay.cpp` at the caret: RmlUi underlines the composing string inline while the overlay supplies the composition header and the candidate page the engine gives no window for, read from the IME's own list (`ImmGetCandidateListW`) as one horizontal row of at most nine entries, each prefixed with the number key that picks it and the selected row in amber; the open line also carries the active input method's short tag (`CN`/`TW`/`HK`/`JP`/`KR`) at its right edge and hides it when the layout has no IME. `SayText` is parsed in the data layer and swallowed so exactly one log is drawn: rows keep the server's colour control bytes (normal text, per-player name tint from the client's `GetClientColor`, location), split the client's `(TEAM)` / `*DEAD*` / `*SPEC*` decorations into their own run, honour positional `%s`/`%sN` substitution on HLSDK-shaped servers, and escape every server string before it reaches the DOM. The log sits bottom-left in the HUD palette (translucent row plates, amber channel ink), wraps long lines inside a 190dp column, grows upward from the input row, and shows a compact window of at most six rows (capped from `hud_saytext_lines`) over a 256-message scrollback: the thin scrollbar and the mouse wheel browse older lines while the input line is open (the wheel never switches weapons then), the tail follows new lines unless the reader scrolled up, and the whole block fades out one second after `hud_saytext_time` elapses; every line is also mirrored into the console the way the native handler did, and emoji render in colour through the Segoe UI Emoji fallback face (RmlUi asks FreeType for FT_LOAD_COLOR and uploads the RGBA glyph atlas); `hud_saytext 0` disables it and `hud_saytext_block_muted 1` drops lines from voice-muted players. Ownership is the input router's: the open input line holds an interactive-HUD token, and the engine is told the UI consumed the key at the CBaseUI key seam (`IVGUI2Extension_BaseUICallbacks::Key_Event`), which is the same route the native chat entry and CaptionMod's VGUI dialog use - the binding simply never runs, so WASD stops and no usercmd filtering is involved. Edges the router passes through for clean pairing (keys held when the line opened) are left to the engine. The token is released on Esc, focus loss, the pause menu or a map change.
 - Resource files (sprites, images and RML documents) resolve through the engine `IFileSystem`, the same mounted view VGUI2Extension uses. Custom server content in `<mod>_downloads`, `<mod>_addon` and other engine search paths therefore participates without CWD-relative path guessing.
 - Menu: main menu, settings (general/input/mouse/video/audio/voice/captions/multiplayer/advanced/menu/renderer), server browser, create game, player list, vote creation (ban/kick/kill/map with the server's map list), connect/loading/error pages, console, direct-connect/password dialogs, quit confirmation, and the nested in-game command menu; the loading page stays above the page shells and the console while a load is in progress, while the connection dialogs and the quit confirmation remain above it; a server `changelevel` also raises the loading page (map-load title/status, no connect address) instead of dropping to the no-map main menu and its backdrop movie. Text input goes through the IME-aware input bridge. The pause menu's **Vote Menu** row and the original `votemenu` command both open the RmlUi page, replacing the legacy GameUI vote dialog. The original `+commandmenu` VGUI window is replaced by a translucent, left-anchored RmlUi menu that leaves the game view visible. The original `inventory` / `+inventory` / `-inventory` viewport window is replaced by an RmlUi inventory window: the chained commands swallow the native `CInventoryPanel`, and the page projects the server's `InvAdd`/`InvRemove` item stream with the native captions and fallbacks (`You haven't got any inventory`, `No item selected`, `Nameless item`, `No item description`). The dialog is a centred panel over a dimmed scrim (clicking outside also closes it): the item list with its count on the left, a detail card on the right showing the item name, description and the server's can-use/can-drop flags as tags, and the action row at the bottom. A row click selects, Up/Down walk the list, Enter activates, Delete drops, and the three action buttons send the native `activateitem "#<id>"` / `dropitem "#<id>"` / `dropitem "*"` verbs; any action, Esc, the close button, the scrim, `-inventory` or the bound key closes the window. Actions are read-through: a row disappears only when the server's `InvRemove` arrives, so a refused action never rewrites the list optimistically. The console wraps output to the current window width, supports mouse selection with Ctrl+C copy or a right-click Copy menu (no selection copies the visible output), and the console hotkey returns straight to gameplay from the in-game pause page (the no-map main menu stays open). Tab completes the editor against the client's cvar/command catalog: a unique match completes in place, several matches extend to their common prefix and open a candidate list that further Tab presses cycle (Enter runs the highlighted candidate, Esc closes only that list); Up/Down keep walking the submission history.
 - Menu backdrop: `abc_ui_menu_video` picks the looping movie behind the no-map menu (blurred by `abc_ui_menu_backdrop_blur` gaussian rounds, 0..4, default 2; 0 shows the unblurred capture); in a level the pause menu blurs the live frame instead.
@@ -119,6 +170,7 @@ symbols.
 | `thirdparty/freetype` | https://github.com/freetype/freetype | tag `VER-2-13-3` (`42608f77f20749dd6ddc9e0536788eaad70ea4b5`) |
 | `thirdparty/FreeImage` | https://github.com/hzqst/FreeImage_clone | `007c9e4c5d4198a1646b6c5274fd855be9cca7ef` |
 | `thirdparty/VGUI2Extension` | https://github.com/MetaHookSv/VGUI2Extension | `01f9ad225aef5815eb1c02539667a9872cc2a511` (headers only) |
+| `thirdparty/miniz` | https://github.com/richgel999/miniz | tag `3.1.2` (`77d0dce8627735138c51770d1799a1ef48f2117d`, read-only zip packages) |
 | `thirdparty/SteamSDK` | https://github.com/MetaHookSv/SteamSDK | `3c1abaf6277f9f99fd16ef40557d6852820b848f` |
 
 ## Shared dependency

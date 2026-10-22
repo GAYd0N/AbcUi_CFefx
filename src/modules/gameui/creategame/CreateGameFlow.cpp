@@ -1,8 +1,6 @@
 // gameui::CreateGameFlow implementation - see CreateGameFlow.h.
 #include "CreateGameFlow.h"
 
-#include "../../../panels/creategame/CreateGamePage.h"
-
 #include <abc/Console.h>
 #include <abc/CvarCmd.h>
 #include <abc/Plugin.h>
@@ -17,22 +15,8 @@ CreateGameFlow::CreateGameFlow(
   Model.setSeams(seams);
 }
 
-void CreateGameFlow::setPage(panels::creategame::CreateGamePage *page) {
-  Page = page;
-  if (Page)
-    Page->setModel(&Model);
-}
-
 void CreateGameFlow::shutdown() {
-  Page = nullptr;
   PendingValid = false;
-  Presented = false;
-}
-
-void CreateGameFlow::hide() {
-  if (Page)
-    Page->hide();
-  Presented = false;
 }
 
 void CreateGameFlow::setOptions(
@@ -70,48 +54,50 @@ void CreateGameFlow::loadCatalog() {
 #endif
 }
 
-void CreateGameFlow::present() {
-  if (!Page)
-    return;
-  if (!Presented) {
-    const char *liveName = abc::CVAR_GET_STRING("hostname");
-    Page->prepare(Model.catalog(), liveName ? liveName : "");
-    Presented = true;
+bool CreateGameFlow::apply(
+    const std::vector<std::pair<std::string, std::string>> &fields,
+    std::string &hint) {
+  services::creategame::Request request;
+  bool lan = false;
+  std::string playersText;
+  for (const auto &field : fields) {
+    if (field.first == "map")
+      request.Map = field.second;
+    else if (field.first == "players")
+      playersText = field.second;
+    else if (field.first == "name")
+      request.ServerName = field.second;
+    else if (field.first == "password")
+      request.Password = field.second;
+    else if (field.first == "lan")
+      lan = field.second == "1";
+    else
+      request.Options.push_back({field.first, field.second});
   }
-  Page->show();
-}
+  request.Lan = lan;
 
-void CreateGameFlow::apply() {
-  if (!Page)
-    return;
   if (Model.catalog().size() == 0) {
     // No enumerated maps at all (filesystem unavailable): the request cannot
     // be valid, name the real cause.
-    Page->showHint("#CG_ErrorUnavailable");
-    return;
+    hint = "#CG_ErrorUnavailable";
+    return false;
   }
-  services::creategame::Request request;
-  request.Map = Page->selectedMap();
-  request.ServerName = Page->serverName();
-  request.Password = Page->password();
   int players = 0;
-  if (!services::creategame::CreateGameModel::parsePlayers(
-          Page->playersText().c_str(), players)) {
-    Page->showHint("#CG_ErrorPlayers");
-    return; // nothing reaches the controller or the engine
+  if (!services::creategame::CreateGameModel::parsePlayers(playersText.c_str(),
+                                                           players)) {
+    hint = "#CG_ErrorPlayers";
+    return false; // nothing reaches the controller or the engine
   }
   request.MaxPlayers = players;
-  request.Lan = Page->lan();
-  request.Options = Page->optionValues();
   if (!Model.validOptions(request)) {
-    Page->showHint("#CG_ErrorOptions");
-    return;
+    hint = "#CG_ErrorOptions";
+    return false;
   }
   const auto validation =
       services::creategame::CreateGameModel::validate(Model.catalog(), request);
   if (!validation.ok()) {
-    Page->showHint(hintTokenFor(validation));
-    return; // nothing reaches the controller or the engine
+    hint = hintTokenFor(validation);
+    return false; // nothing reaches the controller or the engine
   }
   Pending = request;
   PendingValid = true;
@@ -119,6 +105,7 @@ void CreateGameFlow::apply() {
   Host.resetAutoRetry();
   Host.dispatchCreate(request.Map);
   Host.finishDispatch();
+  return true;
 }
 
 const char *CreateGameFlow::hintTokenFor(
@@ -183,22 +170,6 @@ bool CreateGameFlow::launchLocal(const char *map, const char **reasonToken) {
     return false;
   }
   return false;
-}
-
-void CreateGameFlow::handleAction(navigation::ActionKind kind) {
-  // Page-internal intents (fixed names only): Apply assembles and validates
-  // the request; Cancel is a plain back with zero engine writes (the page
-  // never held any).
-  if (kind == navigation::ActionKind::kCgApply)
-    apply();
-  else if (kind == navigation::ActionKind::kCgCancel)
-    Host.dispatchBack();
-  else {
-    abc::ConsoleWarn("[AbcUi] unknown create-game action \"%s\" dropped\n",
-                     navigation::actionName(kind));
-    return;
-  }
-  Host.finishDispatch();
 }
 
 } // namespace gameui

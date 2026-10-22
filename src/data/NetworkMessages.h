@@ -167,10 +167,17 @@ extern abc::CallbackList<void(const InvItemData &)> InvAdd;
 // also removes items whose removeLocked flag is set (native removal rule).
 extern abc::CallbackList<void(int, int)> InvRemove;
 
-// HUD_Init: installs the HookUserMsg chain. Idempotent.
+// HUD_Init: installs the HookUserMsg chain once per process. Repeated HUD
+// cycles keep the existing chain (re-hooking every cycle would make two
+// chained plugins point at each other).
 void init();
-// panels/vote hands its hud_vote cvar here (HUD_Init time) - the VoteMenu
-// consumer passes messages through while the gate is off (old IsVoteEnable).
+// HUD_Init: re-chains the hooks after a client DLL reload rebuilt the usermsg
+// table (detected through a client-image handler on a Ui-exclusive message).
+// A normal map cycle leaves the table untouched and this is a no-op.
+void refreshAfterClientLoad();
+// The vote module hands its hud_vote cvar here at HUD_Init (console api) -
+// the VoteMenu consumer passes messages through while the gate is off (old
+// IsVoteEnable).
 void setVoteGate(cvar_t *cvar);
 
 } // namespace netmsg

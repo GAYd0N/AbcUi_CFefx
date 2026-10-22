@@ -1,6 +1,7 @@
 // Extracted from GameUiModule.cpp (UTF-8). Responsibility: input/MenuInput.
 #include "modules/gameui/GameUiModule.h"
 #include "modules/gameui/GameUiPages.h"
+#include "modsys/ApiTable.h"
 #include <abc/Console.h>
 #include <keydefs.h>
 #include "rmlui/InputBridge.h"
@@ -89,10 +90,11 @@ void GameUiModule::onClaimedKeyDown(int keynum) {
   }
   if (keynum != K_ESCAPE || !MenuPresented)
     return;
-  // T16: an ESC press the console page's own paste-confirm pane
-  // consumed (the Rml feed runs before this action) closes only that
-  // layer - "同一事件不关闭两层".
-  if (Console && Console->consumeEscapeClaim())
+  // T16: an ESC press the console page's own layers (context menu /
+  // confirm pane / completion list) consumed (the Rml feed runs before
+  // this action) closes only that layer - "同一事件不关闭两层". The claim
+  // rides the sdk consolepage section.
+  if (framework::ConsolePageApi::consumeEscapeClaim())
     return;
   // T07.b ESC priority: the first press cancels a running composition
   // instead of navigating; the next press toggles. The IME normally
@@ -115,8 +117,8 @@ void GameUiModule::onClaimedKeyDown(int keynum) {
   // unsaved-changes prompt (second press dismisses it = stay) - the
   // controller's plain pop would silently discard the drafts.
   if (Controller.state().overlays.empty() &&
-      Controller.state().pages.topIs(MenuPage::kServers) && Browser &&
-      Browser->closeSubpage())
+      Controller.state().pages.topIs(MenuPage::kServers) &&
+      framework::ServerBrowserApi::consumeEscapeClaim())
     return;
   if (Controller.state().overlays.empty() &&
       Controller.state().pages.topIs(MenuPage::kSettings) && Settings &&

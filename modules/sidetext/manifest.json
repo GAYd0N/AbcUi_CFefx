@@ -1,0 +1,12 @@
+{
+  "id": "abcui.sidetext",
+  "name": "Side Text",
+  "description": "Left-side score/speed readout (moved from the built-in HUD).",
+  "author": "DrAbc",
+  "version": "1.0.0",
+  "abi": 1,
+  "minAbcUi": "0.8.0",
+  "entry": "entry/abcui_sidetext.dll",
+  "dependencies": [],
+  "conflicts": []
+}

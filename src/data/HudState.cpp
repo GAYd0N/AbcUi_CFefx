@@ -6,6 +6,9 @@
 #include <cdll_int.h>
 #include <entity_state.h>
 
+#include <abcui/events.h>
+
+#include "../modsys/EventBus.h"
 #include "NetworkMessages.h"
 
 namespace hudstate {
@@ -29,6 +32,8 @@ void onHideToken(int token) {
   // the newest message wins - see the isHudHidden contract in the header.
   HideTokens = token;
   HideTokenChanged(token);
+  const AbcUiIntEvent moduleEvent{token};
+  framework::eventBus().publish(ABCUI_CHANNEL_HUD_HIDE_TOKEN, moduleEvent);
 }
 
 } // namespace
@@ -75,6 +80,8 @@ void onUpdateClientData(const client_data_s *cdata) {
   if (suit != Suit) {
     Suit = suit;
     SuitChanged(suit);
+    const AbcUiBoolEvent moduleEvent{suit ? 1 : 0};
+    framework::eventBus().publish(ABCUI_CHANNEL_HUD_SUIT, moduleEvent);
   }
 
   // Longjump module: physinfo "slj", polled on the same cadence as the old
@@ -83,6 +90,8 @@ void onUpdateClientData(const client_data_s *cdata) {
   if (longJump != LongJump) {
     LongJump = longJump;
     LongJumpChanged(longJump);
+    const AbcUiBoolEvent moduleEvent{longJump ? 1 : 0};
+    framework::eventBus().publish(ABCUI_CHANNEL_HUD_LONG_JUMP, moduleEvent);
   }
 
   // Spectate: local player iuser1 (old SetSpectate check).
@@ -91,6 +100,8 @@ void onUpdateClientData(const client_data_s *cdata) {
   if (spectate != Spectate) {
     Spectate = spectate;
     SpectateChanged(spectate);
+    const AbcUiBoolEvent moduleEvent{spectate ? 1 : 0};
+    framework::eventBus().publish(ABCUI_CHANNEL_HUD_SPECTATE, moduleEvent);
   }
 }
 

@@ -27,7 +27,9 @@ bool GameUiModule::retryServerAttempt() {
 // the toggle's truth; AutoRetryGate owns the bounded, paced policy and fires
 // only while the connection-error overlay is actually up.
 void GameUiModule::tickAutoRetry() {
-  const bool enabled = Browser && Browser->autoRetryJoin();
+  // The toggle's truth lives in the session (the page module publishes
+  // it through the sdk serverbrowser section).
+  const bool enabled = ServerBrowser.AutoRetryJoin;
   if (!enabled) {
     AutoRetry.reset(); // the player switched it off: the chain ends
     return;
@@ -43,6 +45,68 @@ void GameUiModule::tickAutoRetry() {
                     services::loading::AutoRetryGate::kMaxAttempts);
   if (!retryServerAttempt())
     abc::ConsoleWarn("[AbcUi] auto retry had nothing to replay\n");
+}
+
+// The sdk connection section's intent boundaries. The controller-layer
+// decisions stay here; the page module reaches them through the section.
+
+bool GameUiModule::connectionCancelLoading() {
+  // The proven termination action (vanilla Cancel): the model latch is the
+  // UI-edge guard; the controller phase gate and the backend's generation
+  // latch sit behind it.
+  const uint32_t live = LoadingModelState.generation();
+  if (live == 0 || !LoadingModelState.requestCancel(live))
+    return false;
+  AutoRetry.reset(); // the player ended the chain
+  Controller.dispatch(MenuEvent{EventKind::kConnectCancel});
+  finishDispatch();
+  return true;
+}
+
+void GameUiModule::connectionRetryFailed() {
+  // A manual retry starts a fresh auto-retry chain.
+  AutoRetry.reset();
+  if (!retryServerAttempt())
+    return; // nothing to retry: the overlay stays honest
+  finishDispatch();
+}
+
+void GameUiModule::connectionReturnHome() {
+  AutoRetry.reset();
+  Controller.dispatch(MenuEvent{EventKind::kBack});
+  finishDispatch();
+}
+
+bool GameUiModule::connectionSubmitPassword(const char *password) {
+  if (!password || !*password)
+    return false; // empty submissions are not typed intents
+  Controller.dispatch(gameui::menu::makePasswordSubmitted(password));
+  finishDispatch();
+  return true;
+}
+
+void GameUiModule::connectionPasswordCancel() {
+  // Vanilla parity: closing the password dialog does not kill the attempt
+  // (its backend Close only destroys the dialog). The loading page stays;
+  // its Cancel is the termination path.
+  Controller.dispatch(MenuEvent{EventKind::kBack});
+  finishDispatch();
+}
+
+bool GameUiModule::connectionConnectAddress(const char *address,
+                                            std::string &errorToken) {
+  std::string host;
+  int port = 0;
+  if (!address || !*address ||
+      !services::loading::LoadingModel::parseAddress(address, host, port)) {
+    errorToken = "#Loading_AddressInvalid";
+    return false; // nothing reaches the engine unvalidated
+  }
+  // A user-initiated attempt starts a fresh auto-retry chain.
+  AutoRetry.reset();
+  Controller.dispatch(gameui::menu::makeConnectRequest(address));
+  finishDispatch();
+  return true;
 }
 
 void GameUiModule::handleConnectionAction(ActionKind Kind) {
@@ -67,33 +131,13 @@ void GameUiModule::handleConnectionAction(ActionKind Kind) {
   } else if (Kind == ActionKind::kErrorReturn) {
     AutoRetry.reset();
     Controller.dispatch(MenuEvent{EventKind::kBack});
-  } else if (Kind == ActionKind::kDirectConnectConnect) {
-    if (!DirectConnect)
-      return;
-    const std::string address = DirectConnect->value();
-    std::string host;
-    int port = 0;
-    if (!services::loading::LoadingModel::parseAddress(address.c_str(), host,
-                                                       port)) {
-      DirectConnect->showHint("#Loading_AddressInvalid");
-      return; // stay put: nothing reaches the engine unvalidated
-    }
-    // A user-initiated attempt starts a fresh auto-retry chain.
-    AutoRetry.reset();
-    Controller.dispatch(gameui::menu::makeConnectRequest(address.c_str()));
+  } else if (Kind == ActionKind::kDirectConnectConnect ||
+             Kind == ActionKind::kPasswordConnect ||
+             Kind == ActionKind::kPasswordCancel) {
+    // The dialog pages are module documents: their submit/cancel intents
+    // travel through the sdk connection section, so nothing arrives here.
+    return;
   } else if (Kind == ActionKind::kDirectConnectCancel)
-    Controller.dispatch(MenuEvent{EventKind::kBack});
-  else if (Kind == ActionKind::kPasswordConnect) {
-    if (!Password)
-      return;
-    const std::string password = Password->value();
-    if (password.empty())
-      return; // empty submissions are not typed intents
-    Controller.dispatch(gameui::menu::makePasswordSubmitted(password.c_str()));
-  } else if (Kind == ActionKind::kPasswordCancel)
-    // Vanilla parity: closing the password dialog does not kill the
-    // attempt (its backend Close only destroys the dialog). The
-    // loading page stays; its Cancel is the termination path.
     Controller.dispatch(MenuEvent{EventKind::kBack});
   finishDispatch();
 }

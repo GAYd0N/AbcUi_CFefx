@@ -12,12 +12,16 @@
 //   LoadClient      plugin entry only: interface grabs, sig scans, export
 //                   chain. No cvar/command work (plan 08 §4.9 red line) and
 //                   no module dispatch.
-//   HUD_Init        the guarded one-shot block in H_HUD_Init: data-layer
-//                   init -> PanelManager::registerPanelCvars ->
-//                   rmlui::registerCommands -> registry().initAll(). Once
-//                   per process, like the panel cvars (the engine keeps
-//                   registered cvars across HUD_Shutdown cycles).
-//   first HUD_Frame rmlui::init() one-shot assembly: Rml::Initialise ->
+//   HUD_Init        every cycle: netmsg::init (usermsg chain installed once)
+//                   + netmsg::refreshAfterClientLoad (re-chain only after a
+//                   client DLL reload) and PanelManager::installHudPanels
+//                   when the list is empty (HUD_Shutdown cleared it). The
+//                   process-scoped block runs once: data-layer init ->
+//                   PanelManager::registerPanelCvars ->
+//                   rmlui::registerCommands -> registry().initAll(). The
+//                   engine keeps registered cvars/commands across
+//                   HUD_Shutdown cycles.
+//   first HUD_Frame rmlui::init() assembly (per context): Rml::Initialise ->
 //                   context -> fonts/localization/theme -> sprites/avatars/
 //                   assets -> PanelManager::initAll (24 panels, factory
 //                   order, untouched) -> debugger + render callbacks ->

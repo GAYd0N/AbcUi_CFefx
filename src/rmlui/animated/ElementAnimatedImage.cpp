@@ -141,8 +141,8 @@ void ElementAnimatedImage::OnAttributeChange(
     else
       continue; // id, class, style, ... - not this element's contract
     if (!valid)
-      abc::ConsoleWarn("[AbcUi animimg] %s: invalid %s='%s'\n",
-                       GetId().c_str(), Name.c_str(), text.c_str());
+      abc::ConsoleWarn("[AbcUi animimg] %s: invalid %s='%s'\n", GetId().c_str(),
+                       Name.c_str(), text.c_str());
   }
 
   const bool reopen = source != Source || blend != Blend;
@@ -193,8 +193,8 @@ bool ElementAnimatedImage::ensureOpen() {
   AppliedSource = Source;
   FrameIndex = -1;
   FrameClock = 0.0;
-  Texture = std::make_unique<services::texture::DynamicTexture>(makePrefix(),
-                                                               Blend);
+  Texture =
+      std::make_unique<services::texture::DynamicTexture>(makePrefix(), Blend);
   Playing = Autoplay;
   // The intrinsic size becomes known with the animation: lay out again.
   DirtyLayout();
@@ -304,8 +304,8 @@ bool ElementAnimatedImage::GetIntrinsicDimensions(Rml::Vector2f &dimensions,
     scale = context->GetDensityIndependentPixelRatio();
   dimensions = Rml::Vector2f(static_cast<float>(Image->Width()) * scale,
                              static_cast<float>(Image->Height()) * scale);
-  ratio = static_cast<float>(Image->Width()) /
-          static_cast<float>(Image->Height());
+  ratio =
+      static_cast<float>(Image->Width()) / static_cast<float>(Image->Height());
   return true;
 }
 

@@ -23,9 +23,6 @@ void GameUiModule::syncAttemptState() {
         state.attemptKind == gameui::menu::AttemptKind::kLocalGame;
     if (state.attemptKind == gameui::menu::AttemptKind::kConnect)
       Create->invalidatePending(); // a stale local request can never retry
-    PasswordInvalid = false;
-    PasswordPrompts = 0;
-    PasswordReprepare = false;
   }
   if (LoadingModelState.generation() != 0 &&
       LoadingModelState.generation() != state.connectGeneration) {
@@ -37,9 +34,6 @@ void GameUiModule::syncAttemptState() {
     // retry (the controller's own attemptKind is already retired).
     LastAttemptWasLocal = CurrentAttemptIsLocal;
     CurrentAttemptIsLocal = false;
-    PasswordInvalid = false;
-    PasswordPrompts = 0;
-    PasswordReprepare = false;
     // T18b: an attempt that ends without the join beat retires the
     // pending history entry unrecorded (only a real join writes it).
     Server->discardPendingHistory();
@@ -49,7 +43,6 @@ void GameUiModule::syncAttemptState() {
 void GameUiModule::drainLoadingFeed() {
   services::LoadingFeedEvent event;
   bool changed = false;
-  bool rendered = false;
   while (services::loadingFeed().pop(event)) {
     changed = true;
     // A server changelevel streams IGameUI loading events with no connect
@@ -100,16 +93,10 @@ void GameUiModule::drainLoadingFeed() {
       LoadingModelState.setSecondaryProgressText(live, event.text.c_str());
       break;
     case services::LoadingFeedKind::kPasswordPrompt:
-      // The engine asked for a server password (IGameUI +0x58).
-      // The first prompt of a generation = "required"; any later
-      // one = the previous password was rejected (the engine's own
-      // flag polarity is not pinned - the per-generation count is
-      // the authoritative signal for the lead line).
-      if (live != 0) {
-        PasswordInvalid = PasswordPrompts > 0;
-        ++PasswordPrompts;
-        PasswordReprepare = true; // re-prepare clears the field
-      }
+      // The engine asked for a server password (IGameUI +0x58). The
+      // per-generation count rides the model; the page module derives the
+      // lead line from it (the sdk connection section).
+      LoadingModelState.notePasswordPrompt(live);
       break;
     case services::LoadingFeedKind::kCount:
       break;
@@ -159,11 +146,6 @@ void GameUiModule::drainLoadingFeed() {
       break;
     }
     // The visible loading page re-projects once per drained batch
-    // (values moved); never inside the pop loop's per-event churn.
-    if (!rendered && MenuPresented && LoadingVisible && Loading) {
-      Loading->render();
-      rendered = true;
-    }
   }
   if (!changed)
     return;

@@ -31,34 +31,36 @@ jobs:
           git config --global url."https://github.com/DrAbcOfficial/Renderer".insteadOf "https://github.com/MetaHookSv/Renderer"
 
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        # actions/checkout v7.0.1, pinned to its commit: a mutable tag could
+        # be repointed by a compromised action repository.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          token: ${{ secrets.SUBMODULE_TOKEN || github.token }}
+          # Default scoped token: permissions: contents: read applies, and a
+          # personal PAT (which carries its own scopes) is not involved.
           submodules: recursive
 
       # AbcCore is owned by the aggregate ABCEnchance repository; standalone
       # CI checks out the central repository and passes its path to CMake.
       - name: Checkout AbcCore
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: DrAbcOfficial/AbcCore
           path: .abc/AbcCore
-          token: ${{ secrets.SUBMODULE_TOKEN || github.token }}
           submodules: recursive
 
-      # The runner image ships an older CMake than the project requires; the
-      # newest release number is resolved at run time through the GitHub CLI.
-      - name: Install the latest CMake (resolved through gh)
+      # The runner image ships an older CMake than the project requires. Pin
+      # one release and verify the official SHA-256 before extracting: a
+      # replaced release asset would otherwise become a build binary.
+      - name: Install CMake 4.4.4
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = gh api repos/Kitware/CMake/releases/latest --jq .tag_name
-          if (-not $tag) { $tag = 'v4.4.4' }
-          $version = $tag.TrimStart('v')
-          $url = "https://github.com/Kitware/CMake/releases/download/$tag/cmake-$version-windows-x86_64.zip"
+          $version = '4.4.4'
+          $sha256 = 'bace36e94b31c68ab6fa295f26dfa11219e0701cf7c94b0284a7d1cb13dac536'
+          $url = "https://github.com/Kitware/CMake/releases/download/v$version/cmake-$version-windows-x86_64.zip"
           Write-Host "Installing CMake $version from $url"
           Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\cmake.zip"
+          $actual = (Get-FileHash -Algorithm SHA256 "$env:RUNNER_TEMP\cmake.zip").Hash.ToLower()
+          if ($actual -ne $sha256) { throw "CMake zip checksum mismatch: $actual" }
           Expand-Archive -Path "$env:RUNNER_TEMP\cmake.zip" -DestinationPath "$env:RUNNER_TEMP\cmake" -Force
           "$env:RUNNER_TEMP\cmake\cmake-$version-windows-x86_64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
@@ -76,15 +78,45 @@ jobs:
           & $cf --dry-run --Werror --style=file @files
 
       - name: Configure
-        # The CMake presets pin the Visual Studio 18 2026 generator, which the
-        # runner image does not carry yet; configure the same Win32/x86 target
-        # with the bundled Visual Studio 2022 generator instead.
+        # Use the newest Visual Studio the runner actually carries: the
+        # presets pin VS 18 2026, so prefer that generator and fall back to
+        # VS 17 2022 only when the image lacks it (instead of always
+        # validating the older generation).
         run: |
           cmake --version
-          cmake -S . -B build/ci -G "Visual Studio 17 2022" -A Win32 -DABC_CORE_DIR="$env:GITHUB_WORKSPACE/.abc/AbcCore"
+          $generator = 'Visual Studio 17 2022'
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) {
+            $instances = & $vswhere -all -prerelease -products * -format json | ConvertFrom-Json
+            $latest = $instances | Sort-Object { [int]($_.installationVersion.Split('.')[0]) } -Descending | Select-Object -First 1
+            if ($latest -and [int]$latest.installationVersion.Split('.')[0] -ge 18) {
+              $generator = 'Visual Studio 18 2026'
+            }
+          }
+          Write-Host "Generating with '$generator'"
+          cmake -S . -B build/ci -G $generator -A Win32 -DABC_CORE_DIR="$env:GITHUB_WORKSPACE/.abc/AbcCore"
 
       - name: Build (${{ matrix.config }})
         run: cmake --build build/ci --config ${{ matrix.config }} --parallel
+
+      # The module packages are zipped by tools/pack.py (Python3 required at
+      # configure time). Fail loudly instead of shipping a bundle without
+      # them: a dist zip with an empty modules directory would install a HUD
+      # with no panels.
+      - name: Verify module packages
+        if: matrix.config == 'Release'
+        shell: pwsh
+        run: |
+          cmake --build build/ci --config Release --target pack_modules
+          $packed = @(Get-ChildItem build/ci/dist/modules/*.zip -ErrorAction SilentlyContinue)
+          if ($packed.Count -lt 1) {
+            throw "no module packages were produced (tools/pack.py did not run)"
+          }
+          $expected = @(Get-ChildItem modules/*/manifest.json).Count
+          if ($packed.Count -ne $expected) {
+            throw "packed $($packed.Count) module(s), expected $expected"
+          }
+          Write-Host "$($packed.Count) module package(s) ready"
 
       - name: Package (Release)
         if: matrix.config == 'Release'
@@ -92,7 +124,8 @@ jobs:
 
       - name: Upload package
         if: matrix.config == 'Release'
-        uses: actions/upload-artifact@v7.0.2
+        # actions/upload-artifact v7.0.2, pinned to its commit.
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: AbcUi-package
           path: build/ci/dist/*.zip

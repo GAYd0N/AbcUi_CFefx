@@ -7,14 +7,18 @@ include_guard(GLOBAL)
 #
 # Search order:
 #   1. ABCUI_MILE_FFMPEG_ROOT / MILE_FFMPEG_ROOT (explicit cache / env)
-#   2. the sibling MetaHookSv Renderer checkout's already-fetched SDK (dev tree)
+#   2. the sibling MetaHookSv Renderer checkout's already-fetched SDK (dev
+#      tree; only with ABCUI_ALLOW_LOCAL_MILE_FFMPEG, because a local tree is
+#      not covered by the pinned release hash)
 #   3. FetchContent of the pinned release (same URL/hash as Renderer)
 set(ABCUI_MILE_FFMPEG_ROOT "$ENV{MILE_FFMPEG_ROOT}" CACHE PATH
-    "Mile.FFmpeg 6.1.0.0 binary SDK; empty searches the dev tree then downloads the verified release")
+    "Mile.FFmpeg 6.1.0.0 binary SDK; empty downloads the verified release")
+option(ABCUI_ALLOW_LOCAL_MILE_FFMPEG
+    "Accept an unverified local Mile.FFmpeg tree (development only)" OFF)
 
 function(abcui_prepare_mile_ffmpeg out_root)
     set(root "${ABCUI_MILE_FFMPEG_ROOT}")
-    if(NOT root)
+    if(NOT root AND ABCUI_ALLOW_LOCAL_MILE_FFMPEG)
         foreach(candidate
                 "${CMAKE_CURRENT_SOURCE_DIR}/../MetaHookSv/Plugins/Renderer/build/preview/_deps/renderer_mile_ffmpeg-src"
                 "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/MileFFmpeg")

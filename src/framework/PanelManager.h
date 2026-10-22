@@ -3,10 +3,11 @@
 // framework::PanelManager - panel registry + lifecycle.
 //
 // The manager owns the panel list and routes the HUD pump, but it does not
-// know the concrete panel types: modules/HudPanelCatalog.cpp fixes the
-// construction order and calls installPanels() once per init cycle. This
-// keeps framework free of panel includes (the old Viewport god object's
-// "hold and route 25 panels" duty without the compile-time dependency).
+// know the concrete panel types: every panel arrives from a UI module (see
+// modmanager::takePanels()) and installPanels() runs once per HUD_Init
+// cycle. This keeps the framework free of panel includes (the old Viewport
+// god object's "hold and route 25 panels" duty without the compile-time
+// dependency).
 
 #include <RmlUi/Core/Context.h>
 

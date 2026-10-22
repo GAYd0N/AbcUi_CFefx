@@ -237,7 +237,10 @@ bool VoteMenuModel::safeCommandArgument(const std::string &value) {
   if (value.empty() || value.size() > kMaxArgument)
     return false;
   for (const unsigned char c : value) {
-    if (c < 0x20 || c == 0x7f || c == ';')
+    // ';' would split the console line; '"' would toggle the engine's
+    // tokenizer quoting and let a player name merge the remaining words into
+    // a different argv than the one the vote UI shows.
+    if (c < 0x20 || c == 0x7f || c == ';' || c == '"')
       return false;
   }
   return true;

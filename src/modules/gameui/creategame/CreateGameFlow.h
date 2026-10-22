@@ -1,29 +1,27 @@
 #pragma once
 
-// gameui::CreateGameFlow - the create-local-game page, map catalog and the
+// gameui::CreateGameFlow - the create-local-game model, map catalog and the
 // kept (pending) request used by local retry.
 //
-// Owns CreateGameModel, the pending Request and the page latch. The
-// composition root supplies the typed controller dispatches and the
+// The page became a module (abcui.gameui, sdk creategame section): the flow
+// keeps the model, the server options and map catalog feeds, the kept
+// pending request and the apply boundary (the page submits the form's
+// fields once on Apply; this assembles, validates and dispatches them).
+// The composition root supplies the typed controller dispatches and the
 // auto-retry reset; the engine launch path is a thin method so
 // GameUiModule::launchLocalGame can stay a static backend shim.
 
 #include "../../../services/creategame/CreateGameModel.h"
-#include "../navigation/MenuAction.h"
 
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
-
-namespace panels::creategame {
-class CreateGamePage;
-}
 
 namespace gameui {
 
 struct CreateGameHost {
   std::function<void(const std::string &map)> dispatchCreate;
-  std::function<void()> dispatchBack;
   std::function<void()> finishDispatch;
   std::function<void()> resetAutoRetry;
 };
@@ -33,22 +31,17 @@ public:
   CreateGameFlow(CreateGameHost host,
                  services::creategame::CreateGameModel::Seams seams);
 
-  void setPage(panels::creategame::CreateGamePage *page);
   void shutdown();
-  bool presented() const {
-    return Presented;
-  }
-  void setPresented(bool presented) {
-    Presented = presented;
-  }
-  void hide();
 
   void setOptions(std::vector<services::creategame::ServerOption> options);
   bool optionsEmpty() const;
   void loadCatalog();
-  void present();
-  void apply();
-  void handleAction(navigation::ActionKind kind);
+  // The page's Apply: assembles the request from the form fields (fixed
+  // names "map"/"players"/"name"/"password"/"lan" plus one per option),
+  // validates, keeps the pending request and dispatches the attempt.
+  // Returns 0 on refusal with a hint token/text.
+  bool apply(const std::vector<std::pair<std::string, std::string>> &fields,
+             std::string &hint);
 
   // Local-retry seam: replay the kept request through the controller.
   bool replayPending();
@@ -75,10 +68,8 @@ private:
 
   CreateGameHost Host;
   services::creategame::CreateGameModel Model;
-  panels::creategame::CreateGamePage *Page = nullptr;
   services::creategame::Request Pending;
   bool PendingValid = false;
-  bool Presented = false;
 };
 
 } // namespace gameui

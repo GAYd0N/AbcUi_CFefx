@@ -1,33 +1,35 @@
 #pragma once
 
-// gameui::InventoryFlow - the in-game inventory window's open/close flow.
+// gameui::InventoryFlow - the in-game inventory window's open/close intents
+// and claimed-key feed.
 //
-// Owns the inventory model and the page pointer. The composition root
-// supplies the navigation callbacks (raise the menu, reconcile to the
-// in-game phase, dispatch open/back, finish the dispatch), so the flow never
-// knows the MenuController. The chained inventory/+inventory/-inventory
-// commands are the only open/close entry points besides the page's own close
-// button; the native CInventoryPanel handler is swallowed by returning false
-// from every hook.
+// The page became a module (abcui.gameui, sdk inventory section), so the
+// flow keeps what is framework-side: the model (fed by the InvAdd/InvRemove
+// stream), the request latch and the raised-menu discipline around
+// open/close, and the key-edge feed (the inventory/+inventory binding close
+// rule, then the menu.commandkey veto channel the page answers). Actions
+// run through the services::inventory access point (the window closes,
+// then the client command runs).
 //
-// Actions are read-through: the flow asks the model for a command (built
-// from the current selection), sends it once through
-// abc::EngineClientCmd, and closes exactly like the native window (it hid
-// itself before issuing the command). No list mutation happens here - a
-// successful drop only removes the row when the server's InvRemove arrives.
+// The chained inventory/+inventory/-inventory commands are the only
+// open/close entry points besides the page's own close button; the native
+// CInventoryPanel handler is swallowed by returning false from every hook.
+//
+// Actions are read-through: the model builds the command from the current
+// selection, it is sent once, and no list mutation happens - a successful
+// drop only removes the row when the server's InvRemove arrives.
 
 #include "../../../services/inventory/InventoryModel.h"
 
 #include <functional>
 
-namespace panels::inventory {
-class InventoryPage;
-}
-
 namespace gameui {
 
 struct InventoryHost {
   std::function<bool()> shellReady;
+  // The inventory page is on top of the menu stack (the module document is
+  // the presented surface).
+  std::function<bool()> pageOnTop;
   // Raises the menu when needed and reports whether this call did so.
   std::function<bool(bool &raisedMenu)> ensureMenu;
   std::function<void()> cancelRaisedMenu;
@@ -43,20 +45,13 @@ class InventoryFlow {
 public:
   explicit InventoryFlow(InventoryHost host);
 
-  void setPage(panels::inventory::InventoryPage *page);
   void shutdown();
   bool consumeRequest();
-  void setPresented(bool presented) {
-    Presented = presented;
-  }
   void resetForWorld();
-  void hide();
 
   void open();
   void close();
-  void present();
   bool handleKey(int keynum);
-  void handleAction(services::inventory::Action action);
 
   services::inventory::InventoryModel &model() {
     return Model;
@@ -65,8 +60,6 @@ public:
 private:
   InventoryHost Host;
   services::inventory::InventoryModel Model;
-  panels::inventory::InventoryPage *Page = nullptr;
-  bool Presented = false;
   bool Requested = false;
   bool RaisedMenu = false;
 };

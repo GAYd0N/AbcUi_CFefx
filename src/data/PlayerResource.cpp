@@ -62,10 +62,18 @@ void PlayerInfo::update() {
       hooks::EngineStudioApi->PlayerInfo(index - 1));
   const bool wasConnected = connected;
   connected = info && info->name[0];
-  if (connected && steamId64 && info->m_nSteamID &&
-      steamId64 != info->m_nSteamID) {
-    // New occupant in this slot: drop the previous player's record. The
-    // ScoreInfo handler refreshes the identity first and applies its wire
+  const cl_entity_t *localPlayer = gEngfuncs.GetLocalPlayer();
+  const bool localSlot = localPlayer && index == localPlayer->index;
+  // New occupant in this slot: drop the previous player's record. The engine
+  // leaves m_nSteamID at 0 for bots and placeholder slots, so a change to 0
+  // is also a new occupant (otherwise the previous human's Steam identity and
+  // avatar stuck to the bot). The local slot is exempt: its engine column is
+  // a placeholder and the real id comes from SteamAPI below.
+  const bool identityChanged = connected && steamId64 != 0 &&
+                               info->m_nSteamID != steamId64 &&
+                               (info->m_nSteamID != 0 || !localSlot);
+  if (identityChanged) {
+    // The ScoreInfo handler refreshes the identity first and applies its wire
     // values afterwards, so this reset cannot discard the stats from the
     // same message (issue #3).
     reset();
@@ -123,7 +131,7 @@ void PlayerInfo::update() {
 // survive a periodic refresh.
 //
 // The mirror only carries other players' ping/loss while the local client
-// reports the score state (ScoreboardPanel's usercmd IN_SCORE, the old
+// reports the score state (the score seat's usercmd IN_SCORE, the old
 // Viewport m_bInScore): the server streams pings solely to clients it
 // believes hold the scoreboard, and the values persist in the mirror after
 // the board closes. Verified live on 124.221.167.52:28347 (Sven Co-op

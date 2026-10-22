@@ -16,3 +16,6 @@
 [submodule "thirdparty/SteamSDK"]
 	path = thirdparty/SteamSDK
 	url = https://github.com/MetaHookSv/SteamSDK
+[submodule "thirdparty/miniz"]
+	path = thirdparty/miniz
+	url = https://github.com/richgel999/miniz

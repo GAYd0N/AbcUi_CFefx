@@ -16,9 +16,8 @@ namespace {
 bool probeWebP(const unsigned char *data, std::size_t size) {
   if (!data || size < 12)
     return false;
-  return data[0] == 'R' && data[1] == 'I' && data[2] == 'F' &&
-         data[3] == 'F' && data[8] == 'W' && data[9] == 'E' &&
-         data[10] == 'B' && data[11] == 'P';
+  return data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' &&
+         data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P';
 }
 
 class WebPAnimation final : public AnimatedImage {
@@ -42,10 +41,8 @@ public:
       error = "webp container rejected";
       return false;
     }
-    const uint32_t declaredWidth =
-        WebPDemuxGetI(demux, WEBP_FF_CANVAS_WIDTH);
-    const uint32_t declaredHeight =
-        WebPDemuxGetI(demux, WEBP_FF_CANVAS_HEIGHT);
+    const uint32_t declaredWidth = WebPDemuxGetI(demux, WEBP_FF_CANVAS_WIDTH);
+    const uint32_t declaredHeight = WebPDemuxGetI(demux, WEBP_FF_CANVAS_HEIGHT);
     WebPIterator iter;
     if (WebPDemuxGetFrame(demux, 1, &iter)) {
       do {
@@ -56,9 +53,9 @@ public:
     WebPDemuxDelete(demux);
 
     std::size_t canvasBytes = 0;
-    if (!framework::ResourceLimits::imageBytes(
-            static_cast<int>(declaredWidth), static_cast<int>(declaredHeight),
-            canvasBytes)) {
+    if (!framework::ResourceLimits::imageBytes(static_cast<int>(declaredWidth),
+                                               static_cast<int>(declaredHeight),
+                                               canvasBytes)) {
       error = "webp canvas out of range";
       return false;
     }

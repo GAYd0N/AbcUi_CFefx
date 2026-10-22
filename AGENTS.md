@@ -48,6 +48,120 @@ These are deliberate, audited exceptions rather than unfinished cleanups:
   is the service lifetime. Consume them through their named accessor; do not
   add new ad-hoc file-level statics. Module and panel lookup goes through
   `modules::registry()` / `PanelManager::find`, not reverse pointers.
+- HUD_Init/HUD_Shutdown repeat within one engine process (the client re-runs
+  its HUD cycle on map init and the teardown path runs on the way out).
+  Everything HUD_Shutdown tears down must be re-armed by H_HUD_Init: the
+  panel list (`installHudPanels` when `PanelManager` is empty) and module
+  documents (`onContextReady`). Cvars, commands and module registration stay
+  process-scoped and are guarded by a one-shot latch; do not move them into
+  the per-cycle path. Usermsg hooks are installed once and re-chained only by
+  `netmsg::refreshAfterClientLoad()` after a client DLL reload (detected via a
+  Ui-exclusive message); re-hooking every cycle would make AbcEssential's and
+  this plugin's hooks point at each other and recurse forever.
+- GameUiModule's engine-event subscriptions (`votemenu`, command menu,
+  inventory commands, InvAdd/InvRemove, MapList) are installed once in
+  `onInit` and guarded by `*Bound` flags. The module object and the event
+  buses are process-lifetime, so they are deliberately not unsubscribed in
+  `onShutdown`; never re-append an unguarded `[this]` subscription from a
+  per-cycle callback.
+- Server weapon names are untrusted. They may enter the weapon registry only
+  as `[A-Za-z0-9_]` identifiers, and only a `weapon_*` token may be sent to
+  `pfnServerCmd` (`ResourceLimits::weaponCommandName`). A bare identifier is
+  not enough: `kill` is a legal identifier and a real console command.
+- Custom Rml elements that are downcast after lookup declare
+  `RMLUI_RTTI_DeclareWithParent`/`RMLUI_RTTI_Define` and are reached through
+  `rmlui_dynamic_cast`; raw `static_cast` between element types is not
+  allowed in production or debug tools.
+- `<colorpicker>` queues `change` events and dispatches them from
+  `ElementColorPicker::pumpChanges()` in the frame pump, never from the
+  drag/render call stack (a page handler may destroy the picker).
+
+## UI module architecture
+
+The plugin is a UI-free framework plus loadable UI modules (zip packages). The
+implemented rules the transition must keep:
+
+- AbcUi.dll ends up UI-free: RmlUi runtime, render bridge, input bridge, IME,
+  theme/localization, texture services (sprites/avatars/custom elements), the
+  data layer (NetworkMessages / WeaponResource / HudState / PlayerResource /
+  PlayerTrace / TextFeed) and the module machinery. No HUD panel or menu page
+  ships inside the framework.
+- UI features live in modules under `modules/<id>/`: `manifest.json` + `src/`
+  + `assets/` + a CMake `add_library(... MODULE)` target. Migrated so far:
+  flashlight, textmenu, vote, motd, weaponchoose, killfeed, textfeed, sidetext,
+  health, ammo, hudeffects, crosshair, damage, itemhighlight, playerboard,
+  radar, scoreboard and chat; `abcui.gameui` has the menu shell, the
+  console, the server browser and the vote creation, player-list,
+  command-menu, inventory and create-game pages (the remaining menu pages
+  still live in the framework); `demo` is the minimal example.
+  modeltest/videotest stay development-only.
+- The module ABI is pure C, versioned struct tables under `sdk/abcui/`
+  (same pattern as `AbcCore_CreateInterface`). A module DLL exports exactly
+  one entry, `AbcUiModule_Main(abiVersion, api, outDescriptor)`; everything
+  else crosses the boundary as C function pointers and POD payloads. Modules
+  must not include RmlUi headers or link the framework's static libraries.
+  Sections: core, console, events, vfs, panels, documents, data, ui, commands,
+  weapons, players, radar, shell, voice, score, input, menu, votemenu,
+  playerlist, commandmenu, menuconfig, social, inventory, creategame,
+  consolepage, serverbrowser, connection. Adding a function
+  means appending it to the section end (and its initializer in
+  `ApiTable.cpp` / `ApiSections.cpp` / `ApiWeapons.cpp` / `ApiPlayers.cpp` /
+  `ApiDocuments.cpp` / `ApiMenu.cpp` / `ApiVoteMenu.cpp` /
+  `ApiPlayerList.cpp` / `ApiCommandMenu.cpp` / `ApiMenuConfig.cpp` /
+  `ApiSocial.cpp` / `ApiInventory.cpp` / `ApiCreateGame.cpp` /
+  `ApiConsolePage.cpp` / `ApiServerBrowser.cpp` / `ApiConnection.cpp` -
+  a missing initializer is silently a null pointer; the table audit in
+  `ApiTable::get` catches it at boot), and
+  appending to snapshot structs means the writer must honor the caller's
+  `structSize`.
+- Module packages are zip files at `svencoop/abc/abcui/modules/` (real files,
+  never inside a VPK): `manifest.json`, the entry DLL and the module's
+  rml / rcss / img / lang trees. Manifest fields: `id`, `name`, `description`,
+  `author`, `version`, `abi`, `minAbcUi`, `entry`, `dependencies`,
+  `conflicts`. Packaging stores every entry uncompressed (STORED): the loader
+  maps the zip with `CreateFileMapping` and serves STORED entries as zero-copy
+  views; DEFLATED entries are inflated once through miniz for third-party
+  compatibility. `tools/pack.py` (the `pack_modules` target) validates the
+  manifests and writes `<id>-<version>.zip`; `dist` includes the archives.
+- Loading happens once per process in the HUD_Init one-shot block: scan,
+  validate (abi / minAbcUi / dependencies / conflicts), topologically sort
+  (ties broken by id), map each package, load the entry DLL from memory
+  (manual PE map; imports resolve through `GetModuleHandle` /
+  `GetProcAddress`), call the entry, then drive
+  `onLoad / onInit / onContextReady / onFrame / onVidInit / onShutdown /
+  onUnload` in load order (reverse order for shutdown). A failed module is
+  skipped together with its dependents; the process keeps running. Modules
+  must avoid static TLS (`__declspec(thread)`) and delayimp.
+- Module panel descriptors are kept for the whole process and every
+  `installHudPanels` cycle builds fresh wrappers: `PanelManager::shutdown`
+  destroys the panel list on every HUD_Shutdown, so taking the wrappers once
+  would lose every module panel after the first map change.
+- Interactive pages are module-owned documents (`documents->create`), never
+  framework pages: the framework loads them on every context cycle, forwards
+  ready/show/hide/close, and keeps the menu layer's focus guard and hide-all
+  rule for descriptors carrying `ABCUI_DOC_FLAG_MENU`. Page modules present
+  themselves from `menu.state` (transitions) and `menu.paint` (the per-frame
+  presentation beat), and navigate through the `menu` section
+  (`openPage`/`back`/`ensureUp`/`resume`) - never through a native GameUI
+  window. The page stack, phase machine and takeover stay framework-side
+  until the last page moves out.
+- Data exchange is event-bus based (`src/modsys/EventBus.h`): string channels,
+  each backed by priority buckets of `abc::CallbackList` (eventpp reused from
+  AbcCore). Priority > 0 runs before the framework default (interception and
+  rewriting), < 0 runs after (fallback); the same priority keeps registration
+  order, and registration order follows the deterministic load order, so
+  behaviour never depends on discovery order. Veto channels aggregate their
+  bool result in priority order. The chained-command bridge inverts that
+  result: `CChainedCommand` runs the engine's original only when every
+  subscriber returned true, while the bus reports "consumed" (any sink
+  returned nonzero), so `Commands.cpp` returns `!publishVetoAggregateRaw(...)`.
+  Channels and payloads are documented in `sdk/abcui/events.h`.
+- Transition rules: each migrated feature moves its sources, assets and cvars
+  into `modules/<id>/` in one commit and registers through the new ABI, and
+  the built-in copy is deleted in that same commit (the framework must not
+  keep a duplicate implementation). Existing lifecycle red lines (one-shot
+  latches, usermsg install-once + re-chain, export chaining) keep applying to
+  the framework spine unchanged.
 
 ## Build
 
@@ -93,5 +207,14 @@ cmake --build --preset win32-debug    # Release: win32-release
   directives are `engine`/`navigation`/`settings`/`detail`, plus a function-local
   `std::chrono` in `ServerQuery.cpp`. Never add one to a header or use it to
   reach an unrelated subsystem.
+- CI pins the CMake download (4.4.4 + published SHA-256) and action commit
+  SHAs, and uses the permission-scoped default token instead of a personal
+  PAT. Keep those properties when editing the workflow.
+- An empty `ABCUI_MILE_FFMPEG_ROOT` downloads the pinned, hash-verified SDK;
+  accepting a local dev-tree copy requires
+  `-DABCUI_ALLOW_LOCAL_MILE_FFMPEG=ON`. Do not restore the implicit local
+  search.
+- RML class tokens must have a rule in an RCSS file; an unstyled class is
+  either given a rule or removed (ids used by C++ lookups stay).
 - Commit messages use `type(scope): summary` (feat / fix / refactor / docs / build / chore) with motivation and verification in the body.
 - Before handing off: no local paths or credentials; README matches actual behaviour; Debug and Release both build.

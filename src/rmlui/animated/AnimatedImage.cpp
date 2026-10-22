@@ -59,9 +59,9 @@ std::unique_ptr<AnimatedImage> openFile(const std::string &path,
   return openBytes(std::move(bytes), path, error);
 }
 
-std::unique_ptr<AnimatedImage>
-openMemory(std::vector<unsigned char> bytes, std::string source,
-           std::string &error) {
+std::unique_ptr<AnimatedImage> openMemory(std::vector<unsigned char> bytes,
+                                          std::string source,
+                                          std::string &error) {
   return openBytes(std::move(bytes), std::move(source), error);
 }
 

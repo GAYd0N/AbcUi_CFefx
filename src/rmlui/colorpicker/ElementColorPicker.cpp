@@ -16,10 +16,22 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <unordered_set>
 #include <vector>
 
 namespace rmlui::colorpicker {
 namespace {
+// Pickers whose `change` event is queued and pickers that are still alive
+// (the destructor removes itself). pumpChanges uses these to skip elements a
+// page handler destroyed while the queue was being drained.
+std::vector<ElementColorPicker *> &PendingChanges() {
+  static std::vector<ElementColorPicker *> pending;
+  return pending;
+}
+std::unordered_set<const ElementColorPicker *> &LiveElements() {
+  static std::unordered_set<const ElementColorPicker *> live;
+  return live;
+}
 // Strip heights and gutters in dp; the density ratio scales them to pixels.
 constexpr float kHueHeight = 10.0f;
 constexpr float kAlphaHeight = 10.0f;
@@ -36,8 +48,7 @@ Rml::ColourbPremultiplied premultiplied(int red, int green, int blue,
   const auto channel = [alpha](int value) {
     return static_cast<Rml::byte>((std::clamp(value, 0, 255) * alpha) / 255);
   };
-  return Rml::ColourbPremultiplied(channel(red), channel(green),
-                                   channel(blue),
+  return Rml::ColourbPremultiplied(channel(red), channel(green), channel(blue),
                                    static_cast<Rml::byte>(alpha));
 }
 
@@ -135,9 +146,12 @@ ElementColorPicker::ElementColorPicker(const Rml::String &Tag)
   // Only the press is bound to the element; the document takes the move and
   // release while the drag is alive.
   AddEventListener("mousedown", &Listener, false);
+  LiveElements().insert(this);
 }
 
 ElementColorPicker::~ElementColorPicker() {
+  LiveElements().erase(this);
+  std::erase(PendingChanges(), this);
   syncDocumentListeners(false);
   releaseGeometry();
 }
@@ -160,8 +174,7 @@ void ElementColorPicker::parseValue(const Rml::String &text) {
   setFromRgba(rgba[0], rgba[1], rgba[2], rgba[3]);
 }
 
-void ElementColorPicker::setFromRgba(int red, int green, int blue,
-                                     int alpha) {
+void ElementColorPicker::setFromRgba(int red, int green, int blue, int alpha) {
   float hue = 0.0f, saturation = 0.0f, value = 0.0f;
   abc::math::RGBToHSV(red, green, blue, hue, saturation, value);
   // A grey has no hue of its own and black has no saturation: keep the
@@ -185,9 +198,36 @@ void ElementColorPicker::applyColor() {
   GeometryDirty = true;
   if (GetAttribute<Rml::String>("value", "") != text)
     SetAttribute("value", Rml::String(text));
-  Rml::Dictionary parameters;
-  parameters["value"] = Rml::Variant(Rml::String(text));
-  DispatchEvent("change", parameters);
+  // Do not dispatch here: this runs inside the element's own drag/render
+  // call stack, and the page's change handler may destroy the picker right
+  // away. Queue the latest value and let pumpChanges fire it from the frame
+  // loop instead.
+  PendingValue = text;
+  if (!ChangePending) {
+    ChangePending = true;
+    PendingChanges().push_back(this);
+  }
+}
+
+void ElementColorPicker::pumpChanges() {
+  auto &pending = PendingChanges();
+  if (pending.empty())
+    return;
+  std::vector<ElementColorPicker *> queued;
+  queued.swap(pending);
+  for (ElementColorPicker *element : queued) {
+    // A handler earlier in this drain may have destroyed this picker (its
+    // destructor removed it from the live set and the queue).
+    if (!LiveElements().contains(element))
+      continue;
+    element->ChangePending = false;
+    const Rml::String value = element->PendingValue;
+    Rml::Dictionary parameters;
+    parameters["value"] = Rml::Variant(value);
+    element->DispatchEvent("change", parameters);
+    // The handler may have destroyed `element`; do not touch it again. Its
+    // destructor already removed it from the live set.
+  }
 }
 
 ElementColorPicker::Layout ElementColorPicker::layout(Rml::Vector2f size) {
@@ -246,8 +286,8 @@ void ElementColorPicker::updateDrag(const Layout &area, float x, float y,
     Value = 1.0f - unit(y - area.SvY, area.SvH);
     break;
   case Region::Alpha:
-    Alpha = static_cast<int>(std::lround(unit(x - area.AlphaX, area.AlphaW) *
-                                         255.0f));
+    Alpha = static_cast<int>(
+        std::lround(unit(x - area.AlphaX, area.AlphaW) * 255.0f));
     break;
   case Region::None:
     return;
@@ -333,8 +373,7 @@ void ElementColorPicker::rebuildGeometry(Rml::Vector2f size) {
   MeshBuilder mesh;
 
   mesh.addGradient(area.HueX, area.HueY, area.HueW, area.HueH,
-                   static_cast<int>(kHueSegments), 1,
-                   [](float s, float) {
+                   static_cast<int>(kHueSegments), 1, [](float s, float) {
                      int red = 0, green = 0, blue = 0;
                      abc::math::HSVToRGB(s * 359.999f, 1.0f, 1.0f, red, green,
                                          blue);
@@ -353,10 +392,9 @@ void ElementColorPicker::rebuildGeometry(Rml::Vector2f size) {
   // Alpha strip: a checkerboard proves the transparency, the gradient
   // over it carries the colour.
   const float cell = std::max(3.0f, 4.0f * ratio);
-  const int columns = std::max(
-      1, static_cast<int>(std::ceil(area.AlphaW / cell)));
-  const int rows = std::max(
-      1, static_cast<int>(std::ceil(area.AlphaH / cell)));
+  const int columns =
+      std::max(1, static_cast<int>(std::ceil(area.AlphaW / cell)));
+  const int rows = std::max(1, static_cast<int>(std::ceil(area.AlphaH / cell)));
   for (int row = 0; row < rows; ++row) {
     for (int column = 0; column < columns; ++column) {
       const float x = area.AlphaX + column * cell;
@@ -371,18 +409,17 @@ void ElementColorPicker::rebuildGeometry(Rml::Vector2f size) {
   }
   int red = 0, green = 0, blue = 0;
   abc::math::HSVToRGB(Hue, Saturation, Value, red, green, blue);
-  mesh.addGradient(area.AlphaX, area.AlphaY, area.AlphaW, area.AlphaH,
-                   static_cast<int>(kAlphaSegments), 1,
-                   [red, green, blue](float s, float) {
-                     const int alpha =
-                         static_cast<int>(std::lround(s * 255.0f));
-                     return premultiplied(red, green, blue, alpha);
-                   });
+  mesh.addGradient(
+      area.AlphaX, area.AlphaY, area.AlphaW, area.AlphaH,
+      static_cast<int>(kAlphaSegments), 1, [red, green, blue](float s, float) {
+        const int alpha = static_cast<int>(std::lround(s * 255.0f));
+        return premultiplied(red, green, blue, alpha);
+      });
 
   // Markers. A black/white sandwich stays readable on every colour.
   const float marker = std::max(2.0f, kMarkerDp * ratio);
-  const float hueX = area.HueX +
-                     std::clamp(Hue / 359.999f, 0.0f, 1.0f) * area.HueW;
+  const float hueX =
+      area.HueX + std::clamp(Hue / 359.999f, 0.0f, 1.0f) * area.HueW;
   mesh.addQuad(hueX - marker, area.HueY, marker * 2.0f, area.HueH,
                premultiplied(0, 0, 0, 255));
   mesh.addQuad(hueX - marker * 0.5f, area.HueY, marker, area.HueH,

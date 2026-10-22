@@ -7,6 +7,9 @@
 #include <abc/GameData.h>
 #include <abc/Plugin.h>
 
+#include <abcui/events.h>
+
+#include <com_model.h>
 #include <keydefs.h>
 #include <usercmd.h>
 #include <in_buttons.h>
@@ -18,13 +21,11 @@
 #include "data/TextFeed.h"
 #include "data/WeaponResource.h"
 #include "framework/PanelManager.h"
+#include "framework/ScoreSeat.h"
+#include "modsys/EventBus.h"
+#include "modsys/ModuleManager.h"
 #include "modules/HudPanelCatalog.h"
 #include "modules/Module.h"
-#include "panels/gindicator/GIndicatorPanel.h"
-#include "panels/itemhighlight/ItemHighlightPanel.h"
-#include "panels/motd/MotdPanel.h"
-#include "panels/scoreboard/ScoreboardPanel.h"
-#include "panels/vote/VotePanel.h"
 #include "rmlui/InputBridge.h"
 #include "rmlui/RmlUiModule.h"
 #include "services/steam/SteamAPI.h"
@@ -90,18 +91,32 @@ void hideVanillaHudPanels() {
 
 static void H_HUD_Init() {
   gExportfuncs.HUD_Init();
-  // Command/cvar registration is HUD_Init-time only (plan 08 §4.9);
-  // guarded like AbcEssential in case the engine re-runs HUD_Init.
+  // HUD_Init/HUD_Shutdown can repeat within one engine process (the client
+  // is reloaded on some map-change/reconnect paths). Everything that
+  // HUD_Shutdown tears down must be re-armed here.
+  //
+  // - usermsg hooks: init() installs the chain once. Re-hooking on every
+  //   cycle would make AbcEssential's and this plugin's hooks point at each
+  //   other, so the only re-install path is a detected client DLL reload
+  //   (refreshAfterClientLoad probes a Ui-exclusive message).
+  // - panels: PanelManager::shutdown() clears the list, so rebuild it when
+  //   it is empty (a live list is left alone).
+  netmsg::init();
+  netmsg::refreshAfterClientLoad();
+  // Module packages boot once per process, before the panel install, so
+  // module-registered panels join the first HUD_Init cycle.
+  framework::modmanager::boot();
+  if (framework::PanelManager::panels().empty())
+    modules::installHudPanels();
+  // Process-scoped registration (cvars/commands survive HUD_Shutdown).
   static bool CommandsRegistered = false;
   if (!CommandsRegistered) {
     CommandsRegistered = true;
-    netmsg::init();
     services::voice::status().init();
     hudstate::init();
     weaponres::init();
     playerres::init();
     textfeed::init();
-    modules::installHudPanels();
     modules::registerHudPanelCvars();
     rmlui::registerCommands();
     modules::registry().initAll();
@@ -109,8 +124,11 @@ static void H_HUD_Init() {
 }
 
 static int H_HUD_VidInit() {
-  rebuildVanillaHudPanels();
   int result = gExportfuncs.HUD_VidInit();
+  // Capture AFTER the client re-ran its own VidInit: if a client rebuilds
+  // the gHUD chain per map, pointers grabbed before the call would be freed
+  // and hideVanillaHudPanels() wrote into them every frame.
+  rebuildVanillaHudPanels();
   hudstate::reset();
   weaponres::reset();
   playerres::resetAll();
@@ -145,7 +163,7 @@ static int H_HUD_Redraw(float time, int intermission) {
   hideVanillaHudPanels();
   // Old Viewport::SetInterMission -> ShowPanel(intermission > 0); the
   // +/-showscores commands stay dead while it lasts.
-  panels::scoreboard::setIntermission(intermission != 0);
+  framework::scoreseat::setIntermission(intermission != 0);
   rmlui::onRedraw(delta);
   return gExportfuncs.HUD_Redraw(time, intermission);
 }
@@ -167,9 +185,28 @@ static void H_HUD_TxferLocalOverrides(struct entity_state_s *state,
 
 static int H_HUD_AddEntity(int type, struct cl_entity_s *ent,
                            const char *modelname) {
-  // Old Viewport::AddEntity routing: grenade indicator + item highlight.
-  panels::gindicator::onAddEntity(ent, modelname);
-  panels::itemhighlight::onAddEntity(ent, modelname);
+  // Old Viewport::AddEntity routing (grenade indicator, item highlight) is
+  // now a bus channel: modules observe the same pass the engine sees.
+  AbcUiAddEntityEvent entity{};
+  entity.type = type;
+  if (ent) {
+    entity.index = ent->index;
+    entity.modelType = ent->model ? static_cast<int32_t>(ent->model->type) : 0;
+    entity.messageNum = ent->curstate.messagenum;
+    entity.effects = ent->curstate.effects;
+    entity.modelIndex = ent->curstate.modelindex;
+    entity.moveType = ent->baseline.movetype;
+    entity.origin[0] = ent->curstate.origin[0];
+    entity.origin[1] = ent->curstate.origin[1];
+    entity.origin[2] = ent->curstate.origin[2];
+  }
+  if (modelname) {
+    size_t i = 0;
+    for (; i + 1 < sizeof(entity.model) && modelname[i]; ++i)
+      entity.model[i] = modelname[i];
+    entity.model[i] = '\0';
+  }
+  framework::eventBus().publish(ABCUI_CHANNEL_HUD_ADD_ENTITY, entity);
   return gExportfuncs.HUD_AddEntity(type, ent, modelname);
 }
 
@@ -185,33 +222,37 @@ static void H_HUD_TxferPredictionData(struct entity_state_s *ps,
 
 namespace {
 
-// Wheel claims that are NOT ownership (T06): the open motd scrolls (old
-// per-page auto-advance died with the pagination - D-17 ledger) without
-// holding UI input. Owner-backed wheel claims (scoreboard pointer mode,
-// menu pages) ride the router's wheelClaimed() inside rmlui::routeKey.
-bool uiOwnsWheel(int down, int keynum) {
+// Wheel claims that are NOT ownership (T06): an open module document (the
+// motd) scrolls without holding UI input. Modules claim through the
+// input.wheel veto channel. Owner-backed wheel claims (scoreboard pointer
+// mode, menu pages) ride the router's wheelClaimed() inside rmlui::routeKey.
+bool moduleWheelClaim(int down, int keynum) {
   if (!down || (keynum != K_MWHEELUP && keynum != K_MWHEELDOWN))
     return false;
-  return panels::motd::wantsWheel();
+  const AbcUiKeyEvent event{1, keynum};
+  return framework::eventBus().publishVeto(ABCUI_CHANNEL_INPUT_WHEEL, event);
 }
 
 } // namespace
 
 static int H_HUD_Key_Event(int down, int keynum,
                            const char *pszCurrentBinding) {
-  // Static interactive-HUD consumers stay the P6-proven pre-stage (vote
-  // answers, scoreboard pointer enter). routeKey is then the single
-  // physical injection point: the router decides UI feeds and the
-  // engine-consume flag (keydown/up pairing, auto-repeat dedup, pre-held
-  // passthrough and focus-loss cleanup live there - T06).
-  const bool consumed = panels::vote::onKeyEvent(down, keynum) ||
-                        panels::scoreboard::onKeyEvent(down, keynum);
+  // Static interactive-HUD consumers stay the P6-proven pre-stage (the
+  // module input.key veto channel - vote answers -, scoreboard pointer
+  // enter). routeKey is then the single physical injection point: the
+  // router decides UI feeds and the engine-consume flag (keydown/up
+  // pairing, auto-repeat dedup, pre-held passthrough and focus-loss cleanup
+  // live there - T06).
+  const AbcUiKeyEvent keyEvent{down ? 1 : 0, keynum};
+  const bool consumed =
+      framework::eventBus().publishVeto(ABCUI_CHANNEL_INPUT_KEY, keyEvent) ||
+      framework::scoreseat::onKeyEvent(down, keynum);
 #ifndef NDEBUG
   if (keynum >= K_MOUSE2 || keynum == K_MWHEELUP || keynum == K_MWHEELDOWN)
     abc::ConsolePrint("[AbcUi] key: down=%d keynum=%d consumed=%d\n", down,
                       keynum, consumed ? 1 : 0);
 #endif
-  if (consumed || rmlui::routeKey(down, keynum, uiOwnsWheel(down, keynum)))
+  if (consumed || rmlui::routeKey(down, keynum, moduleWheelClaim(down, keynum)))
     return 0;
   return gExportfuncs.HUD_Key_Event(down, keynum, pszCurrentBinding);
 }
@@ -271,7 +312,7 @@ static void H_CL_CreateMove(float time, usercmd_s *cmd, int active) {
   // button stream as IN_SCORE - the server streams every player's
   // ping/loss only to clients it believes hold the scoreboard (issue #9;
   // without this the engine player tables sit at 0/0 the whole session).
-  if (panels::scoreboard::inScore())
+  if (framework::scoreseat::held())
     cmd->buttons |= IN_SCORE;
   if (owner) {
     cmd->buttons &= ~(IN_ATTACK | IN_ATTACK2);
@@ -329,27 +370,21 @@ void locateVanillaHudList() {
 namespace {
 
 // Native viewport menu route (from: ABCEnchance exportfuncs.cpp
-// TFV_ShowVGUIMenu). The SC client opens every
-// built-in viewport window through CTeamFortressViewport::ShowVGUIMenu(id);
-// the old mod inline-hooked it so the vanilla mission brief (4) never opens
-// (the missionbriefing command chain feeds the new motd panel) and the
-// vanilla MOTD window (5) yields while hud_motd is non-zero (>= 1 the new
-// panel replaces it, < 0 suppresses both, 0 restores the vanilla window).
-// Every other menu id chains untouched.
-constexpr int kMenuMissionBrief = 4;
-constexpr int kMenuMotd = 5;
+// TFV_ShowVGUIMenu). The SC client opens every built-in viewport window
+// through CTeamFortressViewport::ShowVGUIMenu(id); the hook republishes each
+// request on the menu.vguimenu veto channel so the owning module decides
+// (the motd module suppresses the vanilla mission brief (4) and, while
+// hud_motd is non-zero, the vanilla MOTD window (5)). An unconsumed request
+// chains untouched.
 
 using ShowVguiMenuFn = void(__fastcall *)(void *pthis, int dummy, int menu);
 ShowVguiMenuFn OriginalShowVguiMenu = nullptr;
 hook_t *ShowVguiMenuHook = nullptr;
 
 static void __fastcall H_TFV_ShowVGUIMenu(void *pthis, int dummy, int menu) {
-  if (menu == kMenuMissionBrief)
-    return;
-  if (menu == kMenuMotd && panels::motd::blocksVanillaWindow()) {
-    panels::motd::showMotd();
-    return;
-  }
+  const AbcUiVguiMenuEvent event{menu};
+  if (framework::eventBus().publishVeto(ABCUI_CHANNEL_MENU_VGUI_MENU, event))
+    return; // consumed: the vanilla window must not open
   if (OriginalShowVguiMenu)
     OriginalShowVguiMenu(pthis, dummy, menu);
 }
@@ -360,9 +395,18 @@ void hookVanillaMenuRoute() {
   const auto target = abc::ResolveGameSymbol(
       abc::g_dwClientBase, "client", "TeamFortressViewport_ShowVGUIMenu",
       MH_GAMESYMBOL_KIND_FUNCTION);
+  if (!target) {
+    abc::SysError("[AbcUi] Failed to resolve "
+                  "TeamFortressViewport_ShowVGUIMenu");
+    return;
+  }
   ShowVguiMenuHook = g_pMetaHookAPI->InlineHook(
       target, H_TFV_ShowVGUIMenu,
       reinterpret_cast<void **>(&OriginalShowVguiMenu));
+  // Fail fast like locateNativeHudPanelInfo: without this hook the vanilla
+  // mission brief/MOTD windows stay reachable and silently shadow the panels.
+  if (!ShowVguiMenuHook)
+    abc::SysError("[AbcUi] Failed to hook TeamFortressViewport_ShowVGUIMenu");
 }
 
 void unhookVanillaMenuRoute() {

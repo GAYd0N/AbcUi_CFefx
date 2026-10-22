@@ -1,0 +1,12 @@
+{
+  "id": "abcui.chat",
+  "name": "Chat",
+  "description": "Chat log and the IME-aware message-mode input line (moved from the built-in HUD).",
+  "author": "DrAbc",
+  "version": "1.0.0",
+  "abi": 1,
+  "minAbcUi": "0.8.0",
+  "entry": "entry/abcui_chat.dll",
+  "dependencies": [],
+  "conflicts": []
+}

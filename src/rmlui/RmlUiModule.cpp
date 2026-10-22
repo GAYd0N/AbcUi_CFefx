@@ -137,6 +137,10 @@ public:
   void OnBeginRenderingPost(int *, int *, int *, int *) override {}
   void OnFreeFrameBuffers() override {
     modelpreview::invalidateAll();
+    // The menu backdrop owns three engine FBOs (down/ping/pong); they die
+    // with the renderer's targets in the same event, so drop their handles
+    // too or render() keeps binding released attachments.
+    backdrop::invalidateTargets();
   }
   void OnGenerateFrameBuffers() override {}
   void OnPreRenderView() override {}
@@ -434,6 +438,10 @@ void shutdown() {
     // HUD_Init can arm modules before the first HUD_Frame creates a context.
     if (Sink.shutdown)
       Sink.shutdown();
+    // Same teardown symmetry as the initialized path: the panel list dies
+    // with the cycle so the next HUD_Init can rebuild it (the panels never
+    // loaded a document in this state).
+    framework::PanelManager::shutdown();
     return;
   }
   Initialised = false;
@@ -504,6 +512,9 @@ void onFrame(double frameTime) {
   // same Context::Update (order contract, modules/Module.h).
   if (Sink.frame)
     Sink.frame(frameTime);
+  // Queued <colorpicker> change events fire here, outside the drag/event
+  // stack: a page handler may destroy the picker (see pumpChanges).
+  colorpicker::ElementColorPicker::pumpChanges();
 #ifndef NDEBUG
   PerfTimer updateTimer;
 #endif

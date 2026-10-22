@@ -29,23 +29,27 @@ void GameUiModule::onFrame(double FrameTime) {
   // menu track over the Loading page and read as "the server is gone". The
   // map-load attempt suppresses it until LoadingFinished restores the level.
   const auto &state = Controller.state();
-  const bool mapLoading =
-      state.phase == menu::BackendPhase::kLoading &&
-      state.attemptKind == menu::AttemptKind::kMapLoad;
+  const bool mapLoading = state.phase == menu::BackendPhase::kLoading &&
+                          state.attemptKind == menu::AttemptKind::kMapLoad;
   music.update(bridge.pageShown() && !bridge.hasLevel() && !mapLoading);
-  // Friends board: the throttle lives in the model, the projection is
-  // change-gated on its generation (a steady list writes no DOM).
-  if (Shell && Context && Shell->isVisible()) {
-    auto &friends = services::friends::friendsModel();
-    friends.refresh(FrameTime, steamapi::localSteamId(),
-                    playerCardFacts().PlayerName.c_str());
-    if (FriendsProjected != friends.generation()) {
-      FriendsProjected = friends.generation();
-      Shell->setFriends(friends.rows(), friends.available());
-    }
+  // Friends board: the throttle lives in the model; the module page
+  // projects the rows change-gated on the model's generation (the sdk
+  // social section). The refresh runs while a home page is on top - the
+  // controller truth of the module shell being visible.
+  if (Context && MenuPresented &&
+      (Controller.state().pages.topIs(MenuPage::kMain) ||
+       Controller.state().pages.topIs(MenuPage::kPause))) {
+    services::friends::friendsModel().refresh(
+        FrameTime, steamapi::localSteamId(),
+        playerCardFacts().PlayerName.c_str());
   }
-  lifecycle::pumpMenuFrame([this] { pumpBackgroundWork(); },
-                           [this] { return MenuPresented && Shell && Context; },
-                           [this] { pumpVisibleWork(); });
+  lifecycle::pumpMenuFrame(
+      [this] { pumpBackgroundWork(); },
+      [this] { return MenuPresented && Context != nullptr; },
+      [this] { pumpVisibleWork(); });
+  // The presentation beat (menu.paint): page modules project their DOM here,
+  // inside the framework's takeover pipeline. menu.state stays edge-only.
+  if (MenuPresented)
+    publishMenuPresentation();
 }
 } // namespace gameui

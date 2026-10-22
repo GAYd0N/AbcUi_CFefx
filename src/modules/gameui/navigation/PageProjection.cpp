@@ -6,8 +6,8 @@
 #include "modules/gameui/engine/MenuBindings.h"
 namespace gameui {
 using namespace engine;
-void GameUiModule::syncMenuPresentation() {
-  if (!Shell || !Context)
+void GameUiModule::projectMenuPresentation() {
+  if (!Context)
     return;
   const auto &state = Controller.state();
   if (!Controller.isMenuActive()) {
@@ -16,49 +16,23 @@ void GameUiModule::syncMenuPresentation() {
       Server->releaseQueries();
     return;
   }
-  // GameMenu.res conditions, verified against the shipped GameUI
-  // (CGameMenu::UpdateMenu 0x1000dbe0): "notsingle" rows hide only
-  // in-game+singleplayer - the no-map home always shows them, and the
-  // in-game half of the condition IS the page split (Main vs Pause).
-  // The player list row (OnlyInGame + notsingle) therefore keys on the
-  // maxplayers fact alone on the pause page.
-  const bool multiplayer = menuBackend().maxClientsFact() > 1;
-  Shell->setMultiplayer(multiplayer);
-  // Character card + footer facts: engine cvar values the player edits in
-  // Settings > Multiplayer; the page only projects them.
-  {
-    const auto Facts = engine::playerCardFacts();
-    Shell->setPlayerCard(Facts.PlayerName.c_str(), Facts.ModelPath.c_str(),
-                         Facts.ModelName.c_str());
-    char build[64];
-    _snprintf_s(build, sizeof(build), _TRUNCATE, "Sven Co-op build %u",
-                abc::g_dwEngineBuildnum);
-    Shell->setFooterNote(build);
-  }
+  // The menu home (kMain/kPause) is a module document (abcui.gameui): it
+  // presents its section from menu.state and projects the entry conditions,
+  // the character card, the footer and the friends board from the sdk
+  // menuconfig/social sections.
 
   // Project each implemented page from navigation state. The stub is only
   // the defensive default for a page without a registered projection;
   // it never reopens a native window.
-  bool shellVisible = false;
-  bool loadingVisible = false;
+  bool shellTop = false;
   if (!state.pages.empty()) {
-    const bool overlaysHoldFocus = !state.overlays.empty();
     switch (state.pages.top()) {
     case MenuPage::kMain:
-    case MenuPage::kPause: {
-      shellVisible = true;
-      // Show before the section focus pass: Focus() needs the
-      // document visible (first presentation has no frame between).
-      // The per-frame focus guard (onFrame) re-takes the section
-      // default against focus thieves.
-      Shell->show();
-      const auto section =
-          state.pages.top() == MenuPage::kMain
-              ? panels::mainmenu::MainMenuPage::Section::kMain
-              : panels::mainmenu::MainMenuPage::Section::kPause;
-      Shell->showSection(section, !overlaysHoldFocus);
+    case MenuPage::kPause:
+      // The page is a module document: it presents itself from menu.state
+      // once the page is on top (the entry focus defers to overlays).
+      shellTop = true;
       break;
-    }
     case MenuPage::kSettings:
       SettingsView->present();
       break;
@@ -69,42 +43,29 @@ void GameUiModule::syncMenuPresentation() {
       Server->present();
       break;
     case MenuPage::kCreateGame:
-      // T19: the real create-game page replaced the T09 stub.
-      Create->present();
+      // The page is a module document (abcui.gameui): it presents itself
+      // from menu.state once the page is on top.
       break;
     case MenuPage::kPlayerList:
-      // T20: the real player list replaced the T09 stub. Fresh
-      // roster+mute read on every sync (read-through; the frame beat
-      // re-reads while presented).
-      Player->present();
+      // The page is a module document (abcui.gameui): it presents itself
+      // from menu.state once the page is on top.
       break;
     case MenuPage::kVoteMenu:
-      Vote->present();
+      // The page is a module document (abcui.gameui): it presents itself
+      // from menu.state once the page is on top.
       break;
     case MenuPage::kCommandMenu:
-      Command->present();
+      // The page is a module document (abcui.gameui): it presents itself
+      // from menu.state once the page is on top.
       break;
     case MenuPage::kInventory:
-      Inventory->present();
+      // The page is a module document (abcui.gameui): it presents itself
+      // from menu.state once the page is on top.
       break;
     case MenuPage::kLoading:
-      // Fresh projection on every sync: the attempt's values moved
-      // since the last frame (the frame drain re-renders too). T19:
-      // a local-server start carries its own loading title; an engine
-      // changelevel gets the map-load title/status instead of the connect
-      // wording (there is no server address to contact).
-      if (Loading) {
-        const auto kind = state.attemptKind;
-        const bool mapLoad = kind == menu::AttemptKind::kMapLoad;
-        Loading->setTitleToken(kind == menu::AttemptKind::kLocalGame
-                                   ? "#CG_LoadingTitle"
-                                   : (mapLoad ? "#Loading_MapTitle" : ""));
-        Loading->setStatusToken(mapLoad ? "#Loading_MapStatus" : "");
-        Loading->render();
-        Loading->show();
-        loadingVisible = true;
-        LoadingVisible = true;
-      }
+      // The page is a module document (abcui.gameui): it presents itself
+      // from menu.state (the attempt kind rides the payload) and renders
+      // the drained model on the paint beat.
       break;
     default:
       showStubPage(SubStub.get(), state.pages.top(), false);
@@ -129,14 +90,8 @@ void GameUiModule::syncMenuPresentation() {
     Server->logQueryChange();
   }
   ServerBrowser.Open = serverPageOpen;
-  if (shellVisible)
+  if (shellTop)
     SubStub->hide();
-  else
-    Shell->hide();
-  if (!loadingVisible && Loading) {
-    Loading->hide();
-    LoadingVisible = false;
-  }
   if (state.pages.empty() || state.pages.top() != MenuPage::kSettings) {
     SettingsView->hide();
     // T13b: the mic test is a page-scoped device session - leaving
@@ -146,79 +101,20 @@ void GameUiModule::syncMenuPresentation() {
   }
   if (state.pages.empty() || state.pages.top() != MenuPage::kServers)
     Server->hide();
-  if (state.pages.empty() || state.pages.top() != MenuPage::kCreateGame)
-    Create->hide();
-  if (state.pages.empty() || state.pages.top() != MenuPage::kPlayerList)
-    Player->hide();
-  if (state.pages.empty() || state.pages.top() != MenuPage::kVoteMenu)
-    Vote->hide();
-  if (state.pages.empty() || state.pages.top() != MenuPage::kCommandMenu)
-    Command->hide();
-  if (state.pages.empty() || state.pages.top() != MenuPage::kInventory)
-    Inventory->hide();
 
-  // Overlay layer, top-most last (each show pulls to the context
-  // front); idempotent shows neither re-focus nor re-order. The loading
-  // page (shown in the page switch above) is NOT ordered by this block:
-  // its document z-index tier (InteractiveDocument::kLoadingZIndex) keeps
-  // it above the page shells and the console even though the console
-  // shows later, while the connection dialogs and the quit confirmation
-  // carry higher tiers of their own (#4).
-  // T16 replacement console: fresh projection on every sync (the
-  // page appends only new lines; showLinesForTest analog = render).
-  bool consoleDropped = false;
-  if (state.overlays.contains(MenuOverlay::kConsole) && Console) {
-    if (!ConsolePresented) {
-      Console->prepare(); // fresh open: clear editor, reseed view
-      ConsolePresented = true;
-    }
-    Console->render();
-    Console->show();
-  } else if (Console) {
-    Console->hide();
-    // Issue #5: the UI closed the console (routed ESC, the close button, a
-    // force-dismiss). ConsolePresented is the only witness left at this
-    // point - requestConsoleClose already lowered the bridge truth, so a
-    // consoleRequested() test would miss exactly this path. The engine-side
-    // `hideconsole` follows below.
-    consoleDropped = ConsolePresented;
-    ConsolePresented = false;
-  }
-  // T14 overlays. Each "presented" latch means "projected at least
-  // once for this opening" - the prepare() clears the fields exactly
-  // once per open, repeated syncs are idempotent shows.
-  if (state.overlays.contains(MenuOverlay::kConnectionError) && ConnError) {
-    if (!ErrorPresented || LastErrorReason != state.errorReason) {
-      ConnError->showFor(state.errorReason.c_str());
-      LastErrorReason = state.errorReason;
-      ErrorPresented = true;
-    }
-    ConnError->show();
-  } else if (ConnError) {
-    ConnError->hide();
-    ErrorPresented = false;
-  }
-  if (state.overlays.contains(MenuOverlay::kPassword) && Password) {
-    if (!PasswordPresented || PasswordReprepare) {
-      Password->prepare(PasswordInvalid);
-      PasswordPresented = true;
-      PasswordReprepare = false;
-    }
-    Password->show();
-  } else if (Password) {
-    Password->hide();
-    PasswordPresented = false;
-  }
-  if (state.overlays.contains(MenuOverlay::kDirectConnect) && DirectConnect) {
-    if (!DirectConnectPresented) {
-      DirectConnect->prepare();
-      DirectConnectPresented = true;
-    }
-    DirectConnect->show();
-  } else if (DirectConnect) {
-    DirectConnect->hide();
-    DirectConnectPresented = false;
-  }
+  // Overlay layer, top-most last. The loading page and the three
+  // connection dialogs are module documents now (abcui.gameui): they
+  // present from the state's overlay bitmask, and their document z-index
+  // tiers (loading above the page shells and the console, the connection
+  // dialogs above it) ride the descriptor (#4).
+  // T16 replacement console: the page is a module document (abcui.gameui);
+  // it presents from the state's consoleOpen fact and renders on the paint
+  // beat. A close through its own surfaces (close button, routed ESC)
+  // lowers the engine-facing answer through the section's close funnel, so
+  // the sync only re-asserts it when the overlay dropped without one.
+  // T14 overlays: the connection dialogs present from the bitmask; the
+  // password dialog's re-prepare (a rejected retry clears the field) keys
+  // on the model's per-generation prompt count.
   if (state.overlays.contains(MenuOverlay::kConfirmQuit))
     ConfirmQuit->show();
   else
@@ -234,11 +130,26 @@ void GameUiModule::syncMenuPresentation() {
   // `hideconsole` the suppressed CGameUI::HideGameUI used to issue (issue
   // #5) - without it the engine's console flag outlived the close and the
   // next ActivateGameUI re-opened the console.
-  if (consoleDropped)
-    menuBackend().hideConsole();
-  else if (!state.overlays.contains(MenuOverlay::kConsole) &&
-           services::nativeUiBridge().consoleRequested())
+  if (!state.overlays.contains(MenuOverlay::kConsole) &&
+      services::nativeUiBridge().consoleRequested()) {
+    // The overlay dropped without the close funnel (a routed ESC): clear
+    // the bridge truth AND the engine-side console flag (issue #5 - the
+    // engine's console flag must never outlive the closed overlay).
     services::nativeUiBridge().noteConsoleDismissed();
+    menuBackend().hideConsole();
+  }
+}
+
+// The presentation sync every caller schedules: project the state machine
+// onto the Rml documents, then publish the settled facts to the page modules
+// (menu.state on a transition, menu.paint on every beat).
+void GameUiModule::syncMenuPresentation() {
+  projectMenuPresentation();
+  publishMenuPresentation();
+}
+
+void GameUiModule::publishMenuPresentation() {
+  services::menu::publish();
 }
 
 } // namespace gameui

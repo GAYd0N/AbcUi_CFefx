@@ -11,6 +11,8 @@
 #include <abc/Plugin.h>
 
 #include "hooks.h"
+#include "modsys/FrameworkVersion.h"
+#include "modsys/ModuleManager.h"
 #include "render/Render.h"
 #include "rmlui/RmlUiModule.h"
 #include "services/steam/SteamAPI.h"
@@ -96,7 +98,7 @@ void installDebugAssertHook() {
 
 class CAbcUi : public abc::CAbcPluginBase {
 public:
-  CAbcUi() : abc::CAbcPluginBase("AbcUi", "0.8.0") {}
+  CAbcUi() : abc::CAbcPluginBase("AbcUi", framework::kFrameworkVersion) {}
 
 protected:
   void OnLoadClient(cl_exportfuncs_t *pExportFuncs) override {
@@ -120,6 +122,9 @@ protected:
 
   void OnShutdown() override {
     rmlui::shutdown();
+    // Modules release what they own only after Rml is down (their documents
+    // died with the context; onShutdown already ran through the registry).
+    framework::modmanager::unloadAll();
     steamapi::shutdown();
     vgui2ext::shutdown();
     // T08: the native-UI takeover callbacks and any still-installed

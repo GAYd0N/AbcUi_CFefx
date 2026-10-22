@@ -1,0 +1,12 @@
+{
+  "id": "abcui.demo",
+  "name": "Demo",
+  "description": "Minimal end-to-end module proving the package load path (framework smoke, not a feature).",
+  "author": "DrAbc",
+  "version": "1.0.0",
+  "abi": 1,
+  "minAbcUi": "0.8.0",
+  "entry": "entry/abcui_demo.dll",
+  "dependencies": [],
+  "conflicts": []
+}

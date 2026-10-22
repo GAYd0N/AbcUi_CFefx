@@ -25,7 +25,9 @@ void GameUiModule::onMenuAction(const char *action) {
   else if (Kind == ActionKind::kCreateGame)
     Controller.dispatch(gameui::menu::makeOpenPage(MenuPage::kCreateGame));
   else if (Parsed.Domain == ActionDomain::kCreateGame) {
-    Create->handleAction(Kind);
+    // The create-game page is a module document: it handles its own form
+    // (Apply submits through the sdk creategame section) and sends only
+    // menu.back on cancel, so nothing arrives here.
     return;
   } else if (Kind == ActionKind::kPlayerList)
     Controller.dispatch(gameui::menu::makeOpenPage(MenuPage::kPlayerList));
@@ -33,10 +35,13 @@ void GameUiModule::onMenuAction(const char *action) {
     Vote->open();
     return;
   } else if (Parsed.Domain == ActionDomain::kPlayerList) {
-    Player->handleAction(Kind);
+    // The player-list page is a module document: it handles its own row /
+    // mute actions and sends only menu.back on close, so nothing arrives
+    // here.
     return;
   } else if (Parsed.Domain == ActionDomain::kVoteMenu) {
-    Vote->handleAction(Kind);
+    // The vote page is a module document: it handles its own row actions and
+    // sends only menu.back after a submit/cancel, so nothing arrives here.
     return;
   } else if (Kind == ActionKind::kConsole ||
              Kind == ActionKind::kConsoleClose) {
@@ -74,7 +79,10 @@ void GameUiModule::onMenuAction(const char *action) {
     startKeyCapture();
     return; // no controller transition - the page state already moved
   } else if (Parsed.Domain == ActionDomain::kServers) {
-    Server->handleAction(Kind);
+    // The browser page is a module document: it handles its own row/sort/
+    // paging/filter state and sends only the fixed intents (tabs, refresh/
+    // stop, connect, favorite) through the sdk serverbrowser section, so
+    // nothing arrives here.
     return;
   } else if (Parsed.Domain == ActionDomain::kVideo) {
     Video->handleAction(Kind);

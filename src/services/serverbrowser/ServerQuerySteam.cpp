@@ -277,15 +277,13 @@ public:
     if (!ensureBound())
       return 0;
     Bindings &b = bindings();
-    // Replace semantics: the model sends cancel+release for a live
-    // request, but a stray second request must still not orphan a handle.
-    if (!Lists.empty()) {
-      for (auto &pair : Lists) {
-        if (pair.second.handle)
-          b.servers->ReleaseRequest(pair.second.handle);
-      }
-      Lists.clear();
-    }
+    // One live list request per provider. ServerQuery::begin() cancels and
+    // releases its own handle before asking again, so a non-empty list here
+    // belongs to another live model: rejecting the new request is the only
+    // option that does not release a handle this call does not own (the
+    // provider is a process-lifetime singleton).
+    if (!Lists.empty())
+      return 0;
 
     // Filter array (Steam reads it synchronously inside the request call).
     // The interface signature takes a non-const MatchMakingKeyValuePair_t**

@@ -1,0 +1,75 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="../rcss/votemenu.rcss"/>
+</head>
+<!-- Vote creation menu: the AbcUi replacement for ABCEnchance's VGUI
+     CVoteMenuDialog and the original GameUI vote dialog. The framework opens
+     the page from the pause menu ("Votemenu") or the chained `votemenu`
+     command; the abcui.gameui module presents this document while the vote
+     page is on top of the menu stack.
+
+     Tabs, list rows, the selected line and the primary button are projected
+     by modules/gameui/src/GameUiModule.cpp from the framework's vote model
+     (server map list plus the live player roster). Every server/player-derived
+     string is escaped before it reaches the DOM. The row/tab choices stay
+     page-local; only Submit/Cancel cross the page boundary. -->
+<body id="menuvotemenu">
+	<!-- Same two-column composition as Settings: the vote types form the
+	     left navigation rail, while the filtered list and its feedback live
+	     in the one right-hand content panel. -->
+	<div id="vm-navigation">
+		<button id="vm-tab-ban" data-action="vm-kind" data-kind="ban"
+			data-label="#VoteMenu_Ban">#VoteMenu_Ban</button>
+		<button id="vm-tab-kick" data-action="vm-kind" data-kind="kick"
+			data-label="#VoteMenu_Kick">#VoteMenu_Kick</button>
+		<button id="vm-tab-kill" data-action="vm-kind" data-kind="kill"
+			data-label="#VoteMenu_Kill">#VoteMenu_Kill</button>
+		<button id="vm-tab-map" data-action="vm-kind" data-kind="map"
+			data-label="#VoteMenu_Map">#VoteMenu_Map</button>
+	</div>
+
+	<div id="vm-panel" data-kind="ban">
+		<div id="vm-head">
+			<div id="vm-brand">Sven Co-op</div>
+			<h1 id="vm-title">#VoteMenu_Title</h1>
+			<div id="vm-subtitle">#VoteMenu_Subtitle</div>
+		</div>
+
+		<div id="vm-tools">
+			<input id="vm-filter" type="text" maxlength="64" autofocus="autofocus"
+				data-label="#VoteMenu_Filter" placeholder="#VoteMenu_FilterPlayerHint"/>
+			<button id="vm-filter-apply" data-action="vm-filter"
+				data-label="#VoteMenu_Filter">#VoteMenu_Filter</button>
+			<div id="vm-count-wrap">
+				<span id="vm-count-label">#VoteMenu_Results</span>
+				<span id="vm-count">0</span>
+			</div>
+		</div>
+
+		<div id="vm-list-head">
+			<span class="vm-col vm-col-slot">#</span>
+			<span class="vm-col vm-col-name">#VoteMenu_Player</span>
+			<span class="vm-col vm-col-real">#VoteMenu_SteamName</span>
+			<span class="vm-col vm-col-id">SteamID64</span>
+		</div>
+		<div id="vm-list"></div>
+
+		<div id="vm-selection-row">
+			<span id="vm-selection-label">#VoteMenu_Selected</span>
+			<span id="vm-selected">#VoteMenu_NoneSelected</span>
+		</div>
+		<p id="vm-hint"></p>
+	</div>
+
+	<!-- One non-wrapping flex row, anchored to the same right gutter as the
+	     Settings action bar, keeps both buttons on the same baseline. -->
+	<div id="vm-actions">
+		<button id="vm-cancel" data-action="vm-cancel"
+			data-label="#VoteMenu_Cancel">#VoteMenu_Cancel</button>
+		<button id="vm-submit" data-action="vm-submit"
+			data-label="#VoteMenu_Start">#VoteMenu_Start</button>
+	</div>
+</body>
+</rml>

@@ -1,0 +1,9 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/stacks.rcss"/>
+</head>
+<body id="itemstack">
+	<div id="stack"></div>
+</body>
+</rml>

@@ -8,6 +8,7 @@
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/StringUtilities.h>
 #include <RmlUi/Core/TextInputContext.h>
+#include <RmlUi/Core/Traits.h>
 #include <RmlUi/Core/Elements/ElementFormControlInput.h>
 #include <RmlUi/Core/Elements/ElementFormControlTextArea.h>
 
@@ -261,8 +262,8 @@ TextInputAdapter &adapter() {
 
 bool isTextEditor(const Rml::Element *element) {
   return element &&
-         (dynamic_cast<const Rml::ElementFormControlInput *>(element) ||
-          dynamic_cast<const Rml::ElementFormControlTextArea *>(element));
+         (rmlui_dynamic_cast<const Rml::ElementFormControlInput *>(element) ||
+          rmlui_dynamic_cast<const Rml::ElementFormControlTextArea *>(element));
 }
 
 // T07 step 2: only an editor with keyboard focus receives characters.

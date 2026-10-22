@@ -43,4 +43,23 @@ inline bool resourceName(std::string_view name) {
       return false;
   return true;
 }
+// A token that is safe to hand to the engine console verbatim (the client
+// sends the weapon name as the selection command). resourceName also allows
+// path separators and dots, which a console command does not need; command
+// tokens are [A-Za-z0-9_] only.
+inline bool identifierName(std::string_view name) {
+  return !name.empty() && name.size() <= 127 &&
+         std::all_of(name.begin(), name.end(), [](unsigned char c) {
+           return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                  (c >= '0' && c <= '9') || c == '_';
+         });
+}
+// The engine treats the selection token as a console command, so a legal
+// identifier is not enough ("kill" is one). GoldSrc weapon commands carry the
+// HLSDK "weapon_" prefix; require it before anything server-supplied reaches
+// pfnServerCmd.
+inline bool weaponCommandName(std::string_view name) {
+  return name.size() > 7 && name.size() <= 127 &&
+         name.substr(0, 7) == "weapon_" && identifierName(name);
+}
 } // namespace framework::ResourceLimits

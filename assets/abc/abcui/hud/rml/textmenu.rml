@@ -1,9 +1,0 @@
-<rml>
-<head>
-	<link type="text/rcss" href="../../rcss/base.rcss"/>
-	<link type="text/rcss" href="../rcss/textmenu.rcss"/>
-</head>
-<body id="textmenu">
-	<div id="menu" class="font-textmenu"></div>
-</body>
-</rml>

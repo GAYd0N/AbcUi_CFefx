@@ -130,6 +130,13 @@ SteamApiBackend *nativeBackend() {
       if (!Utils->GetImageSize(handle, &width, &height) || !width || !height ||
           width > 512 || height > 512)
         return false;
+      // The header promises a returned pointer stays valid until shutdown.
+      // Reserve the maximum avatar size once, then resize within that
+      // capacity: a later avatar for the same SteamID changes the logical
+      // size without reallocating, so earlier pointers remain valid.
+      constexpr size_t kMaxAvatarBytes = 512u * 512u * 4u;
+      if (entry.rgba.capacity() < kMaxAvatarBytes)
+        entry.rgba.reserve(kMaxAvatarBytes);
       entry.rgba.resize(static_cast<size_t>(width) * height * 4);
       if (!Utils->GetImageRGBA(handle, entry.rgba.data(),
                                static_cast<int>(entry.rgba.size())))

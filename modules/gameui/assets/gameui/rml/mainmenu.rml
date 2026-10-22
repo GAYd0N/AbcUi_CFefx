@@ -1,0 +1,67 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="engine://abc/abcui/gameui/rcss/mainmenu.rcss"/>
+</head>
+<!-- The menu home (UI overhaul WS4). The blurred backdrop is inserted by
+     framework::menubackdrop before this document's onDocumentReady runs, so
+     it always paints behind every node below.
+
+     Geometry is absolute dp on the 640x480 logical screen (Theme::applyScale
+     maps dp to screen height/480). Layout intent, left to right: identity and
+     the entry column, then the character as the screen's subject, then the
+     compact friends board in the corner - the CS:GO/Alien Swarm reference
+     composition, rebuilt in GoldSrc clothing. The card precedes the board in
+     DOM order: the board is the surface that stays on top of the two. -->
+<body id="mainmenu">
+	<div id="menu-header">
+		<div id="menu-brand">Sven Co-op</div>
+		<div id="title">#MainMenu_Title</div>
+	</div>
+
+	<div id="menu-nav">
+		<!-- The two home sections of the state machine (gameui::menu): kMain
+		     is the no-map home, kPause the in-game one. Visibility between
+		     them is the module's sync decision, never DOM-inferred state;
+		     the browser/create/list row follows the maxplayers fact. -->
+		<div id="page-main"></div>
+		<div id="page-pause"></div>
+	</div>
+
+	<!-- The character card is the screen's subject: this box is exactly what
+	     the preview camera frames. The default pose faces the screen turned
+	     25 degrees toward the player's left (angle yaw -25: the camera looks
+	     along -X from +X, so screen right is +Y and a negative yaw turns the
+	     model's front to the player's left). The source is the player's own
+	     model; the abc_ui_menu_model_path cvar overrides it while non-empty
+	     (read by gameui::engine::playerCardFacts). Visibility of the card is
+	     the module's sync decision, never inferred here. -->
+	<div id="player-card">
+		<!-- sequence 2 is the player model's own deep_idle (verified against
+		     the shipped models: [2] 'deep_idle', 31 frames @12fps), and the
+		     camera is the Renderer preview's verified default view. -->
+		<model id="player-model" src="models/player.mdl" sequence="2" animate="true" angles="0 -25 0"
+			controllers="127 127 127 127" blending="127 127"
+			auto-frame="true" frame-margin="1.2"
+			camera-origin="120 0 0" camera-angles="0 180 0" fov="40"
+			ambient="96" shade="110" light-color="1 0.96 0.9" light-direction="-0.6 -0.35 -1"/>
+	</div>
+
+	<div id="friends-panel" class="abc-panel">
+		<div id="friends-title" class="abc-sectitle">#MainMenu_Friends</div>
+		<div id="friends-list"></div>
+	</div>
+
+	<!-- Right-click menu for a friend row: a single "Join server" entry. The
+	     page positions it at the click point and hides it again on any click
+	     that does not land on it. -->
+	<div id="friend-menu">
+		<div id="friend-menu-join" class="friend-menu-entry" data-action="friend-join">#MainMenu_FriendJoin</div>
+	</div>
+
+	<div id="menu-footer">
+		<div id="menu-version" class="abc-muted"></div>
+	</div>
+</body>
+</rml>

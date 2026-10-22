@@ -1,0 +1,25 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/health.rcss"/>
+</head>
+<body id="health">
+	<!-- HL2-inspired vitals: the additive amber icon plus the large amber
+	     value straight on the scene, with the vgui-era meter kept underneath
+	     each value. The value stays RmlUi type with the black outline (it read
+	     best that way); the icons and the additive machinery
+	     (.hud-glyph/.hud-meter in base.rcss) are still there for the readouts
+	     that want them. -->
+	<img id="health-icon" src="modadd://abcui.health/hud/img/healthbar_icon.png"/>
+	<div id="health-label" class="font-vital">0</div>
+	<div id="health-bar-bg"></div>
+	<div id="health-bar"></div>
+
+	<img id="armor-icon" src="modadd://abcui.health/hud/img/armorbar_icon.png"/>
+	<div id="armor-label" class="font-vital">0</div>
+	<div id="armor-bar-bg"></div>
+	<div id="armor-bar"></div>
+
+	<img id="longjump" src="modadd://abcui.health/hud/img/longjump.png"/>
+</body>
+</rml>

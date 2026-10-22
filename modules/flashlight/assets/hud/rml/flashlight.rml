@@ -1,0 +1,12 @@
+<rml>
+<head>
+	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/flashlight.rcss"/>
+</head>
+<body id="flashlight">
+	<img id="off-image" src="modadd://abcui.flashlight/hud/img/flashlight_off.png"/>
+	<img id="on-image" src="modadd://abcui.flashlight/hud/img/flashlight_on.png"/>
+	<div id="power-wrap"><img id="power-bar" src="modadd://abcui.flashlight/hud/img/flashlight_power.png"/></div>
+	<div id="message" class="font-defaultsmall">100%</div>
+</body>
+</rml>

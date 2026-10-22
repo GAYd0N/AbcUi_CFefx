@@ -8,6 +8,15 @@
 
 #include <abc/NetMsg.h>
 #include <abc/Console.h>
+#include <abc/Plugin.h>
+
+#include <abcui/events.h>
+
+#include "../modsys/EventBus.h"
+
+#include <cstdint>
+
+#include <cstdint>
 
 #include <cvardef.h>
 
@@ -77,9 +86,10 @@ pfnUserMsgHook original_TextMsg = nullptr;
 pfnUserMsgHook original_SayText = nullptr;
 pfnUserMsgHook original_Damage = nullptr;
 pfnUserMsgHook original_MetaHook = nullptr;
-// hud_vote gate for the VoteMenu consumer (set by panels/vote at HUD_Init -
-// before any usermsg can arrive, so the null branch is unreachable in
-// practice; null would pass the message straight through, old IsVoteEnable).
+// hud_vote gate for the VoteMenu consumer (set by the vote module through
+// the module console api at HUD_Init - before any usermsg can arrive, so the
+// null branch is unreachable in practice; null would pass the message
+// straight through, old IsVoteEnable).
 cvar_t *voteEnabled = nullptr;
 pfnUserMsgHook original_Spectator = nullptr;
 pfnUserMsgHook original_ServerName = nullptr;
@@ -102,6 +112,8 @@ int __MsgFunc_AmmoX(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_AmmoX(pszName, iSize, pbuf);
   AmmoX(index, count);
+  const AbcUiAmmoEvent ammoEvent{index, count};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_AMMO_X, ammoEvent);
   return original_AmmoX(pszName, iSize, pbuf);
 }
 
@@ -132,6 +144,7 @@ int __MsgFunc_WeaponList(const char *pszName, int iSize, void *pbuf) {
 
 int __MsgFunc_InitHUD(const char *pszName, int iSize, void *pbuf) {
   InitHud();
+  framework::eventBus().publishRaw(ABCUI_CHANNEL_NETMSG_INIT_HUD, nullptr);
   return original_InitHUD(pszName, iSize, pbuf);
 }
 
@@ -155,6 +168,8 @@ int __MsgFunc_CurWeapon(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_CurWeapon(pszName, iSize, pbuf);
   CurWeapon(state, id, clip, clip2);
+  const AbcUiCurWeaponEvent weaponEvent{state, id, clip, clip2};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_CUR_WEAPON, weaponEvent);
   return original_CurWeapon(pszName, iSize, pbuf);
 }
 
@@ -193,6 +208,8 @@ int __MsgFunc_WeapPickup(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_WeapPickup(pszName, iSize, pbuf);
   WeapPickup(index);
+  const AbcUiWeaponIdEvent pickupEvent{index};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_WEAP_PICKUP, pickupEvent);
   return original_WeapPickup(pszName, iSize, pbuf);
 }
 
@@ -203,6 +220,8 @@ int __MsgFunc_AmmoPickup(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_AmmoPickup(pszName, iSize, pbuf);
   AmmoPickup(index, count);
+  const AbcUiAmmoEvent pickupEvent{index, count};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_AMMO_PICKUP, pickupEvent);
   return original_AmmoPickup(pszName, iSize, pbuf);
 }
 
@@ -212,6 +231,8 @@ int __MsgFunc_ItemPickup(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_ItemPickup(pszName, iSize, pbuf);
   ItemPickup(name.c_str());
+  const AbcUiItemPickupEvent itemEvent{name.c_str()};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_ITEM_PICKUP, itemEvent);
   return original_ItemPickup(pszName, iSize, pbuf);
 }
 
@@ -221,6 +242,8 @@ int __MsgFunc_Battery(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_Battery(pszName, iSize, pbuf);
   Battery(armor);
+  const AbcUiIntEvent armEvent{armor};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_BATTERY, armEvent);
   return original_Battery(pszName, iSize, pbuf);
 }
 
@@ -230,6 +253,8 @@ int __MsgFunc_Health(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_Health(pszName, iSize, pbuf);
   Health(health);
+  const AbcUiIntEvent healthEvent{health};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_HEALTH, healthEvent);
   return original_Health(pszName, iSize, pbuf);
 }
 
@@ -270,6 +295,9 @@ int __MsgFunc_ShowMenu(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_ShowMenu(pszName, iSize, pbuf);
   ShowMenu(validSlots, displaySeconds, bits, text);
+  const AbcUiShowMenuEvent moduleEvent{validSlots, displaySeconds, bits,
+                                       text.c_str()};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_SHOW_MENU, moduleEvent);
   // The old hook unconditionally swallowed ShowMenu so the vanilla VGUI
   // menu never flashes - the TextMenu panel owns this message.
   return 1;
@@ -281,6 +309,8 @@ int __MsgFunc_FlashBat(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_FlashBat(pszName, iSize, pbuf);
   FlashBat(battery);
+  const AbcUiFlashBatEvent moduleEvent{battery};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_FLASHBAT, moduleEvent);
   return original_FlashBat(pszName, iSize, pbuf);
 }
 
@@ -291,6 +321,8 @@ int __MsgFunc_Flashlight(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_Flashlight(pszName, iSize, pbuf);
   Flashlight(on > 0, battery);
+  const AbcUiFlashlightEvent moduleEvent{on > 0 ? 1 : 0, battery};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_FLASHLIGHT, moduleEvent);
   return original_Flashlight(pszName, iSize, pbuf);
 }
 
@@ -337,7 +369,17 @@ int __MsgFunc_SayText(const char *pszName, int iSize, void *pbuf) {
           const abc::CallbackList<SayTextCallback>::Callback &callback) {
         chain &= callback(data);
       });
-  return chain ? original_SayText(pszName, iSize, pbuf) : 1;
+  // Module-facing mirror: the same veto semantics (nonzero = the module drew
+  // the line, the native handler is skipped).
+  const AbcUiSayTextEvent moduleEvent{
+      data.client,
+      data.text.c_str(),
+      {data.params[0].c_str(), data.params[1].c_str(), data.params[2].c_str(),
+       data.params[3].c_str()}};
+  const bool moduleConsumed = framework::eventBus().publishVeto(
+      ABCUI_CHANNEL_TEXTFEED_SAY_TEXT, moduleEvent);
+  return (chain && !moduleConsumed) ? original_SayText(pszName, iSize, pbuf)
+                                    : 1;
 }
 
 int __MsgFunc_Damage(const char *pszName, int iSize, void *pbuf) {
@@ -356,6 +398,12 @@ int __MsgFunc_Damage(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_Damage(pszName, iSize, pbuf);
   Damage(data);
+  const AbcUiDamageEvent damageEvent{
+      data.armor,
+      data.damage,
+      data.tiles,
+      {data.from[0], data.from[1], data.from[2]}};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_DAMAGE, damageEvent);
   return original_Damage(pszName, iSize, pbuf);
 }
 
@@ -407,6 +455,8 @@ int __MsgFunc_MOTD(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_MOTD(pszName, iSize, pbuf);
   Motd(code, info.c_str());
+  const AbcUiMotdEvent moduleEvent{code, info.c_str()};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_MOTD, moduleEvent);
   return original_MOTD(pszName, iSize, pbuf);
 }
 
@@ -424,11 +474,15 @@ int __MsgFunc_VoteMenu(const char *pszName, int iSize, void *pbuf) {
   if (!msg.ok())
     return original_VoteMenu(pszName, iSize, pbuf);
   VoteMenu(data);
+  const AbcUiVoteMenuEvent moduleEvent{data.type, data.content.c_str(),
+                                       data.yes.c_str(), data.no.c_str()};
+  framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_VOTE_MENU, moduleEvent);
   return 1;
 }
 
 int __MsgFunc_EndVote(const char *pszName, int iSize, void *pbuf) {
   EndVote();
+  framework::eventBus().publishRaw(ABCUI_CHANNEL_NETMSG_END_VOTE, nullptr);
   return original_EndVote(pszName, iSize, pbuf);
 }
 
@@ -555,67 +609,113 @@ int __MsgFunc_MetaHook(const char *pszName, int iSize, void *pbuf) {
       if (!msg.ok())
         return original_MetaHook ? original_MetaHook(pszName, iSize, pbuf) : 0;
       PopNum(data);
+      const AbcUiPopNumEvent popEvent{
+          {data.origin[0], data.origin[1], data.origin[2]},
+          data.value,
+          {data.color[0], data.color[1], data.color[2], data.color[3]}};
+      framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_POP_NUM, popEvent);
     }
   }
   return original_MetaHook ? original_MetaHook(pszName, iSize, pbuf) : 0;
 }
 #pragma endregion
 
-} // namespace
+// HookUserMsg returns the previous handler. A refresh after a client reload
+// may report our own handler back; the real predecessor is already stored, so
+// only a foreign one is adopted.
+void installHook(const char *name, pfnUserMsgHook hook,
+                 pfnUserMsgHook &original) {
+  pfnUserMsgHook previous = g_pMetaHookAPI->HookUserMsg(name, hook);
+  if (previous && previous != hook)
+    original = previous;
+}
 
-void init() {
-  static bool registered = false;
-  if (registered)
-    return;
-  registered = true;
-  // HOOK_MESSAGE per message (g_pMetaHookAPI->HookUserMsg): returns the
-  // previous handler, forming the multi-plugin chain (AbcEssential
-  // registers its own links at its HUD_Init).
-  original_AmmoX = HOOK_MESSAGE(AmmoX);
-  original_WeaponList = HOOK_MESSAGE(WeaponList);
-  original_InitHUD = HOOK_MESSAGE(InitHUD);
-  original_CustWeapon = HOOK_MESSAGE(CustWeapon);
-  original_CurWeapon = HOOK_MESSAGE(CurWeapon);
-  original_HideWeapon = HOOK_MESSAGE(HideWeapon);
-  original_HideHUD = HOOK_MESSAGE(HideHUD);
-  original_WeaponSpr = HOOK_MESSAGE(WeaponSpr);
-  original_WeapPickup = HOOK_MESSAGE(WeapPickup);
-  original_AmmoPickup = HOOK_MESSAGE(AmmoPickup);
-  original_ItemPickup = HOOK_MESSAGE(ItemPickup);
-  original_Battery = HOOK_MESSAGE(Battery);
-  original_Health = HOOK_MESSAGE(Health);
-  original_ScoreInfo = HOOK_MESSAGE(ScoreInfo);
-  original_ShowMenu = HOOK_MESSAGE(ShowMenu);
-  original_FlashBat = HOOK_MESSAGE(FlashBat);
-  original_Flashlight = HOOK_MESSAGE(Flashlight);
-  original_TextMsg = HOOK_MESSAGE(TextMsg);
-  original_SayText = HOOK_MESSAGE(SayText);
-  original_Damage = HOOK_MESSAGE(Damage);
+// True when the address is a function inside the loaded client image. Used to
+// tell a client-rebuilt usermsg table (head is the client's own handler) from
+// a table another plugin still owns (a plugin hook lives outside that image).
+bool isClientCode(uintptr_t address) {
+  const auto base = reinterpret_cast<uintptr_t>(abc::g_dwClientBase);
+  return base && abc::g_dwClientSize && address >= base &&
+         address - base < abc::g_dwClientSize;
+}
+
+void registerUserMsgHooks() {
+  installHook("AmmoX", __MsgFunc_AmmoX, original_AmmoX);
+  installHook("WeaponList", __MsgFunc_WeaponList, original_WeaponList);
+  installHook("InitHUD", __MsgFunc_InitHUD, original_InitHUD);
+  installHook("CustWeapon", __MsgFunc_CustWeapon, original_CustWeapon);
+  installHook("CurWeapon", __MsgFunc_CurWeapon, original_CurWeapon);
+  installHook("HideWeapon", __MsgFunc_HideWeapon, original_HideWeapon);
+  installHook("HideHUD", __MsgFunc_HideHUD, original_HideHUD);
+  installHook("WeaponSpr", __MsgFunc_WeaponSpr, original_WeaponSpr);
+  installHook("WeapPickup", __MsgFunc_WeapPickup, original_WeapPickup);
+  installHook("AmmoPickup", __MsgFunc_AmmoPickup, original_AmmoPickup);
+  installHook("ItemPickup", __MsgFunc_ItemPickup, original_ItemPickup);
+  installHook("Battery", __MsgFunc_Battery, original_Battery);
+  installHook("Health", __MsgFunc_Health, original_Health);
+  installHook("ScoreInfo", __MsgFunc_ScoreInfo, original_ScoreInfo);
+  installHook("ShowMenu", __MsgFunc_ShowMenu, original_ShowMenu);
+  installHook("FlashBat", __MsgFunc_FlashBat, original_FlashBat);
+  installHook("Flashlight", __MsgFunc_Flashlight, original_Flashlight);
+  installHook("TextMsg", __MsgFunc_TextMsg, original_TextMsg);
+  installHook("SayText", __MsgFunc_SayText, original_SayText);
+  installHook("Damage", __MsgFunc_Damage, original_Damage);
   // The MetaHook carrier is addon-registered; a null chain (vanilla servers)
   // leaves every read a no-op passthrough (see __MsgFunc_MetaHook).
-  original_MetaHook = HOOK_MESSAGE(MetaHook);
+  installHook("MetaHook", __MsgFunc_MetaHook, original_MetaHook);
   // Batch C additions.
-  original_Spectator = HOOK_MESSAGE(Spectator);
-  original_ServerName = HOOK_MESSAGE(ServerName);
-  original_NextMap = HOOK_MESSAGE(NextMap);
-  original_TimeEnd = HOOK_MESSAGE(TimeEnd);
-  original_MOTD = HOOK_MESSAGE(MOTD);
-  original_VoteMenu = HOOK_MESSAGE(VoteMenu);
-  original_EndVote = HOOK_MESSAGE(EndVote);
-  original_MapList = HOOK_MESSAGE(MapList);
-  original_ClExtrasInfo = HOOK_MESSAGE(ClExtrasInfo);
-  original_VoiceMask = HOOK_MESSAGE(VoiceMask);
-  original_ReqState = HOOK_MESSAGE(ReqState);
+  installHook("Spectator", __MsgFunc_Spectator, original_Spectator);
+  installHook("ServerName", __MsgFunc_ServerName, original_ServerName);
+  installHook("NextMap", __MsgFunc_NextMap, original_NextMap);
+  installHook("TimeEnd", __MsgFunc_TimeEnd, original_TimeEnd);
+  installHook("MOTD", __MsgFunc_MOTD, original_MOTD);
+  installHook("VoteMenu", __MsgFunc_VoteMenu, original_VoteMenu);
+  installHook("EndVote", __MsgFunc_EndVote, original_EndVote);
+  installHook("MapList", __MsgFunc_MapList, original_MapList);
+  installHook("ClExtrasInfo", __MsgFunc_ClExtrasInfo, original_ClExtrasInfo);
+  installHook("VoiceMask", __MsgFunc_VoiceMask, original_VoiceMask);
+  installHook("ReqState", __MsgFunc_ReqState, original_ReqState);
   // Issue 10: the client registers both at its own HUD_Init, which runs
   // before this init() from the hook spine. A null result means the message
   // table moved; the inventory page then has no data (fail-closed, the
   // native panel is still suppressed by the command hook).
-  original_InvAdd = HOOK_MESSAGE(InvAdd);
-  original_InvRemove = HOOK_MESSAGE(InvRemove);
-  if (!original_InvAdd || !original_InvRemove)
+  installHook("InvAdd", __MsgFunc_InvAdd, original_InvAdd);
+  installHook("InvRemove", __MsgFunc_InvRemove, original_InvRemove);
+  static bool warnedMissingInventory = false;
+  if ((!original_InvAdd || !original_InvRemove) && !warnedMissingInventory) {
+    warnedMissingInventory = true;
     abc::ConsoleWarn("[AbcUi] inventory messages (InvAdd/InvRemove) were not "
                      "registered by the client; the inventory page has no "
                      "data\n");
+  }
+}
+
+} // namespace
+
+void init() {
+  // Installed once per process. HUD_Init can repeat (map cycles), but the
+  // usermsg table then still points at this chain: re-hooking every cycle
+  // would make two chained plugins point at each other (AbcEssential hooks
+  // the same messages) and recurse forever.
+  static bool registered = false;
+  if (registered)
+    return;
+  registered = true;
+  registerUserMsgHooks();
+}
+
+void refreshAfterClientLoad() {
+  // A client DLL reload re-registers its usermsg table, replacing our hooks
+  // and leaving the stored predecessors pointing into the old image. Only in
+  // that case re-chain. The probe is a message no other plugin hooks: a
+  // client-image handler means the table was rebuilt. A normal HUD cycle
+  // leaves our hook at the head and does nothing.
+  if (!g_pMetaHookAPI->FindUserMsgHook)
+    return;
+  usermsg_t *probe = g_pMetaHookAPI->FindUserMsgHook("SayText");
+  if (!probe || !isClientCode(reinterpret_cast<uintptr_t>(probe->function)))
+    return;
+  registerUserMsgHooks();
 }
 
 void setVoteGate(cvar_t *cvar) {

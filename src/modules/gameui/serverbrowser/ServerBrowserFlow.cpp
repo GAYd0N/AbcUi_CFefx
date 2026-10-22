@@ -1,7 +1,6 @@
 // gameui::ServerBrowserFlow implementation - see ServerBrowserFlow.h.
 #include "ServerBrowserFlow.h"
 
-#include "../../../panels/serverbrowser/ServerBrowserPage.h"
 #include "../../../services/loading/LoadingModel.h"
 #include "../../../services/serverbrowser/ServerFavorites.h"
 
@@ -16,37 +15,25 @@ ServerBrowserFlow::ServerBrowserFlow(
     services::serverbrowser::ServerBlacklist &blacklist)
     : Host(std::move(host)), Session(session), Blacklist(blacklist) {}
 
-void ServerBrowserFlow::setPage(
-    panels::serverbrowser::ServerBrowserPage *page) {
-  Page = page;
-}
-
 void ServerBrowserFlow::shutdown() {
-  Page = nullptr;
   PendingHistoryValid = false;
   Session.Presented = false;
 }
 
 void ServerBrowserFlow::hide() {
-  if (Page)
-    Page->hide();
   Session.Presented = false;
 }
 
 void ServerBrowserFlow::present() {
-  if (!Page)
-    return;
   if (!Session.Presented) {
-    // Fresh opening: no subpage (detail window / row menu) survives from the
-    // last visit, and the cvar-owned unresponsive rule is sampled again (the
-    // page never reads cvars itself).
-    Page->closeSubpage();
+    // Fresh opening: the cvar-owned unresponsive rule is sampled again
+    // (the page module never reads cvars itself). The subpage state is the
+    // module's own; its document presents from menu.state.
     auto filter = Session.List.filter();
     filter.HideUnresponsive =
         abc::CVAR_GET_FLOAT("abc_ui_browser_hide_unresponsive") != 0;
     Session.List.setFilter(filter);
   }
-  Page->show();
   Session.Presented = true;
 }
 
@@ -116,8 +103,8 @@ void ServerBrowserFlow::toggleSelectedFavorite() {
   abc::ConsolePrint("[AbcUi] favorite %s \"%s\": %s (count=%d)\n",
                     wasFavorite ? "remove" : "add", selected->name.c_str(),
                     ok ? "OK" : "REFUSED", favorites->favoriteCount());
-  if (Page)
-    Page->tick(); // re-project the button state from the store
+  // The page module re-projects the button state from the store (the
+  // signature mixes the read-through favorite state).
 }
 
 void ServerBrowserFlow::releaseQueries() {
@@ -175,44 +162,23 @@ void ServerBrowserFlow::recordPendingHistory() {
                     PendingHistory.connPort, ok ? "OK" : "FAILED");
 }
 
-void ServerBrowserFlow::handleAction(navigation::ActionKind kind) {
-  using services::serverbrowser::QueryKind;
-  if (kind == navigation::ActionKind::kSbTabInternet)
-    beginQuery(QueryKind::Internet);
-  else if (kind == navigation::ActionKind::kSbTabLan)
-    beginQuery(QueryKind::Lan);
-  else if (kind == navigation::ActionKind::kSbTabFavorites)
-    beginQuery(QueryKind::Favorites);
-  else if (kind == navigation::ActionKind::kSbTabHistory)
-    beginQuery(QueryKind::History);
-  else if (kind == navigation::ActionKind::kSbTabFriends)
-    beginQuery(QueryKind::Friends);
-  else if (kind == navigation::ActionKind::kSbFiltersApply ||
-           kind == navigation::ActionKind::kSbFilterEmpty ||
-           kind == navigation::ActionKind::kSbFilterFull ||
-           kind == navigation::ActionKind::kSbFilterSecure)
+void ServerBrowserFlow::applyFiltersQuery() {
+  // The master-side pair moved: the list query is re-issued with the same
+  // kind (the module's filter toggles report the change).
+  beginQuery(Session.Query.kind());
+}
+
+void ServerBrowserFlow::refreshOrStop() {
+  if (Session.Query.listRequest() != 0)
+    Session.Query.refreshAll();
+  else
     beginQuery(Session.Query.kind());
-  else if (kind == navigation::ActionKind::kSbRefresh) {
-    if (Session.Query.listRequest() != 0)
-      Session.Query.refreshAll();
-    else
-      beginQuery(Session.Query.kind());
-    logQueryChange();
-  } else if (kind == navigation::ActionKind::kSbStop) {
-    Session.Query.cancel();
-    logQueryChange();
-  } else if (kind == navigation::ActionKind::kSbConnect) {
-    connectSelected();
-    return;
-  } else if (kind == navigation::ActionKind::kSbFavoriteToggle) {
-    toggleSelectedFavorite();
-    return;
-  } else {
-    abc::ConsoleWarn("[AbcUi] unknown menu action \"%s\" dropped\n",
-                     navigation::actionName(kind));
-    return;
-  }
-  Host.finishDispatch();
+  logQueryChange();
+}
+
+void ServerBrowserFlow::stop() {
+  Session.Query.cancel();
+  logQueryChange();
 }
 
 } // namespace gameui
