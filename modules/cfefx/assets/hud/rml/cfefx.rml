@@ -4,9 +4,9 @@
 	<link type="text/rcss" href="../rcss/cfefx.rcss"/>
 </head>
 <body id="cfefx">
-	<!-- Legacy z-order: stars under marks (panel creation order), score mark
-	     and score effect above both (old zpos 998/999). The panel controller
-	     positions the animated elements per frame; static marks use RCSS. -->
+	<!-- Element order inside the document: stars under marks (creation order),
+	     score mark and score effect above both. The panel controller positions
+	     the animated elements per frame; static marks use RCSS. -->
 	<img id="star-one" class="star" src="../img/cfefx/NoBossStar.png"/>
 	<img id="star-two" class="star" src="../img/cfefx/NoBossStar.png"/>
 	<img id="star-three" class="star" src="../img/cfefx/NoBossStar.png"/>

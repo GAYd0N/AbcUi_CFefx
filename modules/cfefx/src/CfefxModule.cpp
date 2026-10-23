@@ -36,10 +36,10 @@ const AbcUiModuleApi *Api = nullptr;
 
 constexpr const char *kPanelName = "cfefx";
 constexpr const char *kDocumentPath = "mod://abcui.cfefx/hud/rml/cfefx.rml";
-// Old CfefxPanel zpos 998/999: the feedback stacks above every other HUD
-// document, and a z-index above the built-in panels' range keeps that order
-// without depending on package load order.
-constexpr int kPanelZIndex = 999;
+// HUD panels share the default document tier (0) across the modules; paint
+// order inside the tier falls back to module load order, so the feedback never
+// sits above another HUD document (the old VGUI panel's zpos 998/999 has no
+// equivalent in the module catalogs).
 
 // Document element ids, one per old vgui control.
 constexpr const char *kMarkIds[9] = {
@@ -775,7 +775,7 @@ void onModuleLoad() {
   PanelDesc.structSize = sizeof(PanelDesc);
   PanelDesc.name = kPanelName;
   PanelDesc.documentPath = kDocumentPath;
-  PanelDesc.zIndex = kPanelZIndex;
+  PanelDesc.zIndex = 0;
   PanelDesc.userdata = nullptr;
   PanelDesc.onDocumentReady = &onDocumentReady;
   PanelDesc.onData = &onData;
