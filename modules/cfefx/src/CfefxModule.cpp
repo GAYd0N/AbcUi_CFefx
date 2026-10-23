@@ -14,15 +14,16 @@
 // ten per full accumulator) instead of skipping the animation. The nine star
 // sprites are recycled round-robin and a slot only takes a new launch once its
 // previous star has landed, so no star animation is cut. The side marks trail
-// that queue: a mark appears only when its own star animation has finished, and
-// the tenth landing closes the column again, so the readout always follows what
-// the stars have actually shown. The score pop does not wait for the queue: as
-// soon as the accumulator reaches a full hud_cfefx_max (1000 damage by default)
-// it shows immediately, and its image follows the damage reached (1000 shows
-// NanoDamege1, 5000 shows NanoDamege5). The old combo counter is kept and lifts
-// the image further, so consecutive pops still climb the ladder; a score within
-// hud_cfefx_time of the previous one advances the combo, otherwise it starts
-// again at 1.
+// that queue: a mark appears only when its own star animation has finished, the
+// tenth landing closes the column again and the score pop clears it as well, so
+// the readout always follows what the stars have actually shown and never
+// survives the cycle that the pop ended. The score pop does not wait for the
+// queue: as soon as the accumulator reaches a full hud_cfefx_max (1000 damage
+// by default) it shows immediately, and its image follows the damage reached
+// (1000 shows NanoDamege1, 5000 shows NanoDamege5). The old combo counter is
+// kept and lifts the image further, so consecutive pops still climb the ladder;
+// a score within hud_cfefx_time of the previous one advances the combo,
+// otherwise it starts again at 1.
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 
@@ -298,8 +299,9 @@ bool markVisible(std::size_t index, std::size_t visible) {
 
 // Side marks trail the star queue: each landed star tick advances the column by
 // one mark, and the tenth landing closes it again, so the marks never run ahead
-// of the animation the player has actually seen. They are refreshed only when a
-// star lands, never on damage arrival.
+// of the animation the player has actually seen. Damage arrival never touches
+// them; besides the landings, only the score pop (which ends the cycle) clears
+// the column.
 void refreshMarks(std::size_t visible) {
   for (std::size_t i = 0; i < 9; i++)
     setOpacity(Pips[i].mark, markVisible(i, visible) ? 1.0f : 0.0f);
@@ -399,10 +401,14 @@ void fireScorePop() {
     Score++;
 
   // Only the accumulator restarts; the stars already queued for this damage
-  // keep playing, so nothing is cancelled by the pop. Their landings keep
-  // driving the side marks, so the pop itself does not touch them.
+  // keep playing, so nothing is cancelled by the pop. The pop does close the
+  // mark column though: whatever the previous slice had lit is cleared here, so
+  // the row never carries marks from the cycle the score just closed. The
+  // stars that are still in flight start the fresh column from zero.
   Damage = 0;
   LastTier = 0;
+  LandedMarks = 0;
+  refreshMarks(0);
 }
 
 void onDamage(int value) {
