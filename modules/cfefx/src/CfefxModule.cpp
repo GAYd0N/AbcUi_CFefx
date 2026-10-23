@@ -9,16 +9,16 @@
 // old 854x480 absolute animation coordinates are re-anchored to the live
 // viewport so the effect follows the HUD density scale on any aspect ratio.
 //
-// State: the side marks are the accumulator readout - one mark per tenth of the
-// current hud_cfefx_max cycle, shown as soon as the damage lands and cleared by
-// the pop - while the stars are a separate animation queue: every tenth queues
-// one star, so a single big hit plays its whole queue (8000 damage at the
-// default max launches eighty stars, ten per full accumulator) instead of
-// skipping the animation. The nine star sprites are recycled round-robin and a
-// slot only takes a new launch once its previous star has landed, so no star
-// animation is cut. The score pop does not wait for the queue: as soon as the
-// accumulator reaches a full hud_cfefx_max (1000 damage by default) it shows
-// immediately, and its image follows the damage reached (1000 shows
+// State: every tenth of hud_cfefx_max queues one star, so a single big hit
+// plays its whole queue (8000 damage at the default max launches eighty stars,
+// ten per full accumulator) instead of skipping the animation. The nine star
+// sprites are recycled round-robin and a slot only takes a new launch once its
+// previous star has landed, so no star animation is cut. The side marks trail
+// that queue: a mark appears only when its own star animation has finished, and
+// the tenth landing closes the column again, so the readout always follows what
+// the stars have actually shown. The score pop does not wait for the queue: as
+// soon as the accumulator reaches a full hud_cfefx_max (1000 damage by default)
+// it shows immediately, and its image follows the damage reached (1000 shows
 // NanoDamege1, 5000 shows NanoDamege5). The old combo counter is kept and lifts
 // the image further, so consecutive pops still climb the ladder; a score within
 // hud_cfefx_time of the previous one advances the combo, otherwise it starts
@@ -126,6 +126,10 @@ double NextStarStart = 0.0;
 // Round-robin cursor so consecutive launches land on different pips instead of
 // always reusing the first free one.
 std::size_t NextSlot = 0;
+// Stars whose animation has finished since the last full-accumulator boundary,
+// 0..9. The side marks read this instead of the damage counter, so a mark only
+// shows once its star has landed; the tenth landing starts the column over.
+std::size_t LandedMarks = 0;
 std::uint64_t Damage = 0;
 std::size_t LastTier = 0;
 std::size_t Score = 0;
@@ -292,10 +296,10 @@ bool markVisible(std::size_t index, std::size_t visible) {
   return index >= 4 && index < visible;
 }
 
-// Side marks are the accumulator readout: one mark per tenth of the current
-// hud_cfefx_max cycle, shown the moment the damage lands and cleared by the
-// pop. They do not wait for the star queue, so a fresh hit is visible even
-// while a previous big hit is still animating.
+// Side marks trail the star queue: each landed star tick advances the column by
+// one mark, and the tenth landing closes it again, so the marks never run ahead
+// of the animation the player has actually seen. They are refreshed only when a
+// star lands, never on damage arrival.
 void refreshMarks(std::size_t visible) {
   for (std::size_t i = 0; i < 9; i++)
     setOpacity(Pips[i].mark, markVisible(i, visible) ? 1.0f : 0.0f);
@@ -358,17 +362,15 @@ void evaluate() {
 
   // Every tenth plays its own star: a single big hit piles the whole count into
   // the pending queue (5000 damage at the default max plays fifty stars, ten
-  // per full accumulator) and the frame pump launches them in order.
+  // per full accumulator) and the frame pump launches them in order. The side
+  // marks do not move here: they follow the stars as they land.
   PendingStars += tier - previous;
   pumpStarQueue();
 
   // The pop does not wait for the star queue: a full accumulator shows it
-  // immediately, and its image follows the damage reached. The marks show the
-  // cycle's progress right away instead of trailing the star animation.
+  // immediately, and its image follows the damage reached.
   if (tier >= 10)
     fireScorePop();
-  else
-    refreshMarks(tier);
 }
 
 void fireScorePop() {
@@ -397,12 +399,10 @@ void fireScorePop() {
     Score++;
 
   // Only the accumulator restarts; the stars already queued for this damage
-  // keep playing, so nothing is cancelled by the pop. The side marks read the
-  // cycle that just closed, so they clear here and the next damage starts from
-  // an empty row.
+  // keep playing, so nothing is cancelled by the pop. Their landings keep
+  // driving the side marks, so the pop itself does not touch them.
   Damage = 0;
   LastTier = 0;
-  refreshMarks(0);
 }
 
 void onDamage(int value) {
@@ -425,6 +425,7 @@ void reset() {
   PendingStars = 0;
   NextStarStart = ClientTimeNow;
   NextSlot = 0;
+  LandedMarks = 0;
 
   resetAllMarks();
   resetScoreEffect();
@@ -433,29 +434,34 @@ void reset() {
 
 // ------------------------------------------------------------ animation ----
 
-void animatePip(Pip &pip, std::size_t index, double now) {
+// Returns true exactly once, on the frame the star animation has finished, so
+// the caller can advance the side marks when a mark is actually due.
+bool animatePip(Pip &pip, std::size_t index, double now) {
   if (!pip.mark || !pip.star)
-    return;
+    return false;
 
   float width = 0.0f, height = 0.0f, scale = 1.0f;
   if (!screenMetrics(panelDocument(), width, height, scale))
-    return;
+    return false;
 
   if (pip.starStart < 0.0) {
     setOpacity(pip.star, 0.0f);
-    return;
+    return false;
   }
 
   // Queued but not launched yet.
   if (now < pip.starStart) {
     setOpacity(pip.star, 0.0f);
-    return;
+    return false;
   }
 
   const double elapsed = now - pip.starStart;
   if (elapsed >= kStarDuration) {
     setOpacity(pip.star, 0.0f);
-    return;
+    // Retire the pip: the landing is reported once, and freePipSlot() may
+    // recycle the sprite from the next launch on.
+    pip.starStart = -1.0;
+    return true;
   }
 
   // Old StarXAnim: centre -> right 204dp (20 -> 40) -> right 44dp (-> 20),
@@ -497,6 +503,7 @@ void animatePip(Pip &pip, std::size_t index, double now) {
 
   setBox(pip.star, x, y, size, size);
   setOpacity(pip.star, std::clamp(alpha, 0.0f, 1.0f));
+  return false;
 }
 
 void animateScore(double now) {
@@ -642,8 +649,17 @@ void onData(void *, double frameTime) {
 
   pumpStarQueue();
   animateScore(ClientTimeNow);
+
+  // The landed stars are the only input to the mark column: each landing adds
+  // one mark, and the tenth closes the column (one full hud_cfefx_max of
+  // animation), so the readout never runs ahead of the stars.
+  std::size_t landed = 0;
   for (std::size_t i = 0; i < 9; i++)
-    animatePip(Pips[i], i, ClientTimeNow);
+    landed += animatePip(Pips[i], i, ClientTimeNow) ? 1 : 0;
+  if (landed != 0) {
+    LandedMarks = (LandedMarks + landed) % 10;
+    refreshMarks(LandedMarks);
+  }
 }
 
 void onReset(void *) { reset(); }
@@ -703,15 +719,17 @@ void debugDump(const char *label) {
   }
   std::size_t marks = 0;
   for (std::size_t i = 0; i < 9; i++)
-    marks += markVisible(i, LastTier) ? 1 : 0;
+    marks += markVisible(i, LandedMarks) ? 1 : 0;
   Api->core->print(
       "[AbcUi] cfefx: %s enabled=%d active=%d damaged=%llu step=%llu "
-      "tier=%d marks=%llu score=%d pending=%llu flying=%llu "
+      "tier=%d landed=%llu marks=%llu score=%d pending=%llu flying=%llu "
       "lastScore=%.2fs scoreAge=%.2fs amount=%.0f volume=%.2f\n",
       label, cvarFloat(Enabled, 1.0f) > 0.0f ? 1 : 0, hudActive() ? 1 : 0,
       static_cast<unsigned long long>(Damage),
       static_cast<unsigned long long>(damageStep()),
-      static_cast<int>(LastTier), static_cast<unsigned long long>(marks),
+      static_cast<int>(LastTier),
+      static_cast<unsigned long long>(LandedMarks),
+      static_cast<unsigned long long>(marks),
       static_cast<int>(Score),
       static_cast<unsigned long long>(PendingStars),
       static_cast<unsigned long long>(flying),
@@ -730,8 +748,8 @@ void debugHit(void *) {
 }
 
 void debugTier(void *) {
-  // The old "tier 9" argument: clear the accumulator, then land exactly nine
-  // marks so every side mark and its star queue are visible at once.
+  // The old "tier 9" argument: clear the accumulator, then queue exactly nine
+  // stars; the marks fill one by one as those stars land.
   reset();
   onDamage(static_cast<int>(damageStep() * 9));
   debugDump("tier");
@@ -847,6 +865,7 @@ void onModuleShutdown() {
   ScoreStart = -1.0;
   PendingStars = 0;
   NextStarStart = 0.0;
+  LandedMarks = 0;
 }
 
 void onModuleUnload() { Api = nullptr; }
