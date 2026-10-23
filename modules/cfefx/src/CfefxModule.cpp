@@ -309,12 +309,12 @@ void resetAllMarks() {
 
 // The nine marks only own five rows: mark five sits on the top row (118dp)
 // and marks one..four repeat the rows of six..nine (142..214dp), exactly like
-// the old VGUI DmgMarkFive/100 panels. From 600 damage on, the 100..400 twins
-// would paint on top of 600..900, so the pair is resolved in favour of the
-// higher column: the five-slot stack (mark five plus 600..900) is shown and
-// the 100..400 copies stay hidden.
+// the old VGUI DmgMarkFive/100 panels. The old panel also switched columns at
+// the 500 mark: once mark five is reached, 100..400 are cleared because their
+// rows already carry 600..900, and leaving the same 100 art lit under a flying
+// 600 star makes the higher mark look lit before its own star lands.
 bool markVisible(std::size_t index, std::size_t visible) {
-  if (visible < 6)
+  if (visible < 5)
     return index < visible;
   return index >= 4 && index < visible;
 }
