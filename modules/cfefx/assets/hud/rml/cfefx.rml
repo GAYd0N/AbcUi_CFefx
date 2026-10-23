@@ -16,6 +16,9 @@
 	<img id="star-seven" class="star" src="../img/cfefx/NoBossStar.png"/>
 	<img id="star-eight" class="star" src="../img/cfefx/NoBossStar.png"/>
 	<img id="star-nine" class="star" src="../img/cfefx/NoBossStar.png"/>
+	<!-- Tenth position of the accumulator: it belongs to the score pop, so it
+	     is the only star without a matching side mark. -->
+	<img id="star-ten" class="star" src="../img/cfefx/NoBossStar.png"/>
 
 	<img id="dmg-mark-one" class="mark" src="../img/cfefx/NoBossSide100.png"/>
 	<img id="dmg-mark-two" class="mark" src="../img/cfefx/NoBossSide100.png"/>

@@ -11,11 +11,13 @@
 //
 // State: every tenth of hud_cfefx_max queues one star, so a single big hit
 // plays its whole queue (8000 damage at the default max launches eighty stars,
-// ten per full accumulator) instead of skipping the animation. The nine star
-// sprites are recycled round-robin and a slot only takes a new launch once its
-// previous star has landed, so no star animation is cut. The side marks trail
-// that queue: a mark appears only when its own star animation has finished, the
-// tenth landing closes the column again and the score pop clears it as well, so
+// ten per full accumulator) instead of skipping the animation. Ten star sprites
+// cover the ten positions of one accumulator; position i always flies on sprite
+// i and lands on row i, so the star and the mark it lights are the same row.
+// A sprite only takes a new launch once its previous star has landed, so no
+// animation is cut. The side marks trail that queue: a mark appears only when
+// its own star animation has finished, the tenth landing (the pop slot, which
+// has no mark) closes the column again and the score pop clears it as well, so
 // the readout always follows what the stars have actually shown and never
 // survives the cycle that the pop ended. The score pop does not wait for the
 // queue: as soon as the accumulator reaches a full hud_cfefx_max (1000 damage
@@ -43,21 +45,26 @@ constexpr const char *kDocumentPath = "mod://abcui.cfefx/hud/rml/cfefx.rml";
 // sits above another HUD document (the old VGUI panel's zpos 998/999 has no
 // equivalent in the module catalogs).
 
-// Document element ids, one per old vgui control.
+// Document element ids, one per old vgui control. The stars get one sprite per
+// accumulator position (ten, because a full hud_cfefx_max is ten tenths), while
+// the marks stop at nine: the tenth position is the score pop, which is why the
+// tenth star has no mark element.
 constexpr const char *kMarkIds[9] = {
     "dmg-mark-one",   "dmg-mark-two",   "dmg-mark-three",
     "dmg-mark-four",  "dmg-mark-five",  "dmg-mark-six",
     "dmg-mark-seven", "dmg-mark-eight", "dmg-mark-nine",
 };
-constexpr const char *kStarIds[9] = {
+constexpr const char *kStarIds[10] = {
     "star-one", "star-two",   "star-three", "star-four", "star-five",
-    "star-six", "star-seven", "star-eight", "star-nine",
+    "star-six", "star-seven", "star-eight", "star-nine", "star-ten",
 };
 
 // Old hudanimations.txt ypos c-98 / c-74 / c-50 / c-26 and DmgMarkFive c-122,
-// expressed as absolute design-space top edges (480-line base).
-constexpr float kPipTop[9] = {142.0f, 166.0f, 190.0f, 214.0f, 118.0f,
-                              142.0f, 166.0f, 190.0f, 214.0f};
+// expressed as absolute design-space top edges (480-line base). The tenth
+// position has no mark row of its own (it is the pop), so it borrows the top
+// row of the 500 mark.
+constexpr float kPipTop[10] = {142.0f, 166.0f, 190.0f, 214.0f, 118.0f,
+                               142.0f, 166.0f, 190.0f, 214.0f, 118.0f};
 
 // Package-relative, exactly like the document's own src attributes: RmlUi
 // joins a src against the document directory, so "../img/cfefx/..." resolves
@@ -110,9 +117,13 @@ AbcUiCvarHandle Volume = nullptr;
 AbcUiCvarHandle KillTime = nullptr;
 
 struct Pip {
+  // Null on the tenth position: that tenth belongs to the score pop.
   AbcUiElement *mark = nullptr;
   AbcUiElement *star = nullptr;
   double starStart = -1.0;
+  // False for a star that was already in the air when a pop closed the cycle:
+  // it finishes its flight but must not light a mark of the new cycle.
+  bool countsMarks = false;
 };
 
 AbcUiPanelDesc PanelDesc = {};
@@ -124,9 +135,10 @@ double ClientTimeNow = 0.0;
 // instead of the later schedule overwriting an earlier one.
 std::size_t PendingStars = 0;
 double NextStarStart = 0.0;
-// Round-robin cursor so consecutive launches land on different pips instead of
-// always reusing the first free one.
-std::size_t NextSlot = 0;
+// Cycle position of the next star, 0..9: position i always flies on sprite i
+// and lands on row i, so the mark it lights is exactly the one under its
+// landing spot. Position 9 is the pop slot and lights no mark.
+std::size_t NextUnit = 0;
 // Stars whose animation has finished since the last full-accumulator boundary,
 // 0..9. The side marks read this instead of the damage counter, so a mark only
 // shows once its star has landed; the tenth landing starts the column over.
@@ -137,7 +149,7 @@ std::size_t Score = 0;
 double LastScoreTime = 0.0;
 double ScoreStart = -1.0;
 
-Pip Pips[9];
+Pip Pips[10];
 AbcUiElement *ScoreMark = nullptr;
 AbcUiElement *ScoreEffect = nullptr;
 // Tracks the last hudActive() result so reset() runs on the transition into
@@ -265,10 +277,11 @@ void resetScoreEffect() {
 }
 
 void resetDmgMark(std::size_t index) {
-  if (index >= 9)
+  if (index >= 10)
     return;
   Pip &pip = Pips[index];
   pip.starStart = -1.0;
+  pip.countsMarks = false;
   setOpacity(pip.mark, 0.0f);
   setOpacity(pip.star, 0.0f);
 
@@ -281,7 +294,7 @@ void resetDmgMark(std::size_t index) {
 }
 
 void resetAllMarks() {
-  for (std::size_t i = 0; i < 9; i++)
+  for (std::size_t i = 0; i < 10; i++)
     resetDmgMark(i);
 }
 
@@ -297,48 +310,33 @@ bool markVisible(std::size_t index, std::size_t visible) {
   return index >= 4 && index < visible;
 }
 
-// Side marks trail the star queue: each landed star tick advances the column by
-// one mark, and the tenth landing closes it again, so the marks never run ahead
-// of the animation the player has actually seen. Damage arrival never touches
-// them; besides the landings, only the score pop (which ends the cycle) clears
-// the column.
+// Side marks trail the star queue: position i lights mark i only after sprite i
+// has landed on row i, and the tenth landing closes the column again, so the
+// marks never run ahead of the animation the player has actually seen. Damage
+// arrival never touches them; besides the landings, only the score pop (which
+// ends the cycle) clears the column.
 void refreshMarks(std::size_t visible) {
   for (std::size_t i = 0; i < 9; i++)
     setOpacity(Pips[i].mark, markVisible(i, visible) ? 1.0f : 0.0f);
 }
 
-// The next pip in the round-robin order whose previous star has landed (or
-// which never flew), so the nine sprites are recycled without cutting an
-// animation mid-flight and consecutive stars land on different positions.
-std::size_t freePipSlot() {
-  for (std::size_t step = 0; step < 9; step++) {
-    const std::size_t index = (NextSlot + step) % 9;
-    const Pip &pip = Pips[index];
-    if (!pip.mark || !pip.star)
-      continue;
-    if (pip.starStart < 0.0 || ClientTimeNow >= pip.starStart + kStarDuration)
-      return index;
-  }
-  return 9;
-}
-
-void launchStar(std::size_t index) {
-  Pip &pip = Pips[index];
-  pip.starStart = ClientTimeNow;
-  NextSlot = (index + 1) % 9;
-  NextStarStart = ClientTimeNow + kStarStagger;
-}
-
-// Launches at most one pending star per frame: the 0.025 s cadence plus the
-// nine-sprite pool (each star lives 0.3 s) paces a long queue at roughly thirty
-// stars a second, so a big hit visibly plays every one of them in order.
+// Launches at most one pending star per frame, always on the sprite of its own
+// cycle position: position i must fly on sprite i so it lands on row i and the
+// mark it lights is the one under it. The previous star on that sprite has to
+// land first, which paces the queue at ten sprites per 0.3 s (about thirty
+// stars a second) with no interrupted animation.
 void pumpStarQueue() {
   if (PendingStars == 0 || ClientTimeNow < NextStarStart)
     return;
-  const std::size_t slot = freePipSlot();
-  if (slot >= 9)
+
+  Pip &pip = Pips[NextUnit];
+  if (pip.starStart >= 0.0 && ClientTimeNow < pip.starStart + kStarDuration)
     return;
-  launchStar(slot);
+
+  pip.starStart = ClientTimeNow;
+  pip.countsMarks = true;
+  NextUnit = (NextUnit + 1) % 10;
+  NextStarStart = ClientTimeNow + kStarStagger;
   PendingStars--;
 }
 
@@ -367,12 +365,15 @@ void evaluate() {
   // per full accumulator) and the frame pump launches them in order. The side
   // marks do not move here: they follow the stars as they land.
   PendingStars += tier - previous;
-  pumpStarQueue();
 
   // The pop does not wait for the star queue: a full accumulator shows it
-  // immediately, and its image follows the damage reached.
+  // immediately, and its image follows the damage reached. It runs before the
+  // pump so a pop that ends the cycle also restarts the queue at position one
+  // instead of first spending a launch on the closed cycle.
   if (tier >= 10)
     fireScorePop();
+
+  pumpStarQueue();
 }
 
 void fireScorePop() {
@@ -402,12 +403,16 @@ void fireScorePop() {
 
   // Only the accumulator restarts; the stars already queued for this damage
   // keep playing, so nothing is cancelled by the pop. The pop does close the
-  // mark column though: whatever the previous slice had lit is cleared here, so
-  // the row never carries marks from the cycle the score just closed. The
-  // stars that are still in flight start the fresh column from zero.
+  // mark column and the cycle: the next star to fly is position one again, and
+  // the stars still in the air (they belong to the cycle the pop just ended)
+  // finish their flight without lighting a mark, so the fresh column cannot
+  // pick up a position from the old one.
   Damage = 0;
   LastTier = 0;
   LandedMarks = 0;
+  NextUnit = 0;
+  for (Pip &pip : Pips)
+    pip.countsMarks = false;
   refreshMarks(0);
 }
 
@@ -430,7 +435,7 @@ void reset() {
   ScoreStart = -1.0;
   PendingStars = 0;
   NextStarStart = ClientTimeNow;
-  NextSlot = 0;
+  NextUnit = 0;
   LandedMarks = 0;
 
   resetAllMarks();
@@ -441,9 +446,10 @@ void reset() {
 // ------------------------------------------------------------ animation ----
 
 // Returns true exactly once, on the frame the star animation has finished, so
-// the caller can advance the side marks when a mark is actually due.
+// the caller can advance the side marks when a mark is actually due. The tenth
+// sprite has no mark element, so only the star is required.
 bool animatePip(Pip &pip, std::size_t index, double now) {
-  if (!pip.mark || !pip.star)
+  if (!pip.star)
     return false;
 
   float width = 0.0f, height = 0.0f, scale = 1.0f;
@@ -464,16 +470,16 @@ bool animatePip(Pip &pip, std::size_t index, double now) {
   const double elapsed = now - pip.starStart;
   if (elapsed >= kStarDuration) {
     setOpacity(pip.star, 0.0f);
-    // Retire the pip: the landing is reported once, and freePipSlot() may
-    // recycle the sprite from the next launch on.
+    // Retire the pip: the landing is reported once, and the pump may launch the
+    // next star of this position from the following frame on.
     pip.starStart = -1.0;
     return true;
   }
 
   // Old StarXAnim: centre -> right 204dp (20 -> 40) -> right 44dp (-> 20),
   // fading in over 0.02s and out over the last 0.1s. The old script held the
-  // peak for 0.1s; keep a short 0.05s beat there and split the remaining
-  // 0.25s evenly between the two legs.
+  // peak for 0.1s; the hold was removed so the star flies through in one
+  // continuous two-leg move.
   const float startX = width * 0.5f - kStarSize * 0.5f * scale;
   const float startY = height * 0.5f - kStarSize * 0.5f * scale;
   const float midX = width - kStarMidFromRight * scale;
@@ -485,17 +491,13 @@ bool animatePip(Pip &pip, std::size_t index, double now) {
   float x = startX;
   float y = startY;
   float size = smallSize;
-  if (elapsed < 0.125) {
-    const float t = segment(elapsed, 0.0, 0.125);
+  if (elapsed < 0.15) {
+    const float t = segment(elapsed, 0.0, 0.15);
     x = lerp(startX, midX, t);
     y = lerp(startY, top, t);
     size = lerp(smallSize, bigSize, t);
-  } else if (elapsed < 0.175) {
-    x = midX;
-    y = top;
-    size = bigSize;
   } else {
-    const float t = segment(elapsed, 0.175, 0.125);
+    const float t = segment(elapsed, 0.15, 0.15);
     x = lerp(midX, endX, t);
     y = top;
     size = lerp(bigSize, smallSize, t);
@@ -634,10 +636,11 @@ void onDocumentReady(void *) {
 
   ScoreMark = Api->ui->querySelector(doc, "score-mark");
   ScoreEffect = Api->ui->querySelector(doc, "score-effect");
-  for (std::size_t i = 0; i < 9; i++) {
+  for (std::size_t i = 0; i < 9; i++)
     Pips[i].mark = Api->ui->querySelector(doc, kMarkIds[i]);
+  // Ten star sprites, one per accumulator position; the tenth has no mark.
+  for (std::size_t i = 0; i < 10; i++)
     Pips[i].star = Api->ui->querySelector(doc, kStarIds[i]);
-  }
 
   reset();
 }
@@ -656,16 +659,20 @@ void onData(void *, double frameTime) {
   pumpStarQueue();
   animateScore(ClientTimeNow);
 
-  // The landed stars are the only input to the mark column: each landing adds
-  // one mark, and the tenth closes the column (one full hud_cfefx_max of
-  // animation), so the readout never runs ahead of the stars.
-  std::size_t landed = 0;
-  for (std::size_t i = 0; i < 9; i++)
-    landed += animatePip(Pips[i], i, ClientTimeNow) ? 1 : 0;
-  if (landed != 0) {
-    LandedMarks = (LandedMarks + landed) % 10;
-    refreshMarks(LandedMarks);
+  // A landing lights the mark of its own position (the sprite it flew on), so
+  // the column and the star that just landed are always on the same row. The
+  // tenth position is the pop slot: its landing closes the column instead.
+  bool landed = false;
+  for (std::size_t i = 0; i < 10; i++) {
+    if (!animatePip(Pips[i], i, ClientTimeNow))
+      continue;
+    if (!Pips[i].countsMarks)
+      continue;
+    LandedMarks = i < 9 ? i + 1 : 0;
+    landed = true;
   }
+  if (landed)
+    refreshMarks(LandedMarks);
 }
 
 void onReset(void *) { reset(); }
@@ -728,13 +735,14 @@ void debugDump(const char *label) {
     marks += markVisible(i, LandedMarks) ? 1 : 0;
   Api->core->print(
       "[AbcUi] cfefx: %s enabled=%d active=%d damaged=%llu step=%llu "
-      "tier=%d landed=%llu marks=%llu score=%d pending=%llu flying=%llu "
-      "lastScore=%.2fs scoreAge=%.2fs amount=%.0f volume=%.2f\n",
+      "tier=%d landed=%llu next=%llu marks=%llu score=%d pending=%llu "
+      "flying=%llu lastScore=%.2fs scoreAge=%.2fs amount=%.0f volume=%.2f\n",
       label, cvarFloat(Enabled, 1.0f) > 0.0f ? 1 : 0, hudActive() ? 1 : 0,
       static_cast<unsigned long long>(Damage),
       static_cast<unsigned long long>(damageStep()),
       static_cast<int>(LastTier),
       static_cast<unsigned long long>(LandedMarks),
+      static_cast<unsigned long long>(NextUnit),
       static_cast<unsigned long long>(marks),
       static_cast<int>(Score),
       static_cast<unsigned long long>(PendingStars),
@@ -862,6 +870,7 @@ void onModuleShutdown() {
     pip.mark = nullptr;
     pip.star = nullptr;
     pip.starStart = -1.0;
+    pip.countsMarks = false;
   }
   HudActive = false;
   Damage = 0;
@@ -871,6 +880,7 @@ void onModuleShutdown() {
   ScoreStart = -1.0;
   PendingStars = 0;
   NextStarStart = 0.0;
+  NextUnit = 0;
   LandedMarks = 0;
 }
 
