@@ -280,13 +280,25 @@ void resetAllMarks() {
     resetDmgMark(i);
 }
 
+// The nine marks only own five rows: mark five sits on the top row (118dp)
+// and marks one..four repeat the rows of six..nine (142..214dp), exactly like
+// the old VGUI DmgMarkFive/100 panels. From 600 damage on, the 100..400 twins
+// would paint on top of 600..900, so the pair is resolved in favour of the
+// higher column: the five-slot stack (mark five plus 600..900) is shown and
+// the 100..400 copies stay hidden.
+bool markVisible(std::size_t index, std::size_t visible) {
+  if (visible < 6)
+    return index < visible;
+  return index >= 4 && index < visible;
+}
+
 // Side marks are the accumulator readout: one mark per tenth of the current
 // hud_cfefx_max cycle, shown the moment the damage lands and cleared by the
 // pop. They do not wait for the star queue, so a fresh hit is visible even
 // while a previous big hit is still animating.
 void refreshMarks(std::size_t visible) {
   for (std::size_t i = 0; i < 9; i++)
-    setOpacity(Pips[i].mark, i < visible ? 1.0f : 0.0f);
+    setOpacity(Pips[i].mark, markVisible(i, visible) ? 1.0f : 0.0f);
 }
 
 // The next pip in the round-robin order whose previous star has landed (or
@@ -689,14 +701,18 @@ void debugDump(const char *label) {
         ClientTimeNow < pip.starStart + kStarDuration)
       flying++;
   }
+  std::size_t marks = 0;
+  for (std::size_t i = 0; i < 9; i++)
+    marks += markVisible(i, LastTier) ? 1 : 0;
   Api->core->print(
       "[AbcUi] cfefx: %s enabled=%d active=%d damaged=%llu step=%llu "
-      "tier=%d score=%d pending=%llu flying=%llu lastScore=%.2fs "
-      "scoreAge=%.2fs amount=%.0f volume=%.2f\n",
+      "tier=%d marks=%llu score=%d pending=%llu flying=%llu "
+      "lastScore=%.2fs scoreAge=%.2fs amount=%.0f volume=%.2f\n",
       label, cvarFloat(Enabled, 1.0f) > 0.0f ? 1 : 0, hudActive() ? 1 : 0,
       static_cast<unsigned long long>(Damage),
       static_cast<unsigned long long>(damageStep()),
-      static_cast<int>(LastTier), static_cast<int>(Score),
+      static_cast<int>(LastTier), static_cast<unsigned long long>(marks),
+      static_cast<int>(Score),
       static_cast<unsigned long long>(PendingStars),
       static_cast<unsigned long long>(flying),
       ClientTimeNow - LastScoreTime,
