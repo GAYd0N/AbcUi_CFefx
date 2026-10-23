@@ -9,19 +9,20 @@
 // old 854x480 absolute animation coordinates are re-anchored to the live
 // viewport so the effect follows the HUD density scale on any aspect ratio.
 //
-// State: every 1/10 of hud_cfefx_max damage queues one star, so a single big
-// hit plays its whole queue (8000 damage at the default max launches eighty
-// stars, ten per full accumulator) instead of skipping the animation. The nine
-// star sprites are reused in order and a slot only takes a new launch once its
-// previous star has landed, so no star animation is cut; the side marks are
-// allowed to be interrupted while the queue keeps flowing. The score pop does
-// not wait for the queue: as soon as the accumulator reaches a full
-// hud_cfefx_max (1000 damage by default) it shows immediately, and its image
-// follows the damage reached (1000 shows NanoDamege1, 5000 shows NanoDamege5).
-// The old combo counter is kept and lifts the image further, so consecutive
-// pops still climb the ladder; a score within hud_cfefx_time of the previous
-// one advances the combo, otherwise it starts again at 1. Each side mark pops
-// in opaque the moment its own star lands, matching the CF original.
+// State: the side marks are the accumulator readout - one mark per tenth of the
+// current hud_cfefx_max cycle, shown as soon as the damage lands and cleared by
+// the pop - while the stars are a separate animation queue: every tenth queues
+// one star, so a single big hit plays its whole queue (8000 damage at the
+// default max launches eighty stars, ten per full accumulator) instead of
+// skipping the animation. The nine star sprites are recycled round-robin and a
+// slot only takes a new launch once its previous star has landed, so no star
+// animation is cut. The score pop does not wait for the queue: as soon as the
+// accumulator reaches a full hud_cfefx_max (1000 damage by default) it shows
+// immediately, and its image follows the damage reached (1000 shows
+// NanoDamege1, 5000 shows NanoDamege5). The old combo counter is kept and lifts
+// the image further, so consecutive pops still climb the ladder; a score within
+// hud_cfefx_time of the previous one advances the combo, otherwise it starts
+// again at 1.
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 
@@ -117,11 +118,14 @@ AbcUiPanelDesc PanelDesc = {};
 
 double ClientTimeNow = 0.0;
 // Stars waiting for a launch slot; the frame pump launches them one at a time,
-// on the earliest free pip, 0.025 s apart. A big hit only raises this counter,
-// so every tenth of its damage gets its own visible star instead of the later
-// schedule overwriting an earlier one.
+// 0.025 s apart, on a pip that has finished its previous star. A big hit only
+// raises this counter, so every tenth of its damage gets its own visible star
+// instead of the later schedule overwriting an earlier one.
 std::size_t PendingStars = 0;
 double NextStarStart = 0.0;
+// Round-robin cursor so consecutive launches land on different pips instead of
+// always reusing the first free one.
+std::size_t NextSlot = 0;
 std::uint64_t Damage = 0;
 std::size_t LastTier = 0;
 std::size_t Score = 0;
@@ -276,29 +280,34 @@ void resetAllMarks() {
     resetDmgMark(i);
 }
 
-void hideSideMark(std::size_t index) {
-  if (index >= 9)
-    return;
-  setOpacity(Pips[index].mark, 0.0f);
+// Side marks are the accumulator readout: one mark per tenth of the current
+// hud_cfefx_max cycle, shown the moment the damage lands and cleared by the
+// pop. They do not wait for the star queue, so a fresh hit is visible even
+// while a previous big hit is still animating.
+void refreshMarks(std::size_t visible) {
+  for (std::size_t i = 0; i < 9; i++)
+    setOpacity(Pips[i].mark, i < visible ? 1.0f : 0.0f);
 }
 
-// The first pip whose previous star has landed (or which never flew), so the
-// nine sprites are recycled without cutting an animation mid-flight.
+// The next pip in the round-robin order whose previous star has landed (or
+// which never flew), so the nine sprites are recycled without cutting an
+// animation mid-flight and consecutive stars land on different positions.
 std::size_t freePipSlot() {
-  for (std::size_t i = 0; i < 9; i++) {
-    const Pip &pip = Pips[i];
+  for (std::size_t step = 0; step < 9; step++) {
+    const std::size_t index = (NextSlot + step) % 9;
+    const Pip &pip = Pips[index];
     if (!pip.mark || !pip.star)
       continue;
     if (pip.starStart < 0.0 || ClientTimeNow >= pip.starStart + kStarDuration)
-      return i;
+      return index;
   }
   return 9;
 }
 
 void launchStar(std::size_t index) {
   Pip &pip = Pips[index];
-  hideSideMark(index);
   pip.starStart = ClientTimeNow;
+  NextSlot = (index + 1) % 9;
   NextStarStart = ClientTimeNow + kStarStagger;
 }
 
@@ -342,9 +351,12 @@ void evaluate() {
   pumpStarQueue();
 
   // The pop does not wait for the star queue: a full accumulator shows it
-  // immediately, and its image follows the damage reached.
+  // immediately, and its image follows the damage reached. The marks show the
+  // cycle's progress right away instead of trailing the star animation.
   if (tier >= 10)
     fireScorePop();
+  else
+    refreshMarks(tier);
 }
 
 void fireScorePop() {
@@ -373,9 +385,12 @@ void fireScorePop() {
     Score++;
 
   // Only the accumulator restarts; the stars already queued for this damage
-  // keep playing, so nothing is cancelled by the pop.
+  // keep playing, so nothing is cancelled by the pop. The side marks read the
+  // cycle that just closed, so they clear here and the next damage starts from
+  // an empty row.
   Damage = 0;
   LastTier = 0;
+  refreshMarks(0);
 }
 
 void onDamage(int value) {
@@ -397,6 +412,7 @@ void reset() {
   ScoreStart = -1.0;
   PendingStars = 0;
   NextStarStart = ClientTimeNow;
+  NextSlot = 0;
 
   resetAllMarks();
   resetScoreEffect();
@@ -415,28 +431,20 @@ void animatePip(Pip &pip, std::size_t index, double now) {
 
   if (pip.starStart < 0.0) {
     setOpacity(pip.star, 0.0f);
-    setOpacity(pip.mark, 0.0f);
     return;
   }
 
   // Queued but not launched yet.
   if (now < pip.starStart) {
     setOpacity(pip.star, 0.0f);
-    setOpacity(pip.mark, 0.0f);
     return;
   }
 
   const double elapsed = now - pip.starStart;
   if (elapsed >= kStarDuration) {
-    // The star has landed: the side mark appears in the same frame and is
-    // fully opaque - the original has no fade on this transition.
     setOpacity(pip.star, 0.0f);
-    setOpacity(pip.mark, 1.0f);
     return;
   }
-
-  // A side mark is only shown once its own star has landed.
-  setOpacity(pip.mark, 0.0f);
 
   // Old StarXAnim: centre -> right 204dp (20 -> 40) -> right 44dp (-> 20),
   // fading in over 0.02s and out over the last 0.1s. The old script held the
