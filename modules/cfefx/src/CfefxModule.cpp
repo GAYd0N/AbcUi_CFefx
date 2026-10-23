@@ -9,12 +9,18 @@
 // old 854x480 absolute animation coordinates are re-anchored to the live
 // viewport so the effect follows the HUD density scale on any aspect ratio.
 //
-// State: every 1/10 of hud_cfefx_max damage lights one of nine marks; the
-// tenth tenth triggers a score pop (NanoDamege1..10), a sound and resets the
-// marks. A score within hud_cfefx_time of the previous one advances the
-// combo; otherwise it starts again at 1. Stars are queued (0.025 s apart)
-// rather than started together, and each side mark pops in opaque the moment
-// its own star lands, matching the CF original.
+// State: every 1/10 of hud_cfefx_max damage queues one star; a single big hit
+// therefore plays its whole queue (8000 damage at the default max launches
+// eighty stars) instead of jumping straight to the score pop. The nine star
+// sprites are reused in order and a slot only takes a new launch once its
+// previous star has landed, so no animation is cut. The pop is armed by the
+// tenth tenth and fires after the last queued star has landed: one pop per
+// accumulation, and its image follows the damage reached (1000 damage at the
+// default max shows NanoDamege1, 5000 shows NanoDamege5). The old combo counter
+// is kept and lifts the image further, so consecutive pops still climb the
+// ladder; a score within hud_cfefx_time of the previous one advances the combo,
+// otherwise it starts again at 1. Each side mark pops in opaque the moment its
+// own star lands, matching the CF original.
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 
@@ -120,6 +126,10 @@ std::size_t LastTier = 0;
 std::size_t Score = 0;
 double LastScoreTime = 0.0;
 double ScoreStart = -1.0;
+// Armed by the tenth tenth and fired by the frame pump once the last queued
+// star has landed, so one accumulation shows exactly one score pop.
+bool PopPending = false;
+double PopAt = 0.0;
 
 Pip Pips[9];
 AbcUiElement *ScoreMark = nullptr;
@@ -232,11 +242,11 @@ void playScoreSound() {
   Api->console->playSound(kScoreSound, volume);
 }
 
-void updateScoreEffect() {
+void updateScoreEffect(std::size_t image) {
   ScoreStart = ClientTimeNow;
   if (ScoreMark)
     Api->ui->elementSetAttribute(
-        ScoreMark, "src", kScoreImages[std::min<std::size_t>(Score, 9)]);
+        ScoreMark, "src", kScoreImages[std::min<std::size_t>(image, 9)]);
 }
 
 void resetScoreEffect() {
@@ -290,20 +300,25 @@ void resetSideMark(std::size_t index, bool suppress) {
   setOpacity(pip.mark, 0.0f);
 }
 
-void updateDmgMark(std::size_t index) {
+// Queues one star on a pip slot and returns the moment it lands. A new action
+// re-arms its own side mark even if it is already visible (the old side is
+// overwritten immediately) and joins the tail of the star queue. A slot only
+// accepts a launch after its previous star landed, so recycling the nine
+// sprites for a big hit never cuts an animation mid-flight.
+double queueStar(std::size_t index) {
   if (index >= 9)
-    return;
+    return 0.0;
   Pip &pip = Pips[index];
   if (!pip.mark || !pip.star)
-    return;
+    return 0.0;
 
-  // A new action re-arms its own side mark even if it is already visible
-  // (the old side is overwritten immediately) and joins the tail of the
-  // star queue.
   resetSideMark(index, false);
-  const double start = std::max(ClientTimeNow, NextStarStart);
+  double start = std::max(ClientTimeNow, NextStarStart);
+  if (pip.starStart >= 0.0)
+    start = std::max(start, pip.starStart + kStarDuration);
   pip.starStart = start;
   NextStarStart = start + kStarStagger;
+  return start + kStarDuration;
 }
 
 void evaluate() {
@@ -321,46 +336,68 @@ void evaluate() {
     return;
 
   const std::size_t tier = static_cast<std::size_t>(Damage / step);
-  if (tier == 0 || tier == LastTier)
+  if (tier <= LastTier)
     return;
   const std::size_t previous = LastTier;
   LastTier = tier;
 
-  if (tier >= 10) {
-    // Tenth tenth: score pop, clear the marks, reset the accumulator.
-    LastTier = 0;
-    Damage = 0;
-    resetAllMarks();
+  // Every tenth plays its own star: a single big hit drains the whole queue
+  // (8000 damage at the default max launches eighty stars) instead of skipping
+  // to the pop. The nine sprites are recycled in launch order.
+  double lastLanding = ClientTimeNow;
+  for (std::size_t tenth = previous; tenth < tier; tenth++)
+    lastLanding = std::max(lastLanding, queueStar(tenth % 9));
 
-    // Old combo window: reset only when the next score arrives after the
-    // timeout - the score image itself is transient either way.
-    if (Score != 0 && ClientTimeNow - LastScoreTime > cvarFloat(KillTime, 8.0f))
-      Score = 0;
-
-    playScoreSound();
-    updateScoreEffect();
-    LastScoreTime = ClientTimeNow;
-    if (Score < 9)
-      Score++;
-    return;
-  }
-
-  // Queue every tenth unlocked by this hit, in order - a single 400-damage
-  // hit therefore plays four stars 0.05 s apart instead of one synchronized
-  // burst. Re-walking already-lit pips would restart their animations.
   if (tier < 5) {
     // First tier: marks 1-4. Clear the second-row marks.
     for (std::size_t i = 4; i < 9; i++)
       resetDmgMark(i);
   }
-  for (std::size_t i = previous; i < tier; i++)
-    updateDmgMark(i);
   if (tier >= 5) {
     // The 500 mark replaces marks 1-4. Their stars keep flying (the queue
     // stays continuous), but their side marks are interrupted here.
     for (std::size_t i = 0; i < 4; i++)
       resetSideMark(i, true);
   }
+
+  if (tier >= 10) {
+    // One pop per accumulation, fired by the frame pump after the last queued
+    // star has landed; later damage pushes it to the new end of the queue.
+    PopPending = true;
+    PopAt = std::max(PopAt, lastLanding);
+  }
+}
+
+void fireScorePop() {
+  const std::uint64_t step = damageStep();
+  const std::size_t tier =
+      step == 0 ? 0 : static_cast<std::size_t>(Damage / step);
+  // The image follows the damage reached: 1000 damage at the default max
+  // (tier 10) shows NanoDamege1, 5000 (tier 50) shows NanoDamege5.
+  const std::size_t tierImage =
+      std::min<std::size_t>(9, std::max<std::size_t>(1, tier / 10) - 1);
+
+  // Old combo window: reset only when the next score arrives after the
+  // timeout - the score image itself is transient either way.
+  if (Score != 0 && ClientTimeNow - LastScoreTime > cvarFloat(KillTime, 8.0f))
+    Score = 0;
+
+  // The combo counter still raises the image, so consecutive pops climb the
+  // ladder even when the damage alone would show a smaller number.
+  const std::size_t image =
+      std::min<std::size_t>(9, std::max(tierImage, Score));
+
+  playScoreSound();
+  updateScoreEffect(image);
+  LastScoreTime = ClientTimeNow;
+  if (Score < 9)
+    Score++;
+
+  PopPending = false;
+  PopAt = 0.0;
+  Damage = 0;
+  LastTier = 0;
+  resetAllMarks();
 }
 
 void onDamage(int value) {
@@ -380,6 +417,8 @@ void reset() {
   Score = 0;
   LastScoreTime = 0.0;
   ScoreStart = -1.0;
+  PopPending = false;
+  PopAt = 0.0;
 
   resetAllMarks();
   resetScoreEffect();
@@ -607,6 +646,11 @@ void onData(void *, double frameTime) {
   animateScore(ClientTimeNow);
   for (std::size_t i = 0; i < 9; i++)
     animatePip(Pips[i], i, ClientTimeNow);
+
+  // The pop waits for the last queued star to land, so a big hit plays its
+  // whole queue first and then shows one score image.
+  if (PopPending && ClientTimeNow >= PopAt)
+    fireScorePop();
 }
 
 void onReset(void *) { reset(); }
@@ -659,13 +703,15 @@ void debugDump(const char *label) {
   const float volume = cvarFloat(Volume, 0.25f);
   Api->core->print(
       "[AbcUi] cfefx: %s enabled=%d active=%d damaged=%llu step=%llu "
-      "tier=%d score=%d lastScore=%.2fs scoreAge=%.2fs volume=%.2f\n",
+      "tier=%d score=%d lastScore=%.2fs scoreAge=%.2fs popIn=%.2fs "
+      "volume=%.2f\n",
       label, cvarFloat(Enabled, 1.0f) > 0.0f ? 1 : 0, hudActive() ? 1 : 0,
       static_cast<unsigned long long>(Damage),
       static_cast<unsigned long long>(damageStep()),
       static_cast<int>(LastTier), static_cast<int>(Score),
       ClientTimeNow - LastScoreTime,
-      ScoreStart < 0.0 ? -1.0 : ClientTimeNow - ScoreStart, volume);
+      ScoreStart < 0.0 ? -1.0 : ClientTimeNow - ScoreStart,
+      PopPending ? std::max(0.0, PopAt - ClientTimeNow) : -1.0, volume);
   if (!hudActive())
     Api->core->warn("[AbcUi] cfefx: inactive (no live player, health 0 or HUD "
                     "hidden) - the injection ran but nothing draws\n");
@@ -687,6 +733,7 @@ void debugTier(void *) {
 }
 
 void debugScore(void *) {
+  // Ten tenths: ten stars play in the queue, then one pop with NanoDamege1.
   onDamage(static_cast<int>(damageStep() * 10));
   debugDump("score");
 }
@@ -694,6 +741,8 @@ void debugScore(void *) {
 void debugDamage(void *) {
   // The old "hit <value>" argument, driven by a cvar: one injection the size
   // of a single live netmsg.popnum package (default 8000, the large-hit case).
+  // The whole star queue plays and the pop image follows the damage reached
+  // (8000 at hud_cfefx_max 1000 shows NanoDamege8).
   const float requested = cvarFloat(DebugAmount, kDebugAmountDefault);
   const int amount =
       requested <= 0.0f ? 0 : static_cast<int>(std::min(requested, 1.0e6f));
