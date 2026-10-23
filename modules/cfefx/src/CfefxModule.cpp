@@ -116,8 +116,11 @@ struct Pip {
 AbcUiPanelDesc PanelDesc = {};
 
 double ClientTimeNow = 0.0;
-// Earliest time the next queued star may launch; keeps the 0.025 s cadence
-// across separate damage events and reset/rebase cycles.
+// Stars waiting for a launch slot; the frame pump launches them one at a time,
+// on the earliest free pip, 0.025 s apart. A big hit only raises this counter,
+// so every tenth of its damage gets its own visible star instead of the later
+// schedule overwriting an earlier one.
+std::size_t PendingStars = 0;
 double NextStarStart = 0.0;
 std::uint64_t Damage = 0;
 std::size_t LastTier = 0;
@@ -252,18 +255,6 @@ void resetScoreEffect() {
     Api->ui->elementSetAttribute(ScoreMark, "src", kScoreImages[0]);
 }
 
-// Keep the queue cursor behind the last scheduled star after a reset removed
-// one of its entries, so the remaining actions keep their 0.025 s cadence.
-void rebaseStarQueue() {
-  double latest = -1.0;
-  for (const Pip &pip : Pips) {
-    if (pip.starStart >= 0.0)
-      latest = std::max(latest, pip.starStart);
-  }
-  NextStarStart = latest < 0.0 ? ClientTimeNow
-                               : std::max(ClientTimeNow, latest + kStarStagger);
-}
-
 void resetDmgMark(std::size_t index) {
   if (index >= 9)
     return;
@@ -278,7 +269,6 @@ void resetDmgMark(std::size_t index) {
     setBox(pip.star, width * 0.5f - half, height * 0.5f - half,
            kStarSize * scale, kStarSize * scale);
   }
-  rebaseStarQueue();
 }
 
 void resetAllMarks() {
@@ -292,23 +282,37 @@ void hideSideMark(std::size_t index) {
   setOpacity(Pips[index].mark, 0.0f);
 }
 
-// Queues one star on a pip slot. A new action re-arms its own side mark and
-// joins the tail of the star queue. A slot only accepts a launch after its
-// previous star landed, so recycling the nine sprites for a big hit never cuts
-// an animation mid-flight.
-void queueStar(std::size_t index) {
-  if (index >= 9)
-    return;
-  Pip &pip = Pips[index];
-  if (!pip.mark || !pip.star)
-    return;
+// The first pip whose previous star has landed (or which never flew), so the
+// nine sprites are recycled without cutting an animation mid-flight.
+std::size_t freePipSlot() {
+  for (std::size_t i = 0; i < 9; i++) {
+    const Pip &pip = Pips[i];
+    if (!pip.mark || !pip.star)
+      continue;
+    if (pip.starStart < 0.0 || ClientTimeNow >= pip.starStart + kStarDuration)
+      return i;
+  }
+  return 9;
+}
 
+void launchStar(std::size_t index) {
+  Pip &pip = Pips[index];
   hideSideMark(index);
-  double start = std::max(ClientTimeNow, NextStarStart);
-  if (pip.starStart >= 0.0)
-    start = std::max(start, pip.starStart + kStarDuration);
-  pip.starStart = start;
-  NextStarStart = start + kStarStagger;
+  pip.starStart = ClientTimeNow;
+  NextStarStart = ClientTimeNow + kStarStagger;
+}
+
+// Launches at most one pending star per frame: the 0.025 s cadence plus the
+// nine-sprite pool (each star lives 0.3 s) paces a long queue at roughly thirty
+// stars a second, so a big hit visibly plays every one of them in order.
+void pumpStarQueue() {
+  if (PendingStars == 0 || ClientTimeNow < NextStarStart)
+    return;
+  const std::size_t slot = freePipSlot();
+  if (slot >= 9)
+    return;
+  launchStar(slot);
+  PendingStars--;
 }
 
 void evaluate() {
@@ -331,12 +335,11 @@ void evaluate() {
   const std::size_t previous = LastTier;
   LastTier = tier;
 
-  // Every tenth plays its own star: a single big hit queues the whole count
-  // (5000 damage at the default max launches fifty stars, ten per full
-  // accumulator) and the nine sprites are recycled in launch order. The side
-  // marks are allowed to be interrupted; the star queue keeps flowing.
-  for (std::size_t tenth = previous; tenth < tier; tenth++)
-    queueStar(tenth % 9);
+  // Every tenth plays its own star: a single big hit piles the whole count into
+  // the pending queue (5000 damage at the default max plays fifty stars, ten
+  // per full accumulator) and the frame pump launches them in order.
+  PendingStars += tier - previous;
+  pumpStarQueue();
 
   // The pop does not wait for the star queue: a full accumulator shows it
   // immediately, and its image follows the damage reached.
@@ -392,6 +395,8 @@ void reset() {
   Score = 0;
   LastScoreTime = 0.0;
   ScoreStart = -1.0;
+  PendingStars = 0;
+  NextStarStart = ClientTimeNow;
 
   resetAllMarks();
   resetScoreEffect();
@@ -615,6 +620,7 @@ void onData(void *, double frameTime) {
   HudActive = true;
   showPanel();
 
+  pumpStarQueue();
   animateScore(ClientTimeNow);
   for (std::size_t i = 0; i < 9; i++)
     animatePip(Pips[i], i, ClientTimeNow);
@@ -669,14 +675,22 @@ AbcUiCvarHandle DebugAmount = nullptr;
 void debugDump(const char *label) {
   const float volume = cvarFloat(Volume, 0.25f);
   const float amount = cvarFloat(DebugAmount, kDebugAmountDefault);
+  std::size_t flying = 0;
+  for (const Pip &pip : Pips) {
+    if (pip.starStart >= 0.0 &&
+        ClientTimeNow < pip.starStart + kStarDuration)
+      flying++;
+  }
   Api->core->print(
       "[AbcUi] cfefx: %s enabled=%d active=%d damaged=%llu step=%llu "
-      "tier=%d score=%d lastScore=%.2fs scoreAge=%.2fs amount=%.0f "
-      "volume=%.2f\n",
+      "tier=%d score=%d pending=%llu flying=%llu lastScore=%.2fs "
+      "scoreAge=%.2fs amount=%.0f volume=%.2f\n",
       label, cvarFloat(Enabled, 1.0f) > 0.0f ? 1 : 0, hudActive() ? 1 : 0,
       static_cast<unsigned long long>(Damage),
       static_cast<unsigned long long>(damageStep()),
       static_cast<int>(LastTier), static_cast<int>(Score),
+      static_cast<unsigned long long>(PendingStars),
+      static_cast<unsigned long long>(flying),
       ClientTimeNow - LastScoreTime,
       ScoreStart < 0.0 ? -1.0 : ClientTimeNow - ScoreStart, amount, volume);
   if (!hudActive())
@@ -807,6 +821,7 @@ void onModuleShutdown() {
   Score = 0;
   LastScoreTime = 0.0;
   ScoreStart = -1.0;
+  PendingStars = 0;
   NextStarStart = 0.0;
 }
 
