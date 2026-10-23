@@ -16,10 +16,12 @@
 // row i, so the star and the mark it lights are the same row. A sprite only
 // takes a new launch once its previous star has landed, so no animation is cut.
 // The tenth tenth of the accumulator is the score pop itself: it plays no star
-// and lights no mark, and it clears the column. The side marks trail that
-// queue: a mark appears only when its own star animation has finished, and the
-// score pop clears the column as well, so the readout always follows what the
-// stars have actually shown and never survives the cycle that the pop ended.
+// and lights no mark, and it clears the column. The stars the pop catches in the
+// queue (and the ones already in the air) still fly, but they belong to the
+// closed cycle and light nothing. The side marks trail that queue: a mark
+// appears only when its own star animation has finished, and the score pop
+// clears the column as well, so the readout always follows what the stars have
+// actually shown and never survives the cycle that the pop ended.
 // The score pop does not wait for the queue: as soon as the accumulator reaches
 // a full hud_cfefx_max (1000 damage by default) it shows immediately, and its
 // image follows the damage reached (1000 shows NanoDamege1, 5000 shows
@@ -126,10 +128,11 @@ AbcUiPanelDesc PanelDesc = {};
 
 double ClientTimeNow = 0.0;
 // Stars waiting for a launch slot; the frame pump launches them one at a time,
-// 0.025 s apart, on a pip that has finished its previous star. A big hit only
-// raises this counter, so every tenth of its damage gets its own visible star
-// instead of the later schedule overwriting an earlier one.
-std::size_t PendingStars = 0;
+// 0.025 s apart, on a pip that has finished its previous star. Stars that were
+// queued when a pop closed the cycle keep their flight but light no mark, so
+// they are counted apart and always sit in front of the counted ones.
+std::size_t PendingSilent = 0;
+std::size_t PendingCounted = 0;
 double NextStarStart = 0.0;
 // Position of the next star, 0..8: position i always flies on sprite i and
 // lands on row i, so the mark it lights is exactly the one under its landing
@@ -182,6 +185,8 @@ std::uint64_t damageStep() {
 std::size_t starsForTier(std::size_t tier) {
   return (tier / 10) * 9 + std::min<std::size_t>(tier % 10, 9);
 }
+
+std::size_t pendingStars() { return PendingSilent + PendingCounted; }
 
 bool hudActive() {
   if (!panelDocument())
@@ -327,20 +332,30 @@ void refreshMarks(std::size_t visible) {
 // cycle position: position i must fly on sprite i so it lands on row i and the
 // mark it lights is the one under it. The previous star on that sprite has to
 // land first, which paces the queue at nine sprites per 0.3 s (about thirty
-// stars a second) with no interrupted animation.
+// stars a second) with no interrupted animation. A silent star (queued for a
+// cycle the pop already closed) flies but lights nothing; the last one hands
+// the next star position one, so a fresh cycle always starts at mark 1.
 void pumpStarQueue() {
-  if (PendingStars == 0 || ClientTimeNow < NextStarStart)
+  if (pendingStars() == 0 || ClientTimeNow < NextStarStart)
     return;
 
   Pip &pip = Pips[NextUnit];
   if (pip.starStart >= 0.0 && ClientTimeNow < pip.starStart + kStarDuration)
     return;
 
+  const bool silent = PendingSilent > 0;
   pip.starStart = ClientTimeNow;
-  pip.countsMarks = true;
-  NextUnit = (NextUnit + 1) % 9;
+  pip.countsMarks = !silent;
+  if (silent)
+    PendingSilent--;
+  else
+    PendingCounted--;
+
+  if (silent && PendingSilent == 0)
+    NextUnit = 0;
+  else
+    NextUnit = (NextUnit + 1) % 9;
   NextStarStart = ClientTimeNow + kStarStagger;
-  PendingStars--;
 }
 
 void evaluate() {
@@ -367,7 +382,7 @@ void evaluate() {
   // a star. A big hit still plays its whole queue (8000 damage at the default
   // max plays seventy-two stars, nine per 900) and the pump launches them in
   // order. The side marks do not move here: they follow the stars as they land.
-  PendingStars += starsForTier(tier) - starsForTier(previous);
+  PendingCounted += starsForTier(tier) - starsForTier(previous);
 
   // The pop does not wait for the star queue: a full accumulator shows it
   // immediately, and its image follows the damage reached. It runs before the
@@ -404,16 +419,17 @@ void fireScorePop() {
   if (Score < 9)
     Score++;
 
-  // Only the accumulator restarts; the stars already queued for this damage
-  // keep playing, so nothing is cancelled by the pop. The pop does close the
-  // mark column and the cycle: the next star to fly is position one again, and
-  // the stars still in the air (they belong to the cycle the pop just ended)
-  // finish their flight without lighting a mark, so the fresh column cannot
-  // pick up a position from the old one.
+  // The accumulator restarts and the cycle closes: the column is cleared, the
+  // stars still queued for this damage become silent (they keep flying but light
+  // nothing, which is exactly the tenth tenth that has no star and no mark), and
+  // the stars already in the air do the same. The next star that opens a fresh
+  // cycle starts again at position one.
   Damage = 0;
   LastTier = 0;
   LandedMarks = 0;
   NextUnit = 0;
+  PendingSilent += PendingCounted;
+  PendingCounted = 0;
   for (Pip &pip : Pips)
     pip.countsMarks = false;
   refreshMarks(0);
@@ -436,7 +452,8 @@ void reset() {
   Score = 0;
   LastScoreTime = 0.0;
   ScoreStart = -1.0;
-  PendingStars = 0;
+  PendingSilent = 0;
+  PendingCounted = 0;
   NextStarStart = ClientTimeNow;
   NextUnit = 0;
   LandedMarks = 0;
@@ -737,7 +754,8 @@ void debugDump(const char *label) {
   Api->core->print(
       "[AbcUi] cfefx: %s enabled=%d active=%d damaged=%llu step=%llu "
       "tier=%d landed=%llu next=%llu marks=%llu score=%d pending=%llu "
-      "flying=%llu lastScore=%.2fs scoreAge=%.2fs amount=%.0f volume=%.2f\n",
+      "silent=%llu flying=%llu lastScore=%.2fs scoreAge=%.2fs amount=%.0f "
+      "volume=%.2f\n",
       label, cvarFloat(Enabled, 1.0f) > 0.0f ? 1 : 0, hudActive() ? 1 : 0,
       static_cast<unsigned long long>(Damage),
       static_cast<unsigned long long>(damageStep()),
@@ -746,7 +764,8 @@ void debugDump(const char *label) {
       static_cast<unsigned long long>(NextUnit),
       static_cast<unsigned long long>(marks),
       static_cast<int>(Score),
-      static_cast<unsigned long long>(PendingStars),
+      static_cast<unsigned long long>(pendingStars()),
+      static_cast<unsigned long long>(PendingSilent),
       static_cast<unsigned long long>(flying),
       ClientTimeNow - LastScoreTime,
       ScoreStart < 0.0 ? -1.0 : ClientTimeNow - ScoreStart, amount, volume);
@@ -879,7 +898,8 @@ void onModuleShutdown() {
   Score = 0;
   LastScoreTime = 0.0;
   ScoreStart = -1.0;
-  PendingStars = 0;
+  PendingSilent = 0;
+  PendingCounted = 0;
   NextStarStart = 0.0;
   NextUnit = 0;
   LandedMarks = 0;
