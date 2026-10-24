@@ -46,12 +46,8 @@
 //   loaded matrix) into reused scratch buffers. Reset by RmlUi's
 //   RenderManager identity reset whenever the next element is untransformed,
 //   so nothing lingers across the frame.
-// - Extra texture URIs handled here:
-//     tex://<mod-relative path>    -> file loaded straight-alpha. The scheme
-//     keeps Rml from joining the document directory, so markup composed in
-//     code resolves from any document (framework::glyphs outline layer).
-//     texadd://<mod-relative path> -> file loaded additive (old
-//     kRenderTransAdd TGA panels: the pain indicator; the additive glyph ink).
+// - Module images use mod:// or additive modadd://; uploaded module textures
+//   use moduletex://. Engine content uses explicit engine:// / sprite URIs.
 
 #include <RmlUi/Core/RenderInterface.h>
 #include <RmlUi/Core/Types.h>
@@ -59,6 +55,7 @@
 #include "TextureBlend.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -99,12 +96,12 @@ public:
   // textures that later reuse them).
   void clearAdditiveTextures();
 
-  // Externally-owned live texture (batch D - the radar FBO). Requests whose
-  // source starts with `uriPrefix` resolve to `texture` (never deleted by
-  // ReleaseTexture; the owner frees it), carry the given pixel dimensions,
-  // and draw through *maskSlot as a mask texture whenever it is non-zero
-  // (radar shape select) - the old CRadarMapImage::Paint semantics. The
-  // query suffix on the URI is a cache-bust only (the FBO texture id
+  // Externally-owned live texture (radar FBO, module uploads and media).
+  // Requests whose source starts with `uriPrefix` resolve to `texture` (never
+  // deleted by ReleaseTexture; the owner frees it), carry the given pixel
+  // dimensions, and draw through *maskSlot as a mask texture whenever it is
+  // non-zero (radar shape select) - the old CRadarMapImage::Paint semantics.
+  // The query suffix on the URI is a cache-bust only (the FBO texture id
   // changes when the engine regenerates frame buffers; the owner bumps the
   // suffix and re-registers). `blend` selects the draw program: the animated
   // image element registers its frames additive (old kRenderTransAdd
@@ -145,8 +142,7 @@ private:
 
   // Applies the active Rml transform (if any) to a screen-space point.
   Rml::Vector2f applyTransform(const Rml::Vector2f &point) const;
-  // File decode behind both the plain-path and texadd:// calls goes
-  // through framework::ImageLoader (FreeImage); this wrapper uploads the
+  // Explicit engine:// image decoding goes through FreeImage; upload uses
   // result to the VGUI2 surface texture channel.
   Rml::TextureHandle loadFileTexture(Rml::Vector2i &dimensions,
                                      const Rml::String &source);
@@ -177,6 +173,11 @@ private:
     Rml::String ExternalPrefix;
   };
   std::unordered_map<Rml::TextureHandle, TextureRecord> Textures;
+  // Baked geometry is owned through the handle RmlUi returns; releasing the
+  // handle erases (and destroys) the record.
+  std::unordered_map<Rml::CompiledGeometryHandle,
+                     std::unique_ptr<CompiledGeometry>>
+      Geometries;
   Rml::TextureHandle NextTexture = 1;
   Rml::TextureHandle retainTexture(int id, bool owned,
                                    Rml::String external = {});

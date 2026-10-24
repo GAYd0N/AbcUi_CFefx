@@ -112,7 +112,12 @@ jobs:
           if ($packed.Count -lt 1) {
             throw "no module packages were produced (tools/pack.py did not run)"
           }
-          $expected = @(Get-ChildItem modules/*/manifest.json).Count
+          # tools/pack.py skips its EXAMPLE_MODULES (demo): the demo package
+          # is a development smoke target and never ships in dist. Count the
+          # shipped set so the gate cannot demand a package pack.py refuses.
+          $examples = @('demo')
+          $expected = @(Get-ChildItem modules/*/manifest.json |
+            Where-Object { $examples -notcontains $_.Directory.Name }).Count
           if ($packed.Count -ne $expected) {
             throw "packed $($packed.Count) module(s), expected $expected"
           }

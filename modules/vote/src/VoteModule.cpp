@@ -115,8 +115,9 @@ int answerKey(int down, int keynum) {
 // Old StartVote: server text in the content panel, the answer rows carry the
 // bound key name plus the server caption (typed/default votes fall back to
 // the localized default caption).
-void startVote(int type, const char *content, const char *yes, const char *no) {
-  (void)type; // the caption is server text; the enum carries no layout
+// The caption is server text; the vote type carries no layout.
+void startVote([[maybe_unused]] int type, const char *content, const char *yes,
+               const char *no) {
   const std::string escapedContent = escapeText(content);
   setInnerRml("content", escapedContent.c_str());
 
@@ -138,9 +139,12 @@ void startVote(int type, const char *content, const char *yes, const char *no) {
 
 // ---- event sinks ----
 
-void onVoteMenu(void *, const void *payload) {
+int onVoteMenu(void *, const void *payload) {
+  if (!panelDocument())
+    return 0;
   const auto *event = static_cast<const AbcUiVoteMenuEvent *>(payload);
   startVote(event->type, event->content, event->yes, event->no);
+  return 1;
 }
 
 void onEndVote(void *, const void *) {
@@ -155,7 +159,7 @@ int onKeyEvent(void *, const void *payload) {
 // ---- panel callbacks ----
 
 void panelDocumentReady(void *) {
-  // Old ctor label: the static "#Vote_DefaultMessage" title strip.
+  // Old ctor label: the static "#abcui.vote/Vote_DefaultMessage" title strip.
   const std::string title =
       escapeText(defaultCaption("Vote_DefaultMessage", "").c_str());
   setInnerRml("title", title.c_str());
@@ -188,8 +192,8 @@ void onModuleLoad() {
   Panel.reset = &panelReset;
   Api->panels->registerPanel(&Panel);
 
-  Api->events->subscribe(ABCUI_CHANNEL_NETMSG_VOTE_MENU, 0, &onVoteMenu,
-                         nullptr);
+  Api->events->subscribeVeto(ABCUI_CHANNEL_NETMSG_VOTE_MENU, 0, &onVoteMenu,
+                             nullptr);
   Api->events->subscribe(ABCUI_CHANNEL_NETMSG_END_VOTE, 0, &onEndVote, nullptr);
   Api->events->subscribeVeto(ABCUI_CHANNEL_INPUT_KEY, 0, &onKeyEvent, nullptr);
 }
@@ -215,10 +219,11 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->console)
@@ -232,7 +237,7 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.vote";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = &onModuleInit;
   out->onContextReady = nullptr;

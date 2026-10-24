@@ -44,6 +44,8 @@ public:
   // (engine command callbacks / input router free functions). Null before
   // install or after shutdown.
   static HudPanel *find(const char *name);
+  // Startup rollback only, before the context/frame pumps start.
+  static void remove(const char *name);
 
 private:
   static bool SessionActive;

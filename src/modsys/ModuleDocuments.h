@@ -44,6 +44,10 @@ int32_t degraded(AbcUiDocument *doc);
 void show(AbcUiDocument *doc);
 void hide(AbcUiDocument *doc);
 int32_t retry(AbcUiDocument *doc);
+AbcUiRecoveryRegistration registerRecovery(const AbcUiRecoveryDesc *desc);
+void unregisterRecovery(AbcUiRecoveryRegistration registration);
+void removeRecovery(AbcUiRecoveryRegistration registration);
+int32_t requestRetry(AbcUiDocument *doc);
 
 // Rml context cycle: load every registered page (and any page registered
 // later loads on creation). shutdown() closes them while the context is

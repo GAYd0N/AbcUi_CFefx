@@ -82,12 +82,9 @@ bool ServerBlacklist::remove(const std::string &Address) {
   if (!parseAddress(Address, Rule))
     return false;
   auto Next = Rules;
-  Next.erase(std::remove_if(Next.begin(), Next.end(),
-                            [&](const auto &Existing) {
-                              return Existing.Ip == Rule.Ip &&
-                                     Existing.Port == Rule.Port;
-                            }),
-             Next.end());
-  return Next.size() == Rules.size() || commit(std::move(Next));
+  const auto removed = std::erase_if(Next, [&](const auto &Existing) {
+    return Existing.Ip == Rule.Ip && Existing.Port == Rule.Port;
+  });
+  return removed == 0 || commit(std::move(Next));
 }
 } // namespace services::serverbrowser

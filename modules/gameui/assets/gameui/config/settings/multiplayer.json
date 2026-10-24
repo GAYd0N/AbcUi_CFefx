@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "id": "multiplayer",
+  "label": "#abcui.gameui/Settings_SecMultiplayer",
+  "order": 10,
+  "components": [],
+  "sections": [
+    {
+      "id": "player",
+      "label": "#abcui.gameui/Settings_SecPlayer",
+      "components": [
+        "model-preview",
+        "model-picker"
+      ]
+    },
+    {
+      "id": "spray",
+      "label": "#abcui.gameui/Settings_SecSpray",
+      "components": [
+        "spray-preview",
+        "spray-maker"
+      ]
+    }
+  ],
+  "items": [
+    {
+      "cvar": "name",
+      "label": "#abcui.gameui/Settings_PlayerName",
+      "section": "player",
+      "kind": "text",
+      "default": "New Player"
+    },
+    {
+      "cvar": "model",
+      "label": "#abcui.gameui/Settings_PlayerModel",
+      "section": "player",
+      "kind": "string-enum",
+      "default": "",
+      "source": "models/player"
+    },
+    {
+      "cvar": "topcolor",
+      "label": "#abcui.gameui/Settings_PrimaryColor",
+      "section": "player",
+      "kind": "float",
+      "min": 0.0,
+      "max": 255.0,
+      "step": 1.0,
+      "hue": true,
+      "default": 0.0
+    },
+    {
+      "cvar": "bottomcolor",
+      "label": "#abcui.gameui/Settings_SecondaryColor",
+      "section": "player",
+      "kind": "float",
+      "min": 0.0,
+      "max": 255.0,
+      "step": 1.0,
+      "hue": true,
+      "default": 0.0
+    },
+    {
+      "cvar": "cl_logofile",
+      "label": "#abcui.gameui/Settings_Spraypaint",
+      "section": "spray",
+      "kind": "string-enum",
+      "default": "lambda",
+      "source": "logos"
+    },
+    {
+      "cvar": "cl_logocolor",
+      "label": "#abcui.gameui/Settings_SpraypaintColor",
+      "section": "spray",
+      "kind": "string-enum",
+      "default": "Ltblue",
+      "source": "logocolor"
+    }
+  ]
+}

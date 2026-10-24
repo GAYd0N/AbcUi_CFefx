@@ -1,0 +1,2 @@
+abcui.chat/Chat_Say = Decir:
+abcui.chat/Chat_Team = Equipo:

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "id": "voice",
+  "label": "#abcui.gameui/Settings_SecVoice",
+  "order": 50,
+  "components": [],
+  "sections": [
+    {
+      "id": "microphone",
+      "label": "#abcui.gameui/Settings_SecVoice",
+      "components": [
+        "voice"
+      ]
+    }
+  ],
+  "items": [
+    {
+      "cvar": "voice_scale",
+      "label": "#abcui.gameui/Settings_VoiceReceive",
+      "section": "microphone",
+      "kind": "float",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 1.0
+    },
+    {
+      "cvar": "voice_modenable",
+      "label": "#abcui.gameui/Settings_VoiceEnable",
+      "section": "microphone",
+      "kind": "bool",
+      "default": 1.0
+    }
+  ]
+}

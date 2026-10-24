@@ -1,0 +1,7 @@
+abcui.spectator/Spec_Mode1 = 锁定追踪镜头模式
+abcui.spectator/Spec_Mode2 = 自由追踪镜头模式
+abcui.spectator/Spec_Mode3 = 自由漫游模式
+abcui.spectator/Spec_Mode4 = 观察者模式
+abcui.spectator/Spec_Health = 生命
+abcui.spectator/Spec_Armor = 护甲
+abcui.spectator/Spec_Dead = 死亡

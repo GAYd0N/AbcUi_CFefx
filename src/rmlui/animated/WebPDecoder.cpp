@@ -13,11 +13,13 @@ namespace rmlui::animated::detail {
 namespace {
 
 // RIFF....WEBP (the bytes every animated or still WebP starts with).
-bool probeWebP(const unsigned char *data, std::size_t size) {
-  if (!data || size < 12)
+bool probeWebP(std::span<const std::byte> data) {
+  if (data.size() < 12)
     return false;
-  return data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' &&
-         data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P';
+  return data[0] == std::byte{'R'} && data[1] == std::byte{'I'} &&
+         data[2] == std::byte{'F'} && data[3] == std::byte{'F'} &&
+         data[8] == std::byte{'W'} && data[9] == std::byte{'E'} &&
+         data[10] == std::byte{'B'} && data[11] == std::byte{'P'};
 }
 
 class WebPAnimation final : public AnimatedImage {
@@ -27,13 +29,14 @@ public:
       WebPAnimDecoderDelete(Decoder);
   }
 
-  bool open(std::vector<unsigned char> bytes, std::string source,
+  bool open(std::vector<std::byte> bytes, std::string source,
             std::string &error) {
     Bytes = std::move(bytes);
     SourceName = std::move(source);
     FormatName = "webp";
     // The decoder borrows this buffer for its whole lifetime.
-    const WebPData data = {Bytes.data(), Bytes.size()};
+    const WebPData data = {reinterpret_cast<const uint8_t *>(Bytes.data()),
+                           Bytes.size()};
 
     // Metadata pass: durations come from the container, no pixels decode.
     WebPDemuxer *demux = WebPDemux(&data);
@@ -114,9 +117,8 @@ private:
   int NextIndex = 0;
 };
 
-std::unique_ptr<AnimatedImage> openWebP(std::vector<unsigned char> bytes,
-                                        std::string source,
-                                        std::string &error) {
+std::unique_ptr<AnimatedImage>
+openWebP(std::vector<std::byte> bytes, std::string source, std::string &error) {
   auto animation = std::make_unique<WebPAnimation>();
   if (!animation->open(std::move(bytes), std::move(source), error))
     return nullptr;

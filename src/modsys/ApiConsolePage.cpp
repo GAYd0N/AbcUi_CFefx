@@ -2,6 +2,7 @@
 // console's data and services). See ApiTable.h for how it joins the module
 // table.
 #include "ApiTable.h"
+#include "ApiSnapshot.h"
 
 #include <algorithm>
 #include <cstring>
@@ -16,6 +17,9 @@
 namespace framework {
 namespace ConsolePageApi {
 namespace {
+
+static_assert(sizeof(AbcUiConsoleLine) == 1036);
+static_assert(sizeof(AbcUiConsoleSuggestion) == 132);
 
 // The ESC layering claim (see noteEscapeClaim): the console page consumed
 // an ESC press on one of its own layers; the menu owner's routed ESC
@@ -54,24 +58,28 @@ int32_t apiLineCount(void) {
   return static_cast<int32_t>(buffer().lineCount());
 }
 
-int32_t apiCopySince(uint64_t since, AbcUiConsoleLine *out, uint32_t max) {
+void fillLine(const services::console::ConsoleLine &line, void *out) {
+  AbcUiConsoleLine full{};
+  full.structSize = sizeof(full);
+  full.developer = line.Developer ? 1 : 0;
+  full.truncated = line.Truncated ? 1 : 0;
+  copyText(line.Text, full.text, sizeof(full.text));
+  abi::copySnapshot(out, full);
+}
+
+int32_t apiCopySince(uint64_t since, void *out, uint32_t max, uint32_t stride) {
   if (!out || max == 0)
     return 0;
+  if (!abi::validArrayLayout(max, stride))
+    return -1;
   std::vector<services::console::ConsoleLine> lines;
   buffer().copySince(since, lines, max);
   const uint32_t count =
       std::min<uint32_t>(max, static_cast<uint32_t>(lines.size()));
-  for (uint32_t i = 0; i < count; ++i) {
-    AbcUiConsoleLine full{};
-    full.structSize = sizeof(AbcUiConsoleLine);
-    full.developer = lines[i].Developer ? 1 : 0;
-    full.truncated = lines[i].Truncated ? 1 : 0;
-    copyText(lines[i].Text, full.text, sizeof(full.text));
-    const uint32_t declared = out[i].structSize == 0
-                                  ? static_cast<uint32_t>(sizeof(full))
-                                  : out[i].structSize;
-    std::memcpy(&out[i], &full, std::min<size_t>(declared, sizeof(full)));
-  }
+  if (!abi::validSnapshotArray(out, count, stride))
+    return -1;
+  for (uint32_t i = 0; i < count; ++i)
+    fillLine(lines[i], abi::arrayElement(out, i, stride));
   return static_cast<int32_t>(count);
 }
 
@@ -130,23 +138,27 @@ int32_t apiHistoryAt(int32_t index, char *out, uint32_t outSize) {
   return 1;
 }
 
-int32_t apiComplete(const char *prefix, AbcUiConsoleSuggestion *out,
-                    uint32_t max) {
+void fillSuggestion(const std::string &name, void *out) {
+  AbcUiConsoleSuggestion full{};
+  full.structSize = sizeof(full);
+  copyText(name, full.name, sizeof(full.name));
+  abi::copySnapshot(out, full);
+}
+
+int32_t apiComplete(const char *prefix, void *out, uint32_t max,
+                    uint32_t stride) {
   if (!prefix || !*prefix)
     return 0;
-  std::vector<std::string> matches = backend().complete(prefix, max);
-  const uint32_t count =
-      out && max > 0
-          ? std::min<uint32_t>(max, static_cast<uint32_t>(matches.size()))
-          : 0;
-  for (uint32_t i = 0; i < count; ++i) {
-    AbcUiConsoleSuggestion full{};
-    full.structSize = sizeof(AbcUiConsoleSuggestion);
-    copyText(matches[i], full.name, sizeof(full.name));
-    const uint32_t declared = out[i].structSize == 0
-                                  ? static_cast<uint32_t>(sizeof(full))
-                                  : out[i].structSize;
-    std::memcpy(&out[i], &full, std::min<size_t>(declared, sizeof(full)));
+  if (out && max != 0 && !abi::validArrayLayout(max, stride))
+    return -1;
+  const auto matches = backend().complete(prefix, max);
+  if (out && max != 0) {
+    const uint32_t count =
+        std::min<uint32_t>(max, static_cast<uint32_t>(matches.size()));
+    if (!abi::validSnapshotArray(out, count, stride))
+      return -1;
+    for (uint32_t i = 0; i < count; ++i)
+      fillSuggestion(matches[i], abi::arrayElement(out, i, stride));
   }
   return static_cast<int32_t>(matches.size());
 }

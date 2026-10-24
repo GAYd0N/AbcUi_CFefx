@@ -1,16 +1,21 @@
 // framework::WeaponsApi - the sdk weapons section (registry snapshots and the
 // selection action). See ApiTable.h for how it joins the module table.
 #include "ApiTable.h"
+#include "ApiSnapshot.h"
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 
 #include "../data/WeaponResource.h"
+#include "rmlui/texture/SpriteResource.h"
 #include "../framework/ResourceLimits.h"
 
 namespace framework {
 namespace WeaponsApi {
 namespace {
+
+// These records are embedded or returned by the legacy typed-array API.
 
 // Copies a string into a fixed field, always terminating.
 void copyField(const std::string &text, char *out, size_t outSize) {
@@ -24,9 +29,10 @@ void copyField(const std::string &text, char *out, size_t outSize) {
 
 void copySprite(const weaponres::Weapon::SpriteSource &source,
                 AbcUiWeaponSprite &out) {
-  out.valid = source.valid ? 1 : 0;
+  out.status = source.valid ? sprites::resourceStatus(source.atlas, source.rect)
+                            : ABCUI_ERROR_NOT_FOUND;
   out.atlas[0] = '\0';
-  if (source.valid)
+  if (out.status == ABCUI_OK)
     copyField(source.atlas, out.atlas, sizeof(out.atlas));
   out.rect[0] = source.rect.left;
   out.rect[1] = source.rect.top;
@@ -34,17 +40,7 @@ void copySprite(const weaponres::Weapon::SpriteSource &source,
   out.rect[3] = source.rect.bottom;
 }
 
-// Copies `full` into the caller's buffer honoring the size it declared
-// (ABI rule: a caller may be built against an older, shorter header; 0 means
-// "the framework's current size").
-void copyOut(const AbcUiWeaponInfo &full, AbcUiWeaponInfo &out) {
-  const size_t declared = out.structSize;
-  const size_t bytes =
-      declared == 0 || declared > sizeof(full) ? sizeof(full) : declared;
-  std::memcpy(&out, &full, bytes);
-}
-
-void fill(const weaponres::Weapon &weapon, AbcUiWeaponInfo &out) {
+void fill(const weaponres::Weapon &weapon, void *out) {
   AbcUiWeaponInfo full{};
   full.structSize = sizeof(AbcUiWeaponInfo);
   full.slot = weapon.slot;
@@ -68,20 +64,21 @@ void fill(const weaponres::Weapon &weapon, AbcUiWeaponInfo &out) {
   copySprite(weapon.autoaim, full.autoaim);
   copySprite(weapon.zoomedCrosshair, full.zoomedCrosshair);
   copySprite(weapon.zoomedAutoaim, full.zoomedAutoaim);
-  copyOut(full, out);
+  abi::copySnapshot(out, full);
 }
 
-int32_t apiList(AbcUiWeaponInfo *out, int32_t capacity) {
-  const std::vector<const weaponres::Weapon *> weapons =
-      weaponres::allWeapons();
+int32_t apiList(void *out, uint32_t capacity, uint32_t stride) {
+  if (out && capacity != 0 && !abi::validArrayLayout(capacity, stride))
+    return -1;
+  const auto weapons = weaponres::allWeapons();
   const int32_t total = static_cast<int32_t>(weapons.size());
-  if (!out || capacity <= 0)
+  if (!out || capacity == 0)
     return total;
-  const int32_t count = total < capacity ? total : capacity;
-  for (int32_t i = 0; i < count; ++i) {
-    out[i] = AbcUiWeaponInfo{};
-    fill(*weapons[static_cast<size_t>(i)], out[i]);
-  }
+  const uint32_t count = std::min(capacity, static_cast<uint32_t>(total));
+  if (!abi::validSnapshotArray(out, count, stride))
+    return -1;
+  for (uint32_t i = 0; i < count; ++i)
+    fill(*weapons[i], abi::arrayElement(out, i, stride));
   return total;
 }
 
@@ -91,8 +88,7 @@ int32_t apiGet(int32_t slot, int32_t slotPos, AbcUiWeaponInfo *out) {
   const weaponres::Weapon *weapon = weaponres::getWeapon(slot, slotPos);
   if (!weapon)
     return 0;
-  *out = AbcUiWeaponInfo{};
-  fill(*weapon, *out);
+  fill(*weapon, out);
   return 1;
 }
 
@@ -102,8 +98,7 @@ int32_t apiGetById(int32_t id, AbcUiWeaponInfo *out) {
   const weaponres::Weapon *weapon = weaponres::getWeapon(id);
   if (!weapon)
     return 0;
-  *out = AbcUiWeaponInfo{};
-  fill(*weapon, *out);
+  fill(*weapon, out);
   return 1;
 }
 
@@ -117,8 +112,7 @@ int32_t apiSelected(AbcUiWeaponInfo *out) {
   const weaponres::Weapon *weapon = weaponres::selectedWeapon();
   if (!weapon)
     return 0;
-  *out = AbcUiWeaponInfo{};
-  fill(*weapon, *out);
+  fill(*weapon, out);
   return 1;
 }
 
@@ -144,26 +138,28 @@ int32_t apiCurrent(AbcUiWeaponInfo *out) {
   const weaponres::Weapon *weapon = weaponres::currentWeapon();
   if (!weapon)
     return 0;
-  *out = AbcUiWeaponInfo{};
-  fill(*weapon, *out);
+  fill(*weapon, out);
   return 1;
 }
 
 int32_t apiAmmoIcon(int32_t ammoType, AbcUiWeaponSprite *out) {
   if (!out)
-    return 0;
+    return ABCUI_ERROR_INVALID;
   std::string atlas;
   wrect_t rect{};
-  if (!weaponres::ammoIcon(ammoType, atlas, rect))
-    return 0;
+  if (!weaponres::ammoIcon(ammoType, atlas, rect)) {
+    *out = {};
+    out->status = ABCUI_ERROR_NOT_FOUND;
+    return ABCUI_ERROR_NOT_FOUND;
+  }
   *out = AbcUiWeaponSprite{};
-  out->valid = 1;
+  out->status = sprites::resourceStatus(atlas, rect);
   copyField(atlas, out->atlas, sizeof(out->atlas));
   out->rect[0] = rect.left;
   out->rect[1] = rect.top;
   out->rect[2] = rect.right;
   out->rect[3] = rect.bottom;
-  return 1;
+  return out->status;
 }
 
 // One initializer per member, in declaration order (see the console table

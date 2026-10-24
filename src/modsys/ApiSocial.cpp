@@ -1,6 +1,7 @@
 // framework::SocialApi - the sdk social section (the shell's friends
 // board). See ApiTable.h for how it joins the module table.
 #include "ApiTable.h"
+#include "ApiSnapshot.h"
 
 #include <algorithm>
 #include <cstring>
@@ -55,10 +56,7 @@ int32_t apiRowAt(int32_t index, AbcUiFriendRow *out) {
   copyText(row.Connect, full.connect, sizeof(full.connect));
 
   // The caller's declared size wins: never write past an older header.
-  const uint32_t declared = out->structSize == 0
-                                ? static_cast<uint32_t>(sizeof(full))
-                                : out->structSize;
-  std::memcpy(out, &full, std::min<size_t>(declared, sizeof(full)));
+  abi::copySnapshot(out, full);
   return 1;
 }
 

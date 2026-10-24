@@ -8,13 +8,14 @@
 
 #include <abc/Console.h>
 #include <abc/CvarCmd.h>
+#include <abc/Parse.h>
 
 #include <algorithm>
+#include <format>
 #include <cstring>
 #include <vector>
 
 #include "Backdrop.h"
-#include "../../framework/AssetPaths.h"
 #include "../../framework/MenuBackdrop.h"
 
 namespace rmlui::backdrop {
@@ -35,9 +36,7 @@ void attachForSeam(Rml::ElementDocument *document) {
 }
 
 void setPixel(Rml::Element *element, const char *property, float value) {
-  char text[32];
-  _snprintf_s(text, sizeof(text), _TRUNCATE, "%.1fpx", value);
-  element->SetProperty(property, text);
+  element->SetProperty(property, std::format("{:.1f}px", value).c_str());
 }
 
 } // namespace
@@ -101,10 +100,10 @@ void ElementBackdrop::OnAttributeChange(const Rml::ElementAttributes &Changed) {
                          text.c_str(), GetId().c_str());
     } else if (Name == "blur") {
       hasBlur = true;
-      const int value = std::clamp(atoi(text.c_str()), 0, 4);
+      const int value = std::clamp(abc::ParseInt(text).value_or(0), 0, 4);
       rounds = value;
     } else if (Name == "dim") {
-      dim = std::clamp(static_cast<float>(atof(text.c_str())), 0.0f, 1.0f);
+      dim = std::clamp(abc::ParseFloat(text).value_or(0.0f), 0.0f, 1.0f);
     }
   }
   // Only explicit attributes steer the shared backdrop (the cvars own the
@@ -125,8 +124,7 @@ bool ElementBackdrop::sync() {
   // attribute still wins per document.
   if (cvar_t *source = abc::CVAR_GET_POINTER("abc_ui_menu_video")) {
     if (source->string && AppliedVideoCvar != source->string) {
-      AppliedVideoCvar =
-          framework::assets::remapLegacyMenuMedia(source->string);
+      AppliedVideoCvar = source->string;
       menubackdrop::menuBackdrop().setVideoSource(AppliedVideoCvar);
     }
   }
@@ -165,9 +163,7 @@ bool ElementBackdrop::sync() {
   }
   if (AppliedDim != Dim) {
     AppliedDim = Dim;
-    char text[32];
-    _snprintf_s(text, sizeof(text), _TRUNCATE, "%.2f", Dim);
-    Dimmer->SetProperty("opacity", text);
+    Dimmer->SetProperty("opacity", std::format("{:.2f}", Dim).c_str());
   }
 
   const std::string &uri = menubackdrop::menuBackdrop().uri();

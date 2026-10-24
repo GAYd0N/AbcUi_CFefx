@@ -25,7 +25,6 @@
 #include <RmlUi/Core/EventListener.h>
 #include <RmlUi/Core/ObserverPtr.h>
 
-#include <functional>
 #include <string>
 #include <vector>
 
@@ -43,10 +42,8 @@ public:
   // T21; this only carries the emergency-document entry.
   enum class LoadOutcome {
     kLoaded,            // main document loaded from its file path
-    kEmergencyFallback, // main document missing/broken; built-in emergency
-                        // page loaded instead (inline RML, no external
-                        // menu assets)
-    kFailed,            // even the emergency page failed (Rml core broken);
+    kEmergencyFallback, // main document missing/broken; provider page loaded
+    kFailed,            // no recovery provider or its document also failed;
                         // caller escalates, nothing is loaded
   };
 
@@ -88,7 +85,7 @@ public:
   InteractiveDocument(const InteractiveDocument &) = delete;
   InteractiveDocument &operator=(const InteractiveDocument &) = delete;
 
-  // Loads the main document; on failure loads the built-in emergency page
+  // Loads the main document; on failure loads the registered recovery page
   // instead (degraded mode, isDegraded()). Safe to call again after
   // close(); calling on an already-loaded document is a no-op returning the
   // outcome of the earlier load.
@@ -124,26 +121,10 @@ public:
     return Name;
   }
 
-  // --- T21 emergency affordances -------------------------------------
-  // The built-in emergency page is the "minimal Rml emergency page" of the
-  // fault policy (03 doc): resources failed, but Rml itself works, so the
-  // page must offer a recovery resource and an exit. Its two buttons carry
-  // fixed intents and NO localization (the lang table is one of the
-  // external assets that may be exactly what failed).
-  //
-  // Retry is owned by this class: the click only marks the request
-  // (retryRequested); the owner performs retry() on its own beat so the
-  // document is never closed from inside its own event dispatch.
-  // Quit needs the owner's engine reach and goes through the injected
-  // sink as kEmergencyQuitIntent; a null sink leaves the button inert
-  // (every other surface - console `quit`, OS close - still exits).
-  static constexpr const char *kEmergencyQuitIntent = "emergency-quit";
-
-  void setEmergencySink(std::function<void(const char *intent)> sink) {
-    EmergencyHandler = std::move(sink);
+  // Retry requests are consumed by the frame pump, never DOM dispatch.
+  void requestRetry() {
+    RetryRequested = true;
   }
-  // A retry click happened on the emergency page (see above). Cleared by
-  // retry() and close().
   bool retryRequested() const {
     return RetryRequested;
   }
@@ -157,6 +138,11 @@ protected:
   // listeners through addListener(). Never fires for the emergency page
   // (its DOM has none of the page's elements; degrade state is queryable).
   virtual void onDocumentReady() {}
+  virtual const char *recoveryPath() {
+    return nullptr;
+  }
+  virtual void onRecoveryReady() {}
+  virtual void onRecoveryClose() {}
 
   // Owner-tracked listener attach; detached again before Close() runs.
   void addListener(Rml::Element *target, const char *event,
@@ -177,21 +163,6 @@ private:
     bool Capture;
   };
 
-  // Emergency-page buttons (attached in the emergency branch of load()):
-  // the retry one marks RetryRequested, the quit one reports through the
-  // injected sink. Both are member objects so they outlive the emergency
-  // document; close() detaches them from the DOM first.
-  class EmergencyButtonListener final : public Rml::EventListener {
-  public:
-    EmergencyButtonListener(InteractiveDocument *owner, bool isQuit)
-        : Owner(owner), IsQuit(isQuit) {}
-    void ProcessEvent(Rml::Event &) override;
-
-  private:
-    InteractiveDocument *Owner;
-    bool IsQuit;
-  };
-
   const std::string Name;
   const std::string DocumentPath;
   const bool WithBackdrop;
@@ -199,9 +170,6 @@ private:
   Rml::ElementDocument *Document = nullptr;
   bool Degraded = false;
   bool RetryRequested = false;
-  std::function<void(const char *intent)> EmergencyHandler;
-  EmergencyButtonListener RetryButtonListener{this, false};
-  EmergencyButtonListener QuitButtonListener{this, true};
   std::vector<ListenerBinding> Listeners;
 };
 

@@ -1,0 +1,2 @@
+abcui.chat/Chat_Say = 说：
+abcui.chat/Chat_Team = 队伍：

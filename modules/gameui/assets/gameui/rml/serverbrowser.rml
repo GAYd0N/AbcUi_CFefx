@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
 	<link type="text/rcss" href="../rcss/serverbrowser.rcss"/>
 </head>
@@ -24,17 +24,17 @@
 <body id="menuserverbrowser">
 	<div id="sb-head">
 		<div id="sb-brand">Sven Co-op</div>
-		<div id="sb-title">#SB_Title</div>
+		<div id="sb-title">#abcui.gameui/SB_Title</div>
 	</div>
 
 	<!-- Module 1: the list kinds the shipped browser exposes. -->
 	<div id="sb-tabs">
-		<button id="sb-tab-internet" data-action="sb-tab-internet">#SB_TabInternet</button>
-		<button id="sb-tab-favorites" data-action="sb-tab-favorites">#SB_TabFavorites</button>
-		<button id="sb-tab-history" data-action="sb-tab-history">#SB_TabHistory</button>
-		<button id="sb-tab-lan" data-action="sb-tab-lan">#SB_TabLan</button>
-		<button id="sb-tab-friends" data-action="sb-tab-friends">#SB_TabFriends</button>
-		<button id="sb-tab-blacklist" data-action="sb-tab-blacklist">#SB_TabBlacklist</button>
+		<button id="sb-tab-internet" data-action="sb-tab-internet">#abcui.gameui/SB_TabInternet</button>
+		<button id="sb-tab-favorites" data-action="sb-tab-favorites">#abcui.gameui/SB_TabFavorites</button>
+		<button id="sb-tab-history" data-action="sb-tab-history">#abcui.gameui/SB_TabHistory</button>
+		<button id="sb-tab-lan" data-action="sb-tab-lan">#abcui.gameui/SB_TabLan</button>
+		<button id="sb-tab-friends" data-action="sb-tab-friends">#abcui.gameui/SB_TabFriends</button>
+		<button id="sb-tab-blacklist" data-action="sb-tab-blacklist">#abcui.gameui/SB_TabBlacklist</button>
 	</div>
 
 	<!-- Module 2: the server table -->
@@ -44,12 +44,12 @@
 			<span id="sb-status"></span>
 		</div>
 		<div id="sb-header">
-			<span class="sb-col c-vac">#SB_ColumnVac</span>
-			<button id="sb-col-name" class="sb-col c-name" data-action="sb-sort" data-column="name">#SB_ColumnName</button>
-			<button id="sb-col-map" class="sb-col c-map" data-action="sb-sort" data-column="map">#SB_ColumnMap</button>
-			<button id="sb-col-players" class="sb-col c-players" data-action="sb-sort" data-column="players">#SB_ColumnPlayers</button>
-			<span class="sb-col c-bots">#SB_ColumnBots</span>
-			<button id="sb-col-ping" class="sb-col c-ping" data-action="sb-sort" data-column="ping">#SB_ColumnPing</button>
+			<span class="sb-col c-vac">#abcui.gameui/SB_ColumnVac</span>
+			<button id="sb-col-name" class="sb-col c-name" data-action="sb-sort" data-column="name">#abcui.gameui/SB_ColumnName</button>
+			<button id="sb-col-map" class="sb-col c-map" data-action="sb-sort" data-column="map">#abcui.gameui/SB_ColumnMap</button>
+			<button id="sb-col-players" class="sb-col c-players" data-action="sb-sort" data-column="players">#abcui.gameui/SB_ColumnPlayers</button>
+			<span class="sb-col c-bots">#abcui.gameui/SB_ColumnBots</span>
+			<button id="sb-col-ping" class="sb-col c-ping" data-action="sb-sort" data-column="ping">#abcui.gameui/SB_ColumnPing</button>
 		</div>
 		<div id="sb-list"></div>
 		<div id="sb-paging">
@@ -59,15 +59,15 @@
 		</div>
 		<!-- The blacklist tab's body: the rules editor replaces the table. -->
 		<div id="sb-blacklist-panel">
-			<p id="sb-blacklist-hint">#SB_BlacklistAddress</p>
+			<p id="sb-blacklist-hint">#abcui.gameui/SB_BlacklistAddress</p>
 			<div id="sb-blacklist-addrow">
 				<input id="sb-blacklist-address" type="text" maxlength="21"/>
-				<button id="sb-rule-add" data-action="sb-rule-add">#SB_BlacklistAdd</button>
+				<button id="sb-rule-add" data-action="sb-rule-add">#abcui.gameui/SB_BlacklistAdd</button>
 			</div>
 			<div id="sb-blacklist-head">
-				<span class="bl-name">#SB_ColumnName</span>
-				<span class="bl-ip">#SB_BlacklistIp</span>
-				<span class="bl-time">#SB_BlacklistTime</span>
+				<span class="bl-name">#abcui.gameui/SB_ColumnName</span>
+				<span class="bl-ip">#abcui.gameui/SB_BlacklistIp</span>
+				<span class="bl-time">#abcui.gameui/SB_BlacklistTime</span>
 				<span class="bl-action"></span>
 			</div>
 			<div id="sb-blacklist-rules"></div>
@@ -77,16 +77,16 @@
 	<!-- Module 3: the filter column, docked at the right edge. Controls
 	     apply on change; the reset button restores every filter. -->
 	<div id="sb-filter-module">
-		<div id="sb-filter-title" class="abc-sectitle">#SB_Filters</div>
+		<div id="sb-filter-title" class="abc-sectitle">#abcui.gameui/SB_Filters</div>
 		<div id="sb-filter-body">
-			<div class="sb-frow"><span class="sb-flabel">#SB_FilterName</span><input id="sb-filter-name" type="text" maxlength="256"/></div>
-			<div class="sb-frow"><span class="sb-flabel">#SB_FilterMap</span><input id="sb-filter-map" type="text" maxlength="256"/></div>
-			<div class="sb-frow"><span class="sb-flabel">#SB_FilterPing</span><select id="sb-filter-ping"></select></div>
-			<div class="sb-frow"><span class="sb-flabel">#SB_FilterNotEmpty</span><select id="sb-filter-empty"></select></div>
-			<div class="sb-frow"><span class="sb-flabel">#SB_FilterNotFull</span><select id="sb-filter-full"></select></div>
-			<div class="sb-frow"><span class="sb-flabel">#SB_FilterSecure</span><select id="sb-filter-secure"></select></div>
-			<div class="sb-frow"><span class="sb-flabel">#SB_FilterNoPassword</span><select id="sb-filter-password"></select></div>
-			<button id="sb-filters-reset" data-action="sb-filters-reset">#SB_FilterReset</button>
+			<div class="sb-frow"><span class="sb-flabel">#abcui.gameui/SB_FilterName</span><input id="sb-filter-name" type="text" maxlength="256"/></div>
+			<div class="sb-frow"><span class="sb-flabel">#abcui.gameui/SB_FilterMap</span><input id="sb-filter-map" type="text" maxlength="256"/></div>
+			<div class="sb-frow"><span class="sb-flabel">#abcui.gameui/SB_FilterPing</span><select id="sb-filter-ping"></select></div>
+			<div class="sb-frow"><span class="sb-flabel">#abcui.gameui/SB_FilterNotEmpty</span><select id="sb-filter-empty"></select></div>
+			<div class="sb-frow"><span class="sb-flabel">#abcui.gameui/SB_FilterNotFull</span><select id="sb-filter-full"></select></div>
+			<div class="sb-frow"><span class="sb-flabel">#abcui.gameui/SB_FilterSecure</span><select id="sb-filter-secure"></select></div>
+			<div class="sb-frow"><span class="sb-flabel">#abcui.gameui/SB_FilterNoPassword</span><select id="sb-filter-password"></select></div>
+			<button id="sb-filters-reset" data-action="sb-filters-reset">#abcui.gameui/SB_FilterReset</button>
 		</div>
 	</div>
 
@@ -94,9 +94,9 @@
 	     refresh, return. Refresh doubles as Stop while a list query is live
 	     (the shipped browsers' own Refresh/Stop discipline). -->
 	<div id="sb-actions">
-		<button id="sb-connect" data-action="sb-connect">#SB_ContextJoin</button>
-		<button id="sb-refresh" data-action="sb-refresh">#SB_Refresh</button>
-		<button id="sb-return" data-action="return">#MainMenu_Return</button>
+		<button id="sb-connect" data-action="sb-connect">#abcui.gameui/SB_ContextJoin</button>
+		<button id="sb-refresh" data-action="sb-refresh">#abcui.gameui/SB_Refresh</button>
+		<button id="sb-return" data-action="return">#abcui.gameui/MainMenu_Return</button>
 	</div>
 
 	<!-- The server detail window: a left click on a row opens it, ESC or the
@@ -107,13 +107,13 @@
 	     prompts). -->
 	<div id="sb-detail-overlay">
 		<div id="sb-detail-window">
-			<div id="sb-detail-title">#SB_DetailTitle</div>
+			<div id="sb-detail-title">#abcui.gameui/SB_DetailTitle</div>
 			<div id="sb-detail-info"></div>
 			<div id="sb-detail-players"></div>
 			<div id="sb-detail-actions">
-				<button id="sb-detail-join" data-action="sb-connect">#SB_ContextJoin</button>
-				<button id="sb-auto-retry" data-action="sb-auto-retry">#SB_AutoRetry</button>
-				<button id="sb-detail-close" data-action="sb-detail-close">#SB_DetailClose</button>
+				<button id="sb-detail-join" data-action="sb-connect">#abcui.gameui/SB_ContextJoin</button>
+				<button id="sb-auto-retry" data-action="sb-auto-retry">#abcui.gameui/SB_AutoRetry</button>
+				<button id="sb-detail-close" data-action="sb-detail-close">#abcui.gameui/SB_DetailClose</button>
 			</div>
 		</div>
 	</div>
@@ -121,10 +121,10 @@
 	<!-- The secondary menu of a row (right click): join, favorite, and the two
 	     blacklist entries. It is positioned at the click point. -->
 	<div id="sb-context-menu">
-		<div id="sb-menu-join" class="sb-menu-entry" data-action="sb-connect">#SB_ContextJoin</div>
-		<div id="sb-menu-favorite" class="sb-menu-entry" data-action="sb-favorite-toggle">#SB_FavoriteAdd</div>
-		<div id="sb-menu-block" class="sb-menu-entry" data-action="sb-block">#SB_ContextBlock</div>
-		<div id="sb-menu-block-ip" class="sb-menu-entry" data-action="sb-block-ip">#SB_ContextBlockIp</div>
+		<div id="sb-menu-join" class="sb-menu-entry" data-action="sb-connect">#abcui.gameui/SB_ContextJoin</div>
+		<div id="sb-menu-favorite" class="sb-menu-entry" data-action="sb-favorite-toggle">#abcui.gameui/SB_FavoriteAdd</div>
+		<div id="sb-menu-block" class="sb-menu-entry" data-action="sb-block">#abcui.gameui/SB_ContextBlock</div>
+		<div id="sb-menu-block-ip" class="sb-menu-entry" data-action="sb-block-ip">#abcui.gameui/SB_ContextBlockIp</div>
 	</div>
 </body>
 </rml>

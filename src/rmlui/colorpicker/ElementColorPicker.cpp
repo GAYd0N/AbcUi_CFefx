@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <format>
 #include <cstring>
 #include <functional>
 #include <unordered_set>
@@ -192,12 +193,11 @@ void ElementColorPicker::setFromRgba(int red, int green, int blue, int alpha) {
 void ElementColorPicker::applyColor() {
   int red = 0, green = 0, blue = 0;
   abc::math::HSVToRGB(Hue, Saturation, Value, red, green, blue);
-  char text[10];
-  std::snprintf(text, sizeof(text), "#%02x%02x%02x%02x", red, green, blue,
-                Alpha);
+  const Rml::String text =
+      std::format("#{:02x}{:02x}{:02x}{:02x}", red, green, blue, Alpha);
   GeometryDirty = true;
   if (GetAttribute<Rml::String>("value", "") != text)
-    SetAttribute("value", Rml::String(text));
+    SetAttribute("value", text);
   // Do not dispatch here: this runs inside the element's own drag/render
   // call stack, and the page's change handler may destroy the picker right
   // away. Queue the latest value and let pumpChanges fire it from the frame

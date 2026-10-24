@@ -1,6 +1,7 @@
 // framework::PlayerListApi - the sdk playerlist section (the player-list
 // page model). See ApiTable.h for how it joins the module table.
 #include "ApiTable.h"
+#include "ApiSnapshot.h"
 
 #include <algorithm>
 #include <cstring>
@@ -69,10 +70,7 @@ int32_t apiRosterAt(int32_t index, AbcUiPlayerRow *out) {
   copyText(entry.name, full.name, sizeof(full.name));
 
   // The caller's declared size wins: never write past an older header.
-  const uint32_t declared = out->structSize == 0
-                                ? static_cast<uint32_t>(sizeof(full))
-                                : out->structSize;
-  std::memcpy(out, &full, std::min<size_t>(declared, sizeof(full)));
+  abi::copySnapshot(out, full);
   return 1;
 }
 

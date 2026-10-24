@@ -197,6 +197,18 @@
 	height: 100%;
 }
 
+/* Animated Steam avatars: <animimg> is a block box holding an internal
+   <img>, so it needs the same absolute frame treatment as the static image
+   (the module also writes the position inline). */
+#table .avatar-frame animimg {
+	position: absolute;
+	left: 0dp;
+	top: 0dp;
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
 /* Column widths sum to the 552dp table content width. The name column
    absorbs the SteamID width when that column is off (old
    GetNameColumnWidth); rebuildTable applies the no-steamid class. */

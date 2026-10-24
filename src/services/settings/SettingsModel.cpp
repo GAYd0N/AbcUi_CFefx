@@ -8,8 +8,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <format>
 #include <cstdlib>
 #include <cstring>
+#include <string_view>
 
 namespace services {
 namespace settings {
@@ -61,7 +63,7 @@ bool optionTokenValid(const char *text) {
     if (std::strchr("\"'`\\;/|<>*?[]:", *p))
       return false;
   }
-  if (!std::strcmp(text, ".") || !std::strcmp(text, ".."))
+  if (std::string_view(text) == "." || std::string_view(text) == "..")
     return false;
   return true;
 }
@@ -78,6 +80,8 @@ bool optionTokenValid(const char *text) {
 bool fileChoiceValueValid(const char *text) {
   if (!text || !*text)
     return false;
+  if (std::string_view(text).starts_with("mod://"))
+    text += 6;
   for (const char *p = text; *p; ++p) {
     const unsigned char c = static_cast<unsigned char>(*p);
     if (c < 0x20 || c == 0x7f)
@@ -143,7 +147,7 @@ SettingsModel::RowRuntime *SettingsModel::runtime(const char *cvar) {
   if (!cvar)
     return nullptr;
   for (auto &entry : Rows_) {
-    if (std::strcmp(entry.row->Cvar, cvar) == 0)
+    if (std::string_view(entry.row->Cvar) == cvar)
       return &entry;
   }
   return nullptr;
@@ -154,7 +158,7 @@ SettingsModel::runtime(const char *cvar) const {
   if (!cvar)
     return nullptr;
   for (const auto &entry : Rows_) {
-    if (std::strcmp(entry.row->Cvar, cvar) == 0)
+    if (std::string_view(entry.row->Cvar) == cvar)
       return &entry;
   }
   return nullptr;
@@ -163,9 +167,7 @@ SettingsModel::runtime(const char *cvar) const {
 std::string SettingsModel::formatValue(float value) {
   // %g keeps the table's values readable ("3", "0.7", "20") without
   // decimal trails; %.1f would invent precision the domain does not carry.
-  char buffer[32];
-  std::snprintf(buffer, sizeof(buffer), "%g", static_cast<double>(value));
-  return buffer;
+  return std::format("{:g}", value);
 }
 
 bool SettingsModel::parseValue(const char *text, float &out) {
@@ -403,8 +405,8 @@ bool SettingsModel::validateString(const RowRuntime &entry,
     bool known = std::binary_search(entry.options.begin(), entry.options.end(),
                                     std::string(text));
     for (int i = 0; !known && i < entry.row->OptionCount; ++i)
-      known = std::strcmp(entry.row->Options[i].Label, text) ==
-              0; // fixed token table
+      known = std::string_view(entry.row->Options[i].Label) ==
+              text; // fixed token table
     if (!known)
       return false;
   }

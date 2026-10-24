@@ -9,6 +9,7 @@
 #include "services/spray/Encoder.h"
 
 #include <abc/Format.h>
+#include <cstddef>
 
 #include <filesystem>
 #include <fstream>
@@ -57,7 +58,7 @@ void SprayMaker::run(const std::string &path) {
     fail("#Settings_SprayMakerReadError", {});
     return;
   }
-  std::vector<unsigned char> bytes(static_cast<std::size_t>(size));
+  std::vector<std::byte> bytes(static_cast<std::size_t>(size));
   stream.seekg(0);
   if (!stream.read(reinterpret_cast<char *>(bytes.data()), size)) {
     fail("#Settings_SprayMakerReadError", {});
@@ -66,8 +67,7 @@ void SprayMaker::run(const std::string &path) {
   stream.close();
   // Decode (FreeImage, format detected from the content).
   framework::ImageLoader::DecodedImage image;
-  if (!framework::ImageLoader::loadFromMemory(bytes.data(), bytes.size(),
-                                              image)) {
+  if (!framework::ImageLoader::loadFromMemory(bytes, image)) {
     fail("#Settings_SprayMakerDecodeError", {});
     return;
   }

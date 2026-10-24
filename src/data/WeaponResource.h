@@ -70,7 +70,7 @@ struct Weapon {
   SpriteSource active;    // "weapon_s"
   SpriteSource inactive;  // "weapon"
   SpriteSource ammo;      // "ammo"
-  SpriteSource ammo2;     // "ammo2" (falls back to "ammo")
+  SpriteSource ammo2;     // "ammo2" (no implicit fallback)
   SpriteSource crosshair; // batch B
   SpriteSource autoaim;   // batch B
   SpriteSource zoomedCrosshair;

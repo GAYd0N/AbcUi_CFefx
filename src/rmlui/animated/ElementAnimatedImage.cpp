@@ -1,5 +1,9 @@
 // <animimg> implementation - see ElementAnimatedImage.h.
 #include "ElementAnimatedImage.h"
+#include "modsys/ModuleVfs.h"
+#include <RmlUi/Core/ElementDocument.h>
+
+#include "../texture/Avatars.h"
 
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/Core.h>
@@ -8,10 +12,13 @@
 #include <RmlUi/Core/SystemInterface.h>
 
 #include <abc/Console.h>
+#include <abc/Parse.h>
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
+#include <cstdint>
+#include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -33,6 +40,39 @@ constexpr double kMaxStepSeconds = 0.25;
 std::vector<ElementAnimatedImage *> &elements() {
   static std::vector<ElementAnimatedImage *> Elements;
   return Elements;
+}
+
+// Playback origin per animated-avatar source. The scoreboard rebuilds its
+// table every 0.5 s (live ping/health), which recreates every <animimg>; a
+// fresh element would otherwise restart the APNG at frame 0 four times per
+// second. The origin makes a replacement element resume at the position the
+// previous one had reached. The map is bounded; the source's ?gen suffix
+// changes when the bytes change, so a new animation correctly starts at 0.
+std::unordered_map<std::string, double> &avatarClocks() {
+  static std::unordered_map<std::string, double> Clocks;
+  return Clocks;
+}
+
+constexpr std::string_view kAvatarAnimPrefix = "avataranim://";
+
+bool parseAvatarAnimSource(const std::string &source, std::uint64_t &id) {
+  if (!source.starts_with(kAvatarAnimPrefix))
+    return false;
+  const std::size_t begin = kAvatarAnimPrefix.size();
+  std::size_t end = begin;
+  while (end < source.size() && source[end] >= '0' && source[end] <= '9')
+    ++end;
+  if (end == begin || end - begin > 20)
+    return false;
+  std::uint64_t value = 0;
+  for (std::size_t i = begin; i < end; ++i) {
+    const std::uint64_t digit = static_cast<std::uint64_t>(source[i] - '0');
+    if (value > (UINT64_MAX - digit) / 10)
+      return false;
+    value = value * 10 + digit;
+  }
+  id = value;
+  return id != 0;
 }
 
 Rml::ElementInstancerGeneric<ElementAnimatedImage> Instancer;
@@ -59,11 +99,10 @@ bool parseBool(const Rml::String &text, bool &value) {
 bool parseFloat(const Rml::String &text, float &value) {
   if (text.empty())
     return false;
-  char *end = nullptr;
-  const float parsed = std::strtof(text.c_str(), &end);
-  if (end == text.c_str() || *end != '\0' || !std::isfinite(parsed))
+  const auto parsed = abc::ParseFloat(text);
+  if (!parsed || !std::isfinite(*parsed))
     return false;
-  value = parsed;
+  value = *parsed;
   return true;
 }
 
@@ -176,15 +215,43 @@ bool ElementAnimatedImage::ensureOpen() {
   if (Source.empty())
     return false;
 
-  std::string error;
-  std::unique_ptr<AnimatedImage> image = openFile(Source, error);
+  std::uint64_t avatarId = 0;
+  const bool avatarSource = parseAvatarAnimSource(Source, avatarId);
+  std::string error, resolved;
+  std::unique_ptr<AnimatedImage> image;
+  if (avatarSource) {
+    std::vector<std::byte> bytes;
+    if (avatars::animatedBytes(avatarId, bytes)) {
+      image = openMemory(std::move(bytes), Source, error);
+    } else {
+      error = "animated avatar not cached";
+    }
+  } else {
+    auto *document = GetOwnerDocument();
+    if (document && framework::ModuleVfs::resolve(document->GetSourceURL(),
+                                                  Source, resolved))
+      image = openFile(resolved, error);
+    else
+      error = "cannot resolve " + Source;
+  }
   if (!image) {
     // Remember the failure so a missing asset warns once, not every frame; a
     // different source (or invalidate()) retries.
     AppliedSource = Source;
     if (WarnedSource != Source) {
       WarnedSource = Source;
-      abc::ConsoleWarn("[AbcUi animimg] %s\n", error.c_str());
+      if (!avatarSource)
+        abc::ConsoleWarn("[AbcUi animimg] %s\n", error.c_str());
+    }
+    // A cached-avatar miss must not leave a hole in the scoreboard row: draw
+    // the ordinary static avatar until the next table rebuild tries again.
+    if (avatarSource && FrameImage) {
+      const std::string fallback =
+          "avatar://" + std::to_string(avatarId) +
+          "?gen=" + std::to_string(avatars::generation(avatarId));
+      FrameImage->SetAttribute("src", fallback);
+      FrameImage->SetProperty("visibility", "visible");
+      TextureReady = true;
     }
     return false;
   }
@@ -199,12 +266,60 @@ bool ElementAnimatedImage::ensureOpen() {
   // The intrinsic size becomes known with the animation: lay out again.
   DirtyLayout();
 
+  if (avatarSource) {
+    // A replacement row resumes where the previous element left the source;
+    // the first element of a source simply starts at frame 0.
+    const double now = Rml::GetSystemInterface()->GetElapsedTime();
+    auto &clocks = avatarClocks();
+    if (clocks.size() > 512)
+      clocks.clear();
+    const auto [itor, inserted] = clocks.try_emplace(Source, now);
+    (void)inserted;
+    seekToClock(itor->second, now);
+    return TextureReady;
+  }
+
   // Show frame 0 immediately (a controller may have made the element visible
   // in this same HUD frame).
   FrameView frame;
   if (!Image->Rewind() || !Image->Read(frame))
     return false;
   return uploadFrame(frame);
+}
+
+void ElementAnimatedImage::seekToClock(double startSeconds, double now) {
+  if (!Image || Image->FrameCount() <= 0)
+    return;
+  int total = 0;
+  for (int i = 0; i < Image->FrameCount(); ++i) {
+    const int duration = Image->DurationMs(i);
+    total += duration > 0 ? duration : kDefaultFrameMs;
+  }
+  if (total <= 0)
+    return;
+  double elapsedMs = std::max(0.0, now - startSeconds) * 1000.0;
+  double positionMs = std::fmod(elapsedMs, static_cast<double>(total));
+  int target = 0;
+  for (; target < Image->FrameCount(); ++target) {
+    const int duration = Image->DurationMs(target);
+    const int frameMs = duration > 0 ? duration : kDefaultFrameMs;
+    if (positionMs < frameMs)
+      break;
+    positionMs -= frameMs;
+  }
+  if (target >= Image->FrameCount()) {
+    target = Image->FrameCount() - 1;
+    positionMs = 0.0;
+  }
+  if (!Image->Rewind())
+    return;
+  FrameView frame;
+  for (int index = 0; index <= target; ++index) {
+    if (!Image->Read(frame))
+      return;
+  }
+  if (uploadFrame(frame))
+    FrameClock = positionMs / 1000.0;
 }
 
 bool ElementAnimatedImage::uploadFrame(const FrameView &frame) {

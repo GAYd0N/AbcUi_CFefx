@@ -44,7 +44,7 @@ unsigned long long NextGeneration = 0;
 struct Backdrop::State {
   Mode Requested = Mode::kAuto;
   Mode Effective = Mode::kSolid;
-  std::string VideoSource = kDefaultVideoSource;
+  std::string VideoSource;
   int Rounds = 2;
 
   FBO_Container_t Down{};
@@ -175,7 +175,7 @@ void Backdrop::pumpVideo(double frameTime, bool Enabled) {
     state.VideoAttempted = true;
     // A background movie never needs more than 720 px of width: it is
     // blurred by two gaussian rounds before it reaches the screen.
-    const std::string path = abc::ModPath(state.VideoSource.c_str());
+    const std::string &path = state.VideoSource;
     if (!state.Media.open(path.c_str(), 640, 360)) {
       state.VideoFailed = true;
       state.VideoError = state.Media.error();

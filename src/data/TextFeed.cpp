@@ -49,10 +49,12 @@ std::string matchPrefix(const std::smatch &match) {
 }
 
 // Module-facing mirror of the typed kill feed; strings are dispatch-scoped.
-void publishKillFeed(const char *victim, const char *attacker,
+bool publishKillFeed(const char *victim, const char *attacker,
                      const char *inflictor) {
   const AbcUiKillFeedEvent event{victim, attacker, inflictor};
   framework::eventBus().publish(ABCUI_CHANNEL_TEXTFEED_KILL_FEED, event);
+  return framework::eventBus().publishVeto(ABCUI_CHANNEL_TEXTFEED_KILL_FEED,
+                                           event);
 }
 
 // Leading-# tokens resolve through the plugin language table (the table keys
@@ -164,8 +166,7 @@ int onTextMsg(int target, const char *msg, const char *param1,
       const std::string victim = matchPrefix(match);
       const std::string inflictor = localized("DeathMsg_Suicide");
       KillFeed(victim.c_str(), "", inflictor.c_str());
-      publishKillFeed(victim.c_str(), "", inflictor.c_str());
-      return false;
+      return !publishKillFeed(victim.c_str(), "", inflictor.c_str());
     }
     if (std::regex_search(text, match, killedPattern())) {
       const std::string victim = matchPrefix(match);
@@ -177,8 +178,8 @@ int onTextMsg(int target, const char *msg, const char *param1,
         killer.erase(killer.size() - 2);
       const std::string inflictor = localized("DeathMsg_MonsterKill");
       KillFeed(victim.c_str(), killer.c_str(), inflictor.c_str());
-      publishKillFeed(victim.c_str(), killer.c_str(), inflictor.c_str());
-      return false;
+      return !publishKillFeed(victim.c_str(), killer.c_str(),
+                              inflictor.c_str());
     }
     if (std::regex_search(text, match, playerPattern())) {
       // Old: inflictor = the " : X : " in-between group, attacker =
@@ -187,8 +188,8 @@ int onTextMsg(int target, const char *msg, const char *param1,
       const std::string attacker = matchPrefix(match);
       const std::string inflictor = match[1].str();
       KillFeed(victim.c_str(), attacker.c_str(), inflictor.c_str());
-      publishKillFeed(victim.c_str(), attacker.c_str(), inflictor.c_str());
-      return false;
+      return !publishKillFeed(victim.c_str(), attacker.c_str(),
+                              inflictor.c_str());
     }
   }
 
@@ -202,7 +203,8 @@ int onTextMsg(int target, const char *msg, const char *param1,
   Notice(target, formatted.c_str());
   const AbcUiNoticeEvent notice{target, formatted.c_str()};
   framework::eventBus().publish(ABCUI_CHANNEL_TEXTFEED_NOTICE, notice);
-  return false;
+  return !framework::eventBus().publishVeto(ABCUI_CHANNEL_TEXTFEED_NOTICE,
+                                            notice);
 }
 
 } // namespace

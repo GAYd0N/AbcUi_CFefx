@@ -6,13 +6,16 @@
 // drains (module-local color math where the built-in used ColorUtil).
 #include <abcui/events.h>
 #include <abcui/module_api.h>
+#include "../../common/Glyphs.h"
 
 #include <algorithm>
 #include <cstdio>
+#include <format>
 
 namespace {
 
 const AbcUiModuleApi *Api = nullptr;
+moduleui::Glyphs GlyphInk;
 AbcUiPanelDesc Panel = {};
 
 // HUD accent amber (255 176 0, base.rcss --abc-hud-accent); saturation and
@@ -111,9 +114,8 @@ void hsvToRgb(const float hsv[3], float rgb[3]) {
 void setFlashBattery(int battery) {
   const float ratio =
       std::clamp(static_cast<float>(battery) / 100.0f, 0.0f, 1.0f);
-  char value[48];
-  std::snprintf(value, sizeof(value), "%gdp", ratio * kPowerWrapWidth);
-  elementSetProperty("power-wrap", "width", value);
+  std::string value = std::format("{:g}dp", ratio * kPowerWrapWidth);
+  elementSetProperty("power-wrap", "width", value.c_str());
 
   // Old SetFlashBattery: icon colour hue *= ratio (amber -> red), the
   // scheme alpha rides along.
@@ -124,16 +126,15 @@ void setFlashBattery(int battery) {
   rgbToHsv(base, hsv);
   hsv[0] *= ratio;
   hsvToRgb(hsv, rgb);
-  std::snprintf(value, sizeof(value), "rgba(%d, %d, %d, %d)",
-                static_cast<int>(rgb[0] * 255.0f + 0.5f),
-                static_cast<int>(rgb[1] * 255.0f + 0.5f),
-                static_cast<int>(rgb[2] * 255.0f + 0.5f), kIconAlpha);
-  elementSetProperty("power-bar", "image-color", value);
+  value = std::format("rgba({}, {}, {}, {})",
+                      static_cast<int>(rgb[0] * 255.0f + 0.5f),
+                      static_cast<int>(rgb[1] * 255.0f + 0.5f),
+                      static_cast<int>(rgb[2] * 255.0f + 0.5f), kIconAlpha);
+  elementSetProperty("power-bar", "image-color", value.c_str());
 
-  std::snprintf(value, sizeof(value), "%d%%", battery);
-  char ink[256];
-  const char *markup =
-      Api->ui->inkMarkup(value, nullptr, ink, sizeof(ink)) ? ink : value;
+  value = std::format("{}%", battery);
+  const std::string ink = GlyphInk.ink(Api, value);
+  const char *markup = ink.empty() ? value.c_str() : ink.c_str();
   if (AbcUiDocument *doc = panelDocument()) {
     if (AbcUiElement *element = Api->ui->querySelector(doc, "message"))
       Api->ui->elementSetInnerRML(element, markup);
@@ -204,7 +205,14 @@ void panelReset(void *) {
 
 // ---- lifecycle ----
 
+int onNativeHudDraw(void *, const void *payload) {
+  const auto *event = static_cast<const AbcUiNativeHudEvent *>(payload);
+  return panelDocument() && (event->element == ABCUI_NATIVE_HUD_FLASHLIGHT);
+}
+
 void onModuleLoad() {
+  Api->events->subscribeVeto(ABCUI_CHANNEL_HUD_NATIVE_DRAW, 0, &onNativeHudDraw,
+                             nullptr);
   Panel.structSize = sizeof(Panel);
   Panel.name = kPanelName;
   Panel.documentPath = kDocumentPath;
@@ -225,6 +233,10 @@ void onModuleLoad() {
                          nullptr);
 }
 
+void onModuleShutdown() {
+  GlyphInk.reset();
+}
+
 void onModuleUnload() {
   // Subscriptions are process-lifetime by design; the bus outlives every
   // module (the framework unloads in reverse order after Rml is down).
@@ -232,25 +244,26 @@ void onModuleUnload() {
 }
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
-      !api->events || !api->data || !api->ui)
+      !api->textures || !api->events || !api->data || !api->ui)
     return 0;
   Api = api;
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.flashlight";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = nullptr;
   out->onContextReady = nullptr;
   out->onFrame = nullptr;
   out->onVidInit = nullptr;
-  out->onShutdown = nullptr;
+  out->onShutdown = &onModuleShutdown;
   out->onUnload = &onModuleUnload;
   return 1;
 }

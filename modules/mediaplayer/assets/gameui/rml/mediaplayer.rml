@@ -1,0 +1,72 @@
+<rml>
+<head>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
+	<link type="text/rcss" href="../rcss/mediaplayer.rcss"/>
+</head>
+<!-- Sven Co-op Media Player replacement (issue 11). The abcui.mediaplayer
+     module shows this document from the chained MediaPlayer command and
+     drives the engine's own mp3 stream (hw.dll "mp3 playfile/pause/resume/
+     stop"); the native client.dll window never opens. The module projects
+     every dynamic string through escapeRml, so nothing in the playlist is
+     interpreted as markup. -->
+<body id="mp-root">
+	<div id="mp-scrim"></div>
+
+	<div id="mp-window">
+		<div id="mp-window-bg"></div>
+
+		<div id="mp-header">
+			<div id="mp-header-text">
+				<div id="mp-title">#abcui.mediaplayer/MediaPlayer_Title</div>
+				<div id="mp-subtitle">#abcui.mediaplayer/MediaPlayer_Subtitle</div>
+			</div>
+			<button id="mp-close" data-action="mp-close" data-label="#abcui.mediaplayer/MediaPlayer_Close">&#10005;</button>
+		</div>
+
+		<div id="mp-now">
+			<div id="mp-track">#abcui.mediaplayer/MediaPlayer_NoTrack</div>
+			<div id="mp-state">#abcui.mediaplayer/MediaPlayer_Stopped</div>
+		</div>
+
+		<progress id="mp-progress" max="1" value="0"></progress>
+		<div id="mp-time-row">
+			<span id="mp-elapsed">0:00</span>
+			<span id="mp-total">--:--</span>
+		</div>
+
+		<div id="mp-transport">
+			<button id="mp-prev" data-action="mp-prev" data-label="#abcui.mediaplayer/MediaPlayer_Previous">&#9664;&#9664;</button>
+			<button id="mp-toggle" data-action="mp-toggle" data-label="#abcui.mediaplayer/MediaPlayer_Play">
+				<span id="mp-toggle-label">#abcui.mediaplayer/MediaPlayer_Play</span>
+			</button>
+			<button id="mp-stop" data-action="mp-stop" data-label="#abcui.mediaplayer/MediaPlayer_Stop">&#9632;</button>
+			<button id="mp-next" data-action="mp-next" data-label="#abcui.mediaplayer/MediaPlayer_Next">&#9654;&#9654;</button>
+		</div>
+
+		<div id="mp-volume-row">
+			<span id="mp-volume-label">#abcui.mediaplayer/MediaPlayer_Volume</span>
+			<input id="mp-volume" type="range" min="0" max="100" step="1" value="50"/>
+			<span id="mp-volume-value">50%</span>
+		</div>
+
+		<div id="mp-playlist-head">
+			<span id="mp-playlist-title">#abcui.mediaplayer/MediaPlayer_Playlist</span>
+			<span id="mp-playlist-source"></span>
+			<span id="mp-playlist-count">0</span>
+		</div>
+		<div id="mp-list"></div>
+
+		<div id="mp-edit-row">
+			<input id="mp-add-path" type="text" maxlength="511" placeholder="#abcui.mediaplayer/MediaPlayer_AddPlaceholder"/>
+			<button id="mp-add" data-action="mp-add" data-label="#abcui.mediaplayer/MediaPlayer_Add">#abcui.mediaplayer/MediaPlayer_Add</button>
+			<button id="mp-remove" data-action="mp-remove" data-label="#abcui.mediaplayer/MediaPlayer_Remove">#abcui.mediaplayer/MediaPlayer_Remove</button>
+			<button id="mp-up" data-action="mp-up" data-label="#abcui.mediaplayer/MediaPlayer_MoveUp">&#9650;</button>
+			<button id="mp-down" data-action="mp-down" data-label="#abcui.mediaplayer/MediaPlayer_MoveDown">&#9660;</button>
+			<button id="mp-reload" data-action="mp-reload" data-label="#abcui.mediaplayer/MediaPlayer_Reload">#abcui.mediaplayer/MediaPlayer_Reload</button>
+		</div>
+
+		<div id="mp-hint"></div>
+	</div>
+</body>
+</rml>

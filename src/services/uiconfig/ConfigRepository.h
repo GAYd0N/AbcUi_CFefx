@@ -1,7 +1,7 @@
 #pragma once
 
 #include "UiDefinitions.h"
-#include <filesystem>
+#include <functional>
 
 namespace services::uiconfig {
 
@@ -13,7 +13,9 @@ public:
   ConfigRepository(const ConfigRepository &) = delete;
   ConfigRepository &operator=(const ConfigRepository &) = delete;
 
-  void load(const std::filesystem::path &Root,
+  using Reader = std::function<bool(const std::string &, std::string &)>;
+  using Listing = std::function<std::vector<std::string>(const std::string &)>;
+  void load(const std::string &root, Reader reader, Listing listing,
             const std::vector<settings::SettingRow> &Advanced = {});
   const MenuDefinition &menu() const {
     return Menu;
@@ -29,7 +31,8 @@ public:
   }
 
 private:
-  bool read(const std::filesystem::path &Path, std::string &Text);
+  bool read(const std::string &Path, std::string &Text);
+  Reader Read;
   void buildRows();
 
   MenuDefinition Menu;

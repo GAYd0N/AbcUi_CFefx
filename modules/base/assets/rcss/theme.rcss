@@ -1,0 +1,203 @@
+/* theme.rcss - the design tokens and shared components of the Half-Life
+   flavoured flat UI (UI overhaul WS4).
+
+   One palette, one spacing rhythm, one set of component shapes: every menu
+   page links this file and styles only what is special about it, so the
+   plugin cannot drift into per-page looks.
+
+   Shape rules: flat fills, 1dp hairline borders, 2dp radius at most, no
+   gradients (the subtle scrims on the header/footer come from translucent
+   fills, not images). Focus and selection are warmer and brighter - the
+   classic GoldSrc/Black Mesa amber against cold slate. */
+
+body {
+	/* The document body must span the viewport: RmlUi sizes an unsized body
+	   to its content, and every right/percentage anchor inside then resolves
+	   against a zero-width containing block (the recorded scoreboard trap). */
+	width: 100%;
+	height: 100%;
+
+	/* Surfaces */
+	--abc-surface: #0e1417f2;      /* panel fill over the blurred backdrop */
+	--abc-surface-2: #151d22f2;    /* raised rows, headers */
+	--abc-surface-3: #1b252bf2;    /* hovered rows */
+	--abc-inset: #0a0f12f2;        /* input wells, list interiors */
+	/* Lines */
+	--abc-line: #2d3840;
+	--abc-line-soft: #1e262c;
+	/* Text */
+	--abc-text: #d9dfe4;
+	--abc-text-dim: #8c97a0;
+	--abc-text-strong: #ffffff;
+	/* Accent (Half-Life amber) */
+	--abc-accent: #ff9a3c;
+	--abc-accent-soft: #7a4a1e;
+	--abc-accent-ink: #10161a;
+	/* State */
+	--abc-ok: #7ddc8a;
+	--abc-warn: #ffd166;
+	--abc-danger: #ff5f5f;
+	/* Rhythm */
+	--abc-gap: 6dp;
+	--abc-pad: 10dp;
+	--abc-row: 22dp;
+}
+
+/* Shared section chrome: a titled panel used by every menu surface. */
+.abc-panel {
+	display: block;
+	background-color: var(--abc-surface);
+	border: 1dp var(--abc-line);
+	padding: var(--abc-pad);
+}
+
+/* Section headline: small, uppercase, letterspaced, amber rule underneath. */
+.abc-sectitle {
+	display: block;
+	height: 16dp;
+	line-height: 16dp;
+	font-size: 8dp;
+	font-weight: bold;
+	letter-spacing: 1.6dp;
+	color: var(--abc-accent);
+	text-transform: uppercase;
+	margin-bottom: var(--abc-gap);
+}
+
+/* A flat row: the base of every list entry, table row and option line. */
+.abc-row {
+	display: block;
+	height: var(--abc-row);
+	line-height: var(--abc-row);
+	background-color: transparent;
+	color: var(--abc-text);
+	font-size: 9dp;
+	text-align: left;
+	padding-left: 8dp;
+	padding-right: 8dp;
+}
+
+.abc-row:hover {
+	background-color: var(--abc-surface-3);
+}
+
+/* Selected/focused row: amber spine plus a warmer fill. */
+.abc-row-selected, .abc-row:focus {
+	background-color: var(--abc-surface-3);
+	border-left: 2dp var(--abc-accent);
+	color: var(--abc-text-strong);
+}
+
+.abc-muted {
+	color: var(--abc-text-dim);
+}
+
+.abc-value {
+	color: var(--abc-accent);
+}
+
+/* Primary/secondary flat buttons (dialogs, action bars). */
+button, .abc-button {
+	display: inline-block;
+	height: 22dp;
+	line-height: 20dp;
+	min-width: 64dp;
+	padding-left: 10dp;
+	padding-right: 10dp;
+	background-color: var(--abc-surface-2);
+	border: 1dp var(--abc-line);
+	color: var(--abc-text);
+	font-size: 9dp;
+	text-align: center;
+	margin-right: var(--abc-gap);
+	tab-index: auto;
+}
+
+button:hover, .abc-button:hover {
+	background-color: var(--abc-surface-3);
+	border: 1dp var(--abc-text-dim);
+}
+
+button:focus, .abc-button:focus {
+	background-color: var(--abc-accent);
+	border: 1dp var(--abc-accent);
+	color: var(--abc-accent-ink);
+}
+
+/* Shared dialog frame. Home navigation deliberately does not use #panel. */
+#panel {
+	position: absolute;
+	box-sizing: border-box;
+	left: 48dp;
+	top: 40dp;
+	width: 372dp;
+	padding: 16dp;
+	background-color: var(--abc-surface);
+	border: 1dp var(--abc-line);
+	border-top: 2dp var(--abc-accent);
+}
+
+button:disabled {
+	color: var(--abc-text-dim);
+	background-color: var(--abc-inset);
+}
+
+input caret, textarea caret { background-color: var(--abc-text-strong); }
+
+/* RmlUi has no browser user-agent sheet. Native dropdown internals must
+   be laid out explicitly; retain WidgetDropDown's visibility/keyboard logic. */
+select {
+	display: inline-block;
+	box-sizing: border-box;
+	width: 200dp;
+	height: 26dp;
+	color: var(--abc-text);
+	background-color: var(--abc-inset);
+	border: 1dp var(--abc-line);
+	font-size: 10dp;
+	tab-index: auto;
+}
+select:focus, select:hover { border-color: var(--abc-accent); }
+select selectvalue {
+	display: block;
+	height: 24dp;
+	line-height: 24dp;
+	margin-right: 24dp;
+	padding-left: 8dp;
+	white-space: nowrap;
+}
+select selectarrow {
+	width: 22dp;
+	height: 24dp;
+	background-color: var(--abc-surface-3);
+	decorator: image(mod://abcui.base/img/select-arrow.png);
+}
+select selectbox {
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	max-height: 176dp;
+	margin-top: 2dp;
+	background-color: #10171cff;
+	border: 1dp var(--abc-accent-soft);
+	padding: 3dp;
+}
+select option {
+	display: block;
+	box-sizing: border-box;
+	min-height: 24dp;
+	line-height: 24dp;
+	padding: 0dp 8dp;
+	white-space: nowrap;
+}
+select option:hover, select option:checked {
+	background-color: var(--abc-surface-3);
+	color: var(--abc-accent);
+}
+scrollbarvertical { width: 10dp; }
+scrollbarvertical slidertrack { background-color: var(--abc-inset); }
+scrollbarvertical sliderbar {
+	min-height: 24dp;
+	background-color: #46525a;
+}
+scrollbarvertical sliderbar:hover { background-color: var(--abc-accent-soft); }

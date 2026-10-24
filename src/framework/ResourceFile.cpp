@@ -1,5 +1,7 @@
 // framework::ResourceFile implementation - see ResourceFile.h.
 #include "ResourceFile.h"
+#include "modsys/ModuleVfs.h"
+#include <cstring>
 
 #include <abc/Plugin.h>
 
@@ -49,17 +51,37 @@ bool normalize(std::string_view path, std::string &out) {
 }
 
 bool exists(std::string_view path) {
+  if (path.starts_with("abc/abcui/"))
+    return false;
+  if (ModuleVfs::isModuleUri(path)) {
+    PackageEntry entry;
+    return ModuleVfs::open(std::string(path).c_str(), entry, nullptr);
+  }
   std::string normalized;
-  if (!abc::g_pFileSystem || !normalize(path, normalized))
+  if (!abc::g_pFileSystem || !normalize(path, normalized) ||
+      normalized.starts_with("abc/abcui/"))
     return false;
   return abc::g_pFileSystem->FileExists(normalized.c_str());
 }
 
-bool read(std::string_view path, std::vector<unsigned char> &bytes,
+bool read(std::string_view path, std::vector<std::byte> &bytes,
           std::size_t maxBytes) {
   bytes.clear();
+  if (path.starts_with("abc/abcui/"))
+    return false;
+  if (ModuleVfs::isModuleUri(path)) {
+    PackageEntry entry;
+    if (!ModuleVfs::open(std::string(path).c_str(), entry, nullptr) ||
+        entry.size > maxBytes)
+      return false;
+    bytes.resize(entry.size);
+    if (entry.size)
+      std::memcpy(bytes.data(), entry.data, entry.size);
+    return true;
+  }
   std::string normalized;
-  if (!abc::g_pFileSystem || maxBytes == 0 || !normalize(path, normalized))
+  if (!abc::g_pFileSystem || maxBytes == 0 || !normalize(path, normalized) ||
+      normalized.starts_with("abc/abcui/"))
     return false;
 
   FileHandle_t file = abc::g_pFileSystem->Open(normalized.c_str(), "rb");

@@ -1,0 +1,7 @@
+abcui.spectator/Spec_Mode1 = Locked Chase-Camera Mode
+abcui.spectator/Spec_Mode2 = Free Chase-Camera Mode
+abcui.spectator/Spec_Mode3 = Free Roaming Mode
+abcui.spectator/Spec_Mode4 = Spectator Mode
+abcui.spectator/Spec_Health = Health
+abcui.spectator/Spec_Armor = Armor
+abcui.spectator/Spec_Dead = Dead

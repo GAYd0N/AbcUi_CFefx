@@ -10,9 +10,10 @@
 // lifecycle through a single registered IUiModule adapter, so loaded modules
 // run at exactly the same spine points the built-in modules use.
 //
-// A module that fails any step is skipped together with its dependents; the
-// rest keep working. Modules unload in reverse load order at process
-// teardown (after Rml has shut down).
+// Entry/onLoad/onInit failures revoke owned registrations and retire the
+// module together with its dependents. Callbacks are no-throw at the ABI;
+// host exception guards are defensive, not transactional rollback. Teardown
+// quiesces every module before reverse-order unload (after Rml shutdown).
 
 #include <memory>
 #include <vector>
@@ -24,7 +25,7 @@ namespace framework {
 namespace modmanager {
 
 // One-shot per process; safe to call on every HUD_Init cycle. Returns the
-// number of modules that loaded.
+// number of modules still loaded (retired initialization failures excluded).
 size_t boot();
 
 // Lifecycle forwarders, driven by the registry adapter. contextReady

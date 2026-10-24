@@ -34,8 +34,7 @@ void publishPointerState(bool enabled) {
 
 class SeatOwner final : public uiinput::Owner {
 public:
-  bool claimsKey(int down, int keynum) override {
-    (void)down;
+  bool claimsKey([[maybe_unused]] int down, int keynum) override {
     return MouseMode &&
            ((keynum >= kFirstMouseKey && keynum <= kLastMouseKey) ||
             keynum == K_MWHEELUP || keynum == K_MWHEELDOWN);

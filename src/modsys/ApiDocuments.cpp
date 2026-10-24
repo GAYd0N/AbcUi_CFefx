@@ -12,10 +12,13 @@ namespace DocumentsApi {
 namespace {
 
 AbcUiDocument *apiCreate(const AbcUiDocumentDesc *desc) {
-  if (!desc || desc->structSize < sizeof(uint32_t))
+  if (!desc || desc->structSize < offsetof(AbcUiDocumentDesc, flags) ||
+      (desc->structSize < sizeof(AbcUiDocumentDesc) &&
+       desc->structSize % sizeof(uint32_t) != 0))
     return nullptr;
   // Honor the caller's declared size (an older module's shorter descriptor
-  // must not be read past its end); the missing tail stays zeroed.
+  // must not be read past its end); the missing tail stays zeroed. The name
+  // and path are mandatory; never copy half a pointer or callback.
   AbcUiDocumentDesc full{};
   std::memcpy(&full, desc,
               std::min<size_t>(desc->structSize, sizeof(AbcUiDocumentDesc)));
@@ -66,6 +69,9 @@ const AbcUiDocumentsApi kDocumentsApi = {
     apiHide,
     apiRoot,
     apiRetry,
+    module_documents::registerRecovery,
+    module_documents::unregisterRecovery,
+    module_documents::requestRetry,
 };
 
 } // namespace

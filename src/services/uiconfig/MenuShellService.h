@@ -25,6 +25,9 @@ struct MenuShellAccess {
   void (*buildNote)(std::string &note) = nullptr;
 };
 
+void setResourceRoot(std::string uri);
+const std::string &resourceRoot();
+
 void setShellAccess(const MenuShellAccess &access);
 const MenuShellAccess &shellAccess();
 

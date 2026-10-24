@@ -56,6 +56,8 @@ bool findHudSprite(const char *name, std::string &atlasFile, wrect_t &rect);
 // to <rect>. 0 when the atlas or the texture channel is unavailable. The
 // straightAlpha flag keys the cache: the same crop under both blend flavors
 // must not share a texture id (the additive mark rides the id).
+int resourceStatus(const std::string &atlasFile, const wrect_t &rect);
+
 int croppedTexture(const std::string &atlasFile, const wrect_t &rect,
                    bool straightAlpha = false);
 

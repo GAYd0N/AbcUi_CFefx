@@ -7,6 +7,7 @@
 #include <abc/Console.h>
 
 #include <algorithm>
+#include <format>
 #include <string>
 
 namespace services {
@@ -47,10 +48,7 @@ std::uint64_t idFromText(const std::string &text) {
 }
 
 std::string textFromId(std::uint64_t id) {
-  char buffer[24];
-  std::snprintf(buffer, sizeof(buffer), "%llu",
-                static_cast<unsigned long long>(id));
-  return buffer;
+  return std::format("{}", id);
 }
 } // namespace
 

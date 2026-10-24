@@ -40,7 +40,8 @@ std::unique_ptr<PackageImage> PackageImage::open(const char *path,
   }
 
   LARGE_INTEGER fileSize{};
-  if (!GetFileSizeEx(file, &fileSize) || fileSize.QuadPart <= 0) {
+  if (!GetFileSizeEx(file, &fileSize) || fileSize.QuadPart <= 0 ||
+      fileSize.QuadPart > 1024ll * 1024 * 1024) {
     CloseHandle(file);
     if (error)
       *error = "package file size is unreadable or empty";

@@ -18,6 +18,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace framework {
 
@@ -28,19 +29,27 @@ bool isModuleUri(std::string_view uri);
 
 // Mounts a parsed package under a module id and takes ownership of the
 // image. Fails when the id is empty or already mounted.
-bool mount(const char *moduleId, std::unique_ptr<PackageImage> image);
+bool mount(const char *moduleId, std::unique_ptr<PackageImage> image,
+           std::vector<std::string> dependencies = {});
 // Drops one mount (load failures) or every mount (process teardown).
 void unmount(const char *moduleId);
 void unmountAll();
 
 bool isMounted(const char *moduleId);
+// Deterministic snapshot; callers must still check mount lifetime on lookup.
+std::vector<std::string> mountedIds();
+// Canonical package URI and dependency checks. Never searches loose files.
+bool resolve(std::string_view base, std::string_view path, std::string &uri);
+bool canRead(std::string_view requester, std::string_view uri);
+std::vector<std::string> list(const char *directory);
+bool readText(const char *uri, std::string &out, size_t maxBytes = 1024 * 1024);
 
 // Resolves "mod://<id>/<path>" into an entry view. The path may carry '.'
 // and '..' segments; they are collapsed before lookup.
-bool open(const char *uri, PackageEntry &out, std::string *error);
+[[nodiscard]] bool open(const char *uri, PackageEntry &out, std::string *error);
 // Same, for a path inside a known module.
-bool openPath(const char *moduleId, const char *path, PackageEntry &out,
-              std::string *error);
+[[nodiscard]] bool openPath(const char *moduleId, const char *path,
+                            PackageEntry &out, std::string *error);
 
 } // namespace ModuleVfs
 

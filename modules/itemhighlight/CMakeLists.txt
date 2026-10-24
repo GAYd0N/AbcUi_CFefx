@@ -1,6 +1,7 @@
 # abcui.itemhighlight - world-item highlight module (see sdk/abcui/abi.h for
 # the module build contract).
-add_library(abcui_mod_itemhighlight MODULE src/ItemHighlightModule.cpp)
+add_library(abcui_mod_itemhighlight MODULE src/ItemHighlightModule.cpp
+                                             src/items/ItemList.cpp)
 target_include_directories(abcui_mod_itemhighlight PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk")
 set_target_properties(abcui_mod_itemhighlight PROPERTIES OUTPUT_NAME

@@ -1,14 +1,8 @@
 #pragma once
 
-// framework::Localization - token -> string table for the game language.
-// Plan 05 §4.4: replaces ABCEnchance abcenchance/localize/{lang}.txt (VGUI
-// localized format: "token" "value" pairs, GBK for the old schinese file) --
-// the table files under abc/abcui/lang/ are UTF-8 `key = value` lines.
-//
-// Language selection: VGUI2Extension GetCurrentLanguage() when present,
-// falling back to english (the old code's gamedir heuristic covers the same
-// two cases in practice). Rml resolves "#token" strings through
-// AbcSystemInterface::TranslateString -> translate() below.
+// Package-owned UTF-8 translation tables. Explicit <module-id>/<token>
+// namespaces; unqualified SDK lookups use the current module's namespace.
+// Each module loads English first, then its active-language overrides.
 
 #include <string>
 
@@ -16,8 +10,7 @@ namespace framework {
 
 class Localization {
 public:
-  // Loads abc/abcui/lang/<lang>.txt for the detected language. Idempotent:
-  // calling again after a language switch reloads the table.
+  // Reloads the mounted packages for the detected language.
   static void load();
 
   // True and fills `out` when the token is known; leaves `out` alone and

@@ -10,6 +10,7 @@
 #include <abcui/module_api.h>
 
 #include <cstdio>
+#include <format>
 #include <cstring>
 #include <string>
 
@@ -201,10 +202,9 @@ void showMenu(int validSlots, int displaySeconds, int bits, const char *text) {
 // Old SelectMenuItem: valid slot -> menuselect/as_menuselect + fade out.
 void selectMenuItem(int slot) {
   if (slot > 0 && (ValidSlots & (1 << (slot - 1)))) {
-    char command[32];
-    std::snprintf(command, sizeof(command), "%s %d\n",
-                  IsASMenu ? "as_menuselect" : "menuselect", slot);
-    Api->console->engineCommand(command);
+    const std::string command =
+        std::format("{} {}\n", IsASMenu ? "as_menuselect" : "menuselect", slot);
+    Api->console->engineCommand(command.c_str());
     setMenuOpen(false);
     closeForFade();
   }
@@ -249,9 +249,12 @@ void panelReset(void *) {
 
 // ---- event sinks ----
 
-void onShowMenu(void *, const void *payload) {
+int onShowMenu(void *, const void *payload) {
+  if (!Api->ui->panelDocument("textmenu"))
+    return 0;
   const auto *event = static_cast<const AbcUiShowMenuEvent *>(payload);
   showMenu(event->validSlots, event->displaySeconds, event->bits, event->text);
+  return 1;
 }
 
 void onInitHud(void *, const void *) {
@@ -283,13 +286,12 @@ void onModuleLoad() {
   Panel.reset = &panelReset;
   Api->panels->registerPanel(&Panel);
 
-  Api->events->subscribe(ABCUI_CHANNEL_NETMSG_SHOW_MENU, 0, &onShowMenu,
-                         nullptr);
+  Api->events->subscribeVeto(ABCUI_CHANNEL_NETMSG_SHOW_MENU, 0, &onShowMenu,
+                             nullptr);
   Api->events->subscribe(ABCUI_CHANNEL_NETMSG_INIT_HUD, 0, &onInitHud, nullptr);
   for (intptr_t i = 0; i < 10; i++) {
-    char name[8];
-    std::snprintf(name, sizeof(name), "slot%d", static_cast<int>(i) + 1);
-    Api->commands->subscribeCommand(name, 0, &onSlotCommand,
+    const std::string name = std::format("slot{}", i + 1);
+    Api->commands->subscribeCommand(name.c_str(), 0, &onSlotCommand,
                                     reinterpret_cast<void *>(i));
   }
 }
@@ -306,10 +308,11 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->commands || !api->console)
@@ -318,7 +321,7 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.textmenu";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = nullptr;
   out->onContextReady = nullptr;

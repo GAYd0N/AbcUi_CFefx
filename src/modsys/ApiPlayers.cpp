@@ -1,6 +1,7 @@
 // framework::PlayersApi - the sdk players section (player-resource rows and
 // engine entity snapshots). See ApiTable.h for how it joins the module table.
 #include "ApiTable.h"
+#include "ApiSnapshot.h"
 
 #include <algorithm>
 #include <cstring>
@@ -23,16 +24,7 @@ void copyField(const std::string &text, char *out, size_t outSize) {
   out[i] = '\0';
 }
 
-// Honors the caller's declared structSize (ABI rule: an older, shorter header
-// must not be overrun). 0 means "the framework's current size".
-void copyOut(const AbcUiPlayerInfo &full, AbcUiPlayerInfo &out) {
-  const size_t declared = out.structSize;
-  const size_t bytes =
-      declared == 0 || declared > sizeof(full) ? sizeof(full) : declared;
-  std::memcpy(&out, &full, bytes);
-}
-
-void fill(const playerres::PlayerInfo &info, AbcUiPlayerInfo &out) {
+void fill(const playerres::PlayerInfo &info, void *out) {
   AbcUiPlayerInfo full{};
   full.structSize = sizeof(AbcUiPlayerInfo);
   full.index = info.index;
@@ -53,7 +45,7 @@ void fill(const playerres::PlayerInfo &info, AbcUiPlayerInfo &out) {
   copyField(info.model, full.model, sizeof(full.model));
   full.deaths = info.deaths;
   copyField(info.realName, full.realName, sizeof(full.realName));
-  copyOut(full, out);
+  abi::copySnapshot(out, full);
 }
 
 void apiLocal(AbcUiPlayerInfo *out) {
@@ -63,10 +55,10 @@ void apiLocal(AbcUiPlayerInfo *out) {
   if (!info) {
     AbcUiPlayerInfo empty{};
     empty.structSize = sizeof(AbcUiPlayerInfo);
-    copyOut(empty, *out);
+    abi::copySnapshot(out, empty);
     return;
   }
-  fill(*info, *out);
+  fill(*info, out);
 }
 
 int32_t apiGet(int32_t index, AbcUiPlayerInfo *out) {
@@ -75,17 +67,13 @@ int32_t apiGet(int32_t index, AbcUiPlayerInfo *out) {
   const playerres::PlayerInfo *info = playerres::getPlayerInfo(index);
   if (!info)
     return 0;
-  fill(*info, *out);
+  fill(*info, out);
   return 1;
 }
 
 int32_t apiEntity(int32_t index, AbcUiEntityState *out) {
   if (!out)
     return 0;
-  const size_t declared = out->structSize;
-  const size_t bytes = declared == 0 || declared > sizeof(AbcUiEntityState)
-                           ? sizeof(AbcUiEntityState)
-                           : declared;
   AbcUiEntityState state{};
   state.structSize = sizeof(AbcUiEntityState);
   const cl_entity_t *entity = gEngfuncs.GetEntityByIndex(index);
@@ -101,7 +89,7 @@ int32_t apiEntity(int32_t index, AbcUiEntityState *out) {
       state.maxs[i] = entity->curstate.maxs[i];
     }
   }
-  std::memcpy(out, &state, bytes);
+  abi::copySnapshot(out, state);
   return state.valid;
 }
 
@@ -117,8 +105,22 @@ int32_t apiClientColor(int32_t index, float out[3]) {
   return 1;
 }
 
-int32_t apiAvatarGeneration(uint64_t steamId64) {
-  return static_cast<int32_t>(avatars::generation(steamId64));
+int32_t apiAvatar(uint64_t steamId64, int32_t *generation) {
+  if (!generation)
+    return ABCUI_ERROR_INVALID;
+  int value = 0;
+  const int result = avatars::status(steamId64, value);
+  *generation = value;
+  return result;
+}
+
+int32_t apiAvatarAnimated(uint64_t steamId64, int32_t *generation) {
+  if (!generation)
+    return ABCUI_ERROR_INVALID;
+  int value = 0;
+  const int result = avatars::animatedStatus(steamId64, value);
+  *generation = value;
+  return result;
 }
 
 int32_t apiTeamNameToken(int32_t team, char *out, uint32_t outSize) {
@@ -142,14 +144,9 @@ void apiRefresh(int32_t full) {
 }
 
 const AbcUiPlayersApi kPlayersApi = {
-    sizeof(AbcUiPlayersApi),
-    apiLocal,
-    apiGet,
-    apiEntity,
-    apiClientColor,
-    apiAvatarGeneration,
-    apiTeamNameToken,
-    apiRefresh,
+    sizeof(AbcUiPlayersApi), apiLocal,  apiGet,           apiEntity,
+    apiClientColor,          apiAvatar, apiTeamNameToken, apiRefresh,
+    apiAvatarAnimated,
 };
 
 } // namespace

@@ -1,10 +1,15 @@
 // framework::ApiTable implementation - see ApiTable.h.
 #include "ApiTable.h"
+#include "ApiTextures.h"
+#include "ApiAudio.h"
 
 #include <cstdarg>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <map>
+#include <memory>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -20,11 +25,13 @@
 #include "ModuleManager.h"
 #include "ModulePanel.h"
 #include "ModuleVfs.h"
+#include "ModuleServices.h"
 
 // The SDK's AbcUiFileView typedef sits at global scope (module_api.h), so its
 // definition must too; it owns one package entry view.
 struct AbcUiFileView {
   framework::PackageEntry entry;
+  framework::module_resources::Registration lifetime;
 };
 
 namespace framework {
@@ -76,6 +83,10 @@ void apiError(const char *format, ...) {
   abc::ConsoleError("[module] %s\n", buffer);
 }
 
+int32_t apiFailInitialization(const char *reason) {
+  return module_resources::failInitialization(reason) ? 1 : 0;
+}
+
 const AbcUiCoreApi kCoreApi = {
     sizeof(AbcUiCoreApi),
     packedVersion(kFrameworkVersion),
@@ -83,13 +94,18 @@ const AbcUiCoreApi kCoreApi = {
     apiPrint,
     apiWarn,
     apiError,
+    apiFailInitialization,
+    module_services::registerService,
+    module_services::unregisterService,
+    module_services::available,
+    module_services::call,
 };
 
 // ------------------------------------------------------------- console ----
 
 AbcUiCvarHandle apiRegisterCvar(const char *name, const char *value,
                                 int flags) {
-  if (!name || !value)
+  if (!name || !value || !module_resources::accepting())
     return nullptr;
   return static_cast<AbcUiCvarHandle>(
       abc::CREATE_CVAR(name, value, flags, nullptr));
@@ -117,6 +133,7 @@ void apiCvarString(AbcUiCvarHandle cvar, char *out, uint32_t outSize,
 struct ModuleCommand {
   AbcUiCommandFn fn = nullptr;
   void *userdata = nullptr;
+  module_resources::Registration lifetime;
 };
 
 std::map<std::string, ModuleCommand> &moduleCommands() {
@@ -130,18 +147,34 @@ void moduleCommandThunk() {
   const char *name = gEngfuncs.Cmd_Argv(0);
   const auto &table = moduleCommands();
   const auto it = table.find(name ? name : "");
-  if (it != table.end() && it->second.fn)
-    it->second.fn(it->second.userdata);
+  if (it != table.end() && it->second.fn) {
+    const auto owner = it->second.lifetime.owner();
+    const auto fn = it->second.fn;
+    void *userdata = it->second.userdata;
+    module_resources::invoke(owner, "console command", fn, userdata);
+  }
 }
 
 void apiRegisterCommand(const char *name, AbcUiCommandFn fn, void *userdata) {
-  if (!name || !fn)
+  if (!name || !fn || !module_resources::accepting())
     return;
   auto &table = moduleCommands();
-  const bool fresh = table.find(name) == table.end();
-  table[name] = ModuleCommand{fn, userdata};
+  auto [it, fresh] = table.try_emplace(name);
+  if (it->second.fn &&
+      it->second.lifetime.owner() != module_resources::current()) {
+    abc::ConsoleWarn("[AbcUi] command \"%s\" belongs to another module\n",
+                     name);
+    return;
+  }
+  it->second = ModuleCommand{fn, userdata};
+  it->second.lifetime.track([key = it->first] {
+    auto &record = moduleCommands().at(key);
+    record.fn = nullptr;
+    record.userdata = nullptr;
+    record.lifetime.forget();
+  });
   if (fresh)
-    abc::ADD_COMMAND(name, &moduleCommandThunk);
+    abc::ADD_COMMAND(it->first.c_str(), &moduleCommandThunk);
 }
 
 void apiEngineCommand(const char *command) {
@@ -154,8 +187,28 @@ void apiServerCommand(const char *command) {
     abc::ServerCmd(command);
 }
 
+module_resources::Registration &voteGateLifetime() {
+  static module_resources::Registration lifetime;
+  return lifetime;
+}
+
 void apiSetVoteGate(AbcUiCvarHandle cvar) {
+  if (!module_resources::accepting())
+    return;
+  auto &lifetime = voteGateLifetime();
+  if (cvar && lifetime.tracked() &&
+      lifetime.owner() != module_resources::current()) {
+    abc::ConsoleWarn("[AbcUi] vote gate belongs to another module\n");
+    return;
+  }
+  lifetime.forget();
+  lifetime = module_resources::Registration{};
   netmsg::setVoteGate(static_cast<cvar_t *>(cvar));
+  if (cvar)
+    lifetime.track([] {
+      netmsg::setVoteGate(nullptr);
+      voteGateLifetime().forget();
+    });
 }
 
 // Engine cvar callbacks receive only the cvar pointer; the module's
@@ -163,6 +216,7 @@ void apiSetVoteGate(AbcUiCvarHandle cvar) {
 struct CvarWatch {
   AbcUiCommandFn fn = nullptr;
   void *userdata = nullptr;
+  module_resources::Registration lifetime;
 };
 
 std::map<cvar_t *, CvarWatch> &cvarWatches() {
@@ -173,19 +227,35 @@ std::map<cvar_t *, CvarWatch> &cvarWatches() {
 void cvarWatchThunk(cvar_t *cvar) {
   const auto &table = cvarWatches();
   const auto it = table.find(cvar);
-  if (it != table.end() && it->second.fn)
-    it->second.fn(it->second.userdata);
+  if (it != table.end() && it->second.fn) {
+    const auto owner = it->second.lifetime.owner();
+    const auto fn = it->second.fn;
+    void *userdata = it->second.userdata;
+    module_resources::invoke(owner, "cvar watch", fn, userdata);
+  }
 }
 
 AbcUiCvarHandle apiRegisterCvarWatch(const char *name, const char *value,
                                      int flags, AbcUiCommandFn fn,
                                      void *userdata) {
+  if (!module_resources::accepting())
+    return nullptr;
   if (!name || !value || !fn)
     return apiRegisterCvar(name, value, flags);
+  if (auto *existing = abc::CVAR_GET_POINTER(name)) {
+    const auto it = cvarWatches().find(existing);
+    if (it != cvarWatches().end() &&
+        it->second.lifetime.owner() != module_resources::current()) {
+      abc::ConsoleWarn("[AbcUi] cvar watch \"%s\" belongs to another module\n",
+                       name);
+      return nullptr;
+    }
+  }
   cvar_t *cvar = abc::CREATE_CVAR(name, value, flags, &cvarWatchThunk);
   if (!cvar)
     return nullptr;
   cvarWatches()[cvar] = CvarWatch{fn, userdata};
+  cvarWatches()[cvar].lifetime.track([cvar] { cvarWatches().erase(cvar); });
   return static_cast<AbcUiCvarHandle>(cvar);
 }
 
@@ -233,21 +303,18 @@ const AbcUiConsoleApi kConsoleApi = {
 
 AbcUiSubscription apiSubscribe(const char *channel, int priority,
                                AbcUiEventSink sink, void *userdata) {
-  return eventBus().subscribe(channel, priority,
-                              reinterpret_cast<EventSinkFn>(sink), userdata);
+  return eventBus().subscribe(channel, priority, sink, userdata);
 }
 
 AbcUiSubscription apiSubscribeVeto(const char *channel, int priority,
                                    AbcUiEventVeto sink, void *userdata) {
-  return eventBus().subscribeVeto(
-      channel, priority, reinterpret_cast<EventVetoFn>(sink), userdata);
+  return eventBus().subscribeVeto(channel, priority, sink, userdata);
 }
 
 AbcUiSubscription apiSubscribeVetoAggregate(const char *channel, int priority,
                                             AbcUiEventVeto sink,
                                             void *userdata) {
-  return eventBus().subscribeVetoAggregate(
-      channel, priority, reinterpret_cast<EventVetoFn>(sink), userdata);
+  return eventBus().subscribeVetoAggregate(channel, priority, sink, userdata);
 }
 
 void apiUnsubscribe(AbcUiSubscription subscription) {
@@ -255,45 +322,95 @@ void apiUnsubscribe(AbcUiSubscription subscription) {
 }
 
 const AbcUiEventsApi kEventsApi = {
-    sizeof(AbcUiEventsApi),    apiSubscribe, apiSubscribeVeto, apiUnsubscribe,
-    apiSubscribeVetoAggregate,
+    sizeof(AbcUiEventsApi),    apiSubscribe,
+    apiSubscribeVeto,          apiUnsubscribe,
+    apiSubscribeVetoAggregate, module_services::publish,
 };
 
 // ----------------------------------------------------------------- vfs ----
 
-AbcUiFileView *apiVfsOpen(const char *moduleId, const char *path) {
-  auto *view = new (std::nothrow) AbcUiFileView();
-  if (!view)
-    return nullptr;
-  if (!ModuleVfs::openPath(moduleId, path, view->entry, nullptr)) {
-    delete view;
-    return nullptr;
-  }
-  return view;
+std::map<AbcUiFileView *, std::unique_ptr<AbcUiFileView>> &fileViews() {
+  static std::map<AbcUiFileView *, std::unique_ptr<AbcUiFileView>> views;
+  return views;
+}
+
+void removeView(AbcUiFileView *view) {
+  fileViews().erase(view);
+}
+
+bool ownsView(AbcUiFileView *view) {
+  const auto it = fileViews().find(view);
+  return it != fileViews().end() &&
+         it->second->lifetime.owner() == module_resources::current();
+}
+void apiViewFree(AbcUiFileView *view) {
+  if (ownsView(view))
+    removeView(view);
+}
+
+int32_t apiVfsOpen(const char *uri, AbcUiFileView **out) {
+  if (out)
+    *out = nullptr;
+  if (!uri || !out || !ModuleVfs::isModuleUri(uri))
+    return ABCUI_ERROR_INVALID;
+  const auto owner = module_resources::current();
+  if (!owner || !module_resources::accepting() ||
+      !ModuleVfs::canRead(owner->id, uri))
+    return ABCUI_ERROR_FORBIDDEN;
+  auto view = std::make_unique<AbcUiFileView>();
+  if (!ModuleVfs::open(uri, view->entry, nullptr))
+    return ABCUI_ERROR_NOT_FOUND;
+  if (view->entry.size > UINT32_MAX)
+    return ABCUI_ERROR_LIMIT;
+  AbcUiFileView *raw = view.get();
+  fileViews().emplace(raw, std::move(view));
+  raw->lifetime.track([raw] { removeView(raw); });
+  *out = raw;
+  return ABCUI_OK;
 }
 
 const void *apiViewData(AbcUiFileView *view) {
-  return view ? view->entry.data : nullptr;
+  return ownsView(view) ? view->entry.data : nullptr;
 }
 
 uint32_t apiViewSize(AbcUiFileView *view) {
-  return view ? static_cast<uint32_t>(view->entry.size) : 0;
+  return ownsView(view) ? static_cast<uint32_t>(view->entry.size) : 0;
 }
 
-void apiViewFree(AbcUiFileView *view) {
-  delete view;
+int32_t apiVfsEnumerate(const char *directory, AbcUiFileSink sink,
+                        void *userdata) {
+  const auto owner = module_resources::current();
+  if (!directory || !sink)
+    return ABCUI_ERROR_INVALID;
+  std::string probe = std::string(directory) + "/_";
+  if (!owner || !ModuleVfs::canRead(owner->id, probe))
+    return ABCUI_ERROR_FORBIDDEN;
+  const auto files = ModuleVfs::list(directory);
+  for (const auto &uri : files)
+    module_resources::invoke(owner, "VFS enumeration", sink, userdata,
+                             uri.c_str());
+  return ABCUI_OK;
 }
 
-int apiVfsExists(const char *moduleId, const char *path) {
-  PackageEntry entry;
-  return ModuleVfs::openPath(moduleId, path, entry, nullptr) ? 1 : 0;
+int32_t apiVfsResolve(const char *base, const char *path, char *out,
+                      uint32_t outSize) {
+  std::string uri;
+  if (!path || !ModuleVfs::resolve(base ? base : "", path, uri))
+    return ABCUI_ERROR_INVALID;
+  const auto owner = module_resources::current();
+  if (!owner || !ModuleVfs::canRead(owner->id, uri))
+    return ABCUI_ERROR_FORBIDDEN;
+  if (!out || outSize <= uri.size())
+    return ABCUI_ERROR_LIMIT;
+  std::memcpy(out, uri.c_str(), uri.size() + 1);
+  return ABCUI_OK;
 }
 
 int apiReadEngineFile(const char *path, void *out, uint32_t outSize,
                       uint32_t maxBytes) {
-  if (!path || !*path)
+  if (!path || !*path || std::string_view(path).starts_with("abc/abcui/"))
     return -1;
-  std::vector<unsigned char> bytes;
+  std::vector<std::byte> bytes;
   if (!ResourceFile::read(path, bytes, maxBytes ? maxBytes : 65536u))
     return -1;
   if (out && outSize > 0) {
@@ -306,8 +423,8 @@ int apiReadEngineFile(const char *path, void *out, uint32_t outSize,
 }
 
 const AbcUiVfsApi kVfsApi = {
-    sizeof(AbcUiVfsApi), apiVfsOpen,   apiViewData,       apiViewSize,
-    apiViewFree,         apiVfsExists, apiReadEngineFile,
+    sizeof(AbcUiVfsApi), apiVfsOpen,      apiViewData,   apiViewSize,
+    apiViewFree,         apiVfsEnumerate, apiVfsResolve, apiReadEngineFile,
 };
 
 // -------------------------------------------------------------- panels ----
@@ -338,8 +455,12 @@ void apiRadarSetActive(int32_t active) {
   radarrender::setActive(active != 0);
 }
 
-void apiRadarSetMaskRound(int32_t round) {
-  radarrender::setMaskRound(round != 0);
+int32_t apiRadarSetMask(AbcUiTexture texture) {
+  const int id = TexturesApi::textureId(texture);
+  if (texture && !id)
+    return ABCUI_ERROR_INVALID;
+  radarrender::setMask(id);
+  return ABCUI_OK;
 }
 
 void apiRadarSetZoom(float zoom) {
@@ -347,21 +468,15 @@ void apiRadarSetZoom(float zoom) {
 }
 
 const AbcUiRadarApi kRadarApi = {
-    sizeof(AbcUiRadarApi), apiRadarReady,        apiRadarGeneration,
-    apiRadarSetActive,     apiRadarSetMaskRound, apiRadarSetZoom,
+    sizeof(AbcUiRadarApi), apiRadarReady,   apiRadarGeneration,
+    apiRadarSetActive,     apiRadarSetMask, apiRadarSetZoom,
 };
 
 // ------------------------------------------------------------- commands ----
 
 AbcUiSubscription apiSubscribeCommand(const char *name, int priority,
                                       AbcUiEventVeto sink, void *userdata) {
-  if (!name)
-    return 0;
-  // The chained-command bus bridges every hooked command onto an aggregate
-  // veto channel ("command.<name>"); see framework/Commands.cpp.
-  const std::string channel = std::string("command.") + name;
-  return eventBus().subscribeVetoAggregate(
-      channel.c_str(), priority, reinterpret_cast<EventVetoFn>(sink), userdata);
+  return ::commands::subscribe(name, priority, sink, userdata);
 }
 
 int apiTextMenuOpen() {
@@ -372,11 +487,16 @@ void apiSetTextMenuOpen(int open) {
   ::commands::setTextMenuOpen(open != 0);
 }
 
+int32_t apiEnsureFirstCommand(const char *name) {
+  return ::commands::ensureFirst(name);
+}
+
 const AbcUiCommandsApi kCommandsApi = {
     sizeof(AbcUiCommandsApi),
     apiSubscribeCommand,
     apiTextMenuOpen,
     apiSetTextMenuOpen,
+    apiEnsureFirstCommand,
 };
 
 } // namespace
@@ -411,7 +531,7 @@ bool tableComplete(const AbcUiModuleApi &api) {
          api.documents && api.menu && api.votemenu && api.playerlist &&
          api.commandmenu && api.menuconfig && api.social && api.inventory &&
          api.creategame && api.consolepage && api.serverbrowser &&
-         api.connection && api.settings;
+         api.connection && api.settings && api.textures && api.audio;
 }
 
 void verifySections() {
@@ -424,15 +544,15 @@ void verifySections() {
   // later commits appended members. Such omissions only surface as null calls
   // at runtime, so audit every section here and report at boot.
   const bool complete =
-      allMembersSet(kConsoleApi) && allMembersSet(kEventsApi) &&
-      allMembersSet(kVfsApi) && allMembersSet(kPanelsApi) &&
-      allMembersSet(kCommandsApi) && allMembersSet(kRadarApi) &&
-      allMembersSet(*DataApi::get()) && allMembersSet(*UiApi::get()) &&
-      allMembersSet(*WeaponsApi::get()) && allMembersSet(*PlayersApi::get()) &&
-      allMembersSet(*ScoreApi::get()) && allMembersSet(*InputApi::get()) &&
-      allMembersSet(*ShellApi::get()) && allMembersSet(*VoiceApi::get()) &&
-      allMembersSet(*DocumentsApi::get()) && allMembersSet(*MenuApi::get()) &&
-      allMembersSet(*VoteMenuApi::get()) &&
+      kCoreApi.failInitialization && allMembersSet(kConsoleApi) &&
+      allMembersSet(kEventsApi) && allMembersSet(kVfsApi) &&
+      allMembersSet(kPanelsApi) && allMembersSet(kCommandsApi) &&
+      allMembersSet(kRadarApi) && allMembersSet(*DataApi::get()) &&
+      allMembersSet(*UiApi::get()) && allMembersSet(*WeaponsApi::get()) &&
+      allMembersSet(*PlayersApi::get()) && allMembersSet(*ScoreApi::get()) &&
+      allMembersSet(*InputApi::get()) && allMembersSet(*ShellApi::get()) &&
+      allMembersSet(*VoiceApi::get()) && allMembersSet(*DocumentsApi::get()) &&
+      allMembersSet(*MenuApi::get()) && allMembersSet(*VoteMenuApi::get()) &&
       allMembersSet(*PlayerListApi::get()) &&
       allMembersSet(*CommandMenuApi::get()) &&
       allMembersSet(*MenuConfigApi::get()) &&
@@ -441,7 +561,8 @@ void verifySections() {
       allMembersSet(*ConsolePageApi::get()) &&
       allMembersSet(*ServerBrowserApi::get()) &&
       allMembersSet(*ConnectionApi::get()) &&
-      allMembersSet(*SettingsApi::get());
+      allMembersSet(*SettingsApi::get()) &&
+      allMembersSet(*TexturesApi::get()) && allMembersSet(*AudioApi::get());
   if (!complete) {
     abc::ConsoleError("[AbcUi] module api table has null section members");
   }
@@ -482,6 +603,8 @@ const AbcUiModuleApi *get() {
       ServerBrowserApi::get(),
       ConnectionApi::get(),
       SettingsApi::get(),
+      TexturesApi::get(),
+      AudioApi::get(),
   };
   static const bool complete = tableComplete(kApi);
   if (!complete)

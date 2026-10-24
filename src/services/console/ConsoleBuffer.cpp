@@ -29,7 +29,7 @@ unsigned utf8SequenceLength(unsigned char lead) {
 
 void ConsoleBuffer::pushText(const char *text, std::size_t length,
                              bool developer) {
-  std::lock_guard<std::mutex> lock(Mutex);
+  std::lock_guard lock(Mutex);
   if (Stopped) {
     ++Stats.RejectedAfterShutdown;
     return;
@@ -99,7 +99,7 @@ void ConsoleBuffer::trimPartialSequenceLocked() {
 }
 
 void ConsoleBuffer::clear() {
-  std::lock_guard<std::mutex> lock(Mutex);
+  std::lock_guard lock(Mutex);
   Lines.clear();
   Pending.clear();
   PendingDeveloper = false;
@@ -108,7 +108,7 @@ void ConsoleBuffer::clear() {
 }
 
 void ConsoleBuffer::shutdown() {
-  std::lock_guard<std::mutex> lock(Mutex);
+  std::lock_guard lock(Mutex);
   if (Stopped)
     return;
   Stopped = true;
@@ -120,34 +120,34 @@ void ConsoleBuffer::shutdown() {
 }
 
 bool ConsoleBuffer::stopped() const {
-  std::lock_guard<std::mutex> lock(Mutex);
+  std::lock_guard lock(Mutex);
   return Stopped;
 }
 
 std::uint64_t ConsoleBuffer::generation() const {
-  std::lock_guard<std::mutex> lock(Mutex);
+  std::lock_guard lock(Mutex);
   return GenerationCounter;
 }
 
 std::uint64_t ConsoleBuffer::latestSequence() const {
-  std::lock_guard<std::mutex> lock(Mutex);
+  std::lock_guard lock(Mutex);
   return SequenceCounter;
 }
 
 std::size_t ConsoleBuffer::lineCount() const {
-  std::lock_guard<std::mutex> lock(Mutex);
+  std::lock_guard lock(Mutex);
   return Lines.size();
 }
 
 ConsoleBufferStats ConsoleBuffer::stats() const {
-  std::lock_guard<std::mutex> lock(Mutex);
+  std::lock_guard lock(Mutex);
   return Stats;
 }
 
 std::size_t ConsoleBuffer::copySince(std::uint64_t since,
                                      std::vector<ConsoleLine> &out,
                                      std::size_t max) const {
-  std::lock_guard<std::mutex> lock(Mutex);
+  std::lock_guard lock(Mutex);
   out.clear();
   if (max == 0)
     return 0;

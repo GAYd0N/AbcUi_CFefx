@@ -10,10 +10,10 @@
 // with DLL_PROCESS_ATTACH on success; unload runs DllMain(DETACH), releases
 // the imported modules and frees the image.
 //
-// x86 SEH and C++ exceptions work for manually mapped images (the FS-chain
-// needs no kernel registration); static TLS, delay-loaded imports and .NET
-// images are rejected with a load error instead of failing silently later.
-// These constraints are documented in the SDK.
+// The image is not registered with the OS loader; cross-image C++ unwinding
+// is not guaranteed. SDK callbacks must not throw across the C ABI; expected
+// startup errors use core->failInitialization. Static TLS, delay-loaded
+// imports and .NET images are rejected with a load error.
 
 #include <cstddef>
 #include <string>
@@ -32,8 +32,9 @@ public:
   // Maps and initializes the image. False with `error` set on any failure.
   // `data` is only read during the call: sections are copied into the
   // committed image.
-  bool load(const void *data, size_t size, std::string *error);
-  // DllMain(DETACH), import release, image free. Idempotent.
+  [[nodiscard]] bool load(const void *data, size_t size, std::string *error);
+  // Detach only after a successful attach, then release imports and image.
+  // Safe after a partial load and idempotent.
   void unload();
 
   bool isLoaded() const {
@@ -45,9 +46,10 @@ public:
   void *getExport(const char *name) const;
 
 private:
-  void *Image = nullptr;       // committed image base (entry point lives here)
-  size_t ImageSize = 0;        // SizeOfImage (virtual)
-  std::vector<void *> Imports; // modules to FreeLibrary at unload
+  void *Image = nullptr; // committed image base (entry point lives here)
+  size_t ImageSize = 0;  // SizeOfImage (virtual)
+  void *AttachedEntry = nullptr; // set only after DllMain(ATTACH) succeeds
+  std::vector<void *> Imports;   // modules to FreeLibrary at unload
 };
 
 } // namespace framework

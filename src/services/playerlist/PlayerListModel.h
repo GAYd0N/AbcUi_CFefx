@@ -84,10 +84,7 @@ struct SelectionKey {
 
   static SelectionKey forEntry(const RosterEntry &entry);
   bool matches(const RosterEntry &entry) const;
-  bool operator==(const SelectionKey &other) const {
-    return HasId == other.HasId && SteamId64 == other.SteamId64 &&
-           Index == other.Index && Name == other.Name;
-  }
+  bool operator==(const SelectionKey &) const = default;
 };
 
 enum class ToggleError {

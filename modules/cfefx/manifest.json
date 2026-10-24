@@ -3,10 +3,12 @@
   "name": "CFefx",
   "description": "Cumulative damage marks, queued star flight, the score pop with its special-kill sound and the combo score counter (the Cfefx feedback family).",
   "author": "GAYd0N",
-  "version": "1.0.0",
-  "abi": 1,
-  "minAbcUi": "0.8.0",
+  "version": "2.0.0",
+  "abi": 2,
+  "minAbcUi": "0.9.1",
   "entry": "entry/abcui_cfefx.dll",
-  "dependencies": [],
+  "dependencies": [
+    "abcui.base"
+  ],
   "conflicts": []
 }

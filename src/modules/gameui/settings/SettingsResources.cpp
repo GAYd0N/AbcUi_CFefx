@@ -13,6 +13,8 @@
 #include <vector>
 #include <string>
 #include <cstdio>
+#include <string_view>
+
 namespace gameui::settings {
 std::string readModFile(const char *relativePath) {
   constexpr unsigned MaxBytes = 4 * 1024 * 1024;
@@ -188,7 +190,7 @@ services::settings::SettingsModel::UserScrTable loadAdvancedScript() {
   std::string Text;
   {
     const char *Language = vgui2ext::currentLanguage();
-    if (Language && *Language && std::strcmp(Language, "english") != 0) {
+    if (Language && *Language && std::string_view(Language) != "english") {
       std::string Path = abc::GameDir();
       Path += "_";
       Path += Language;

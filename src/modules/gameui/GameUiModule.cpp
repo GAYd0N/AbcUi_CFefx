@@ -1,6 +1,8 @@
 // Extracted from GameUiModule.cpp (UTF-8). Responsibility: GameUiModule.
 #include "modules/gameui/GameUiModule.h"
-#include "modules/gameui/GameUiModule.h"
+
+#include <cstring>
+#include <format>
 
 #include "../../data/WeaponResource.h"
 #include "../../framework/ResourceLimits.h"
@@ -23,13 +25,16 @@
 #include "framework/Commands.h"
 #include "data/NetworkMessages.h"
 #include "modsys/ModuleDocuments.h"
+#include "modsys/ModuleVfs.h"
 #include "modules/gameui/engine/MenuBindings.h"
 #include "modules/gameui/engine/SettingsBindings.h"
 #include "modules/gameui/engine/VideoBindings.h"
 #include "modules/gameui/debug/ProbeCommand.h"
 #include "rmlui/RmlUiModule.h"
 #include <fstream>
-#include <sstream>
+#include <iterator>
+#include <string_view>
+
 namespace gameui {
 using namespace engine;
 using namespace settings;
@@ -76,17 +81,12 @@ namespace {
 bool loadCommandMenuDefinition(services::commandmenu::Definition &definition,
                                std::string &error) {
   const std::string path =
-      abc::ModPath("abc/abcui/gameui/config/commandmenu.json");
-  std::ifstream stream(path, std::ios::binary);
-  if (!stream) {
-    error = "cannot open file";
+      services::uiconfig::resourceRoot() + "/commandmenu.json";
+  std::string contents;
+  if (!framework::ModuleVfs::readText(path.c_str(), contents)) {
+    error = "cannot open package entry";
     return false;
   }
-  std::ostringstream text;
-  text << stream.rdbuf();
-  std::string contents = text.str();
-  if (contents.compare(0, 3, "\xef\xbb\xbf") == 0)
-    contents.erase(0, 3);
   services::commandmenu::ParseError parseError;
   if (!services::commandmenu::DefinitionParser::parse(contents, definition,
                                                       parseError)) {
@@ -187,10 +187,7 @@ GameUiModule::GameUiModule()
     modelLabel = facts.ModelName;
   };
   shellAccess.buildNote = [](std::string &note) {
-    char build[64];
-    _snprintf_s(build, sizeof(build), _TRUNCATE, "Sven Co-op build %u",
-                abc::g_dwEngineBuildnum);
-    note = build;
+    note = std::format("Sven Co-op build {}", abc::g_dwEngineBuildnum);
   };
   services::uiconfig::setShellAccess(shellAccess);
   // The shell's friends board join intent: validated here (the address
@@ -308,6 +305,24 @@ GameUiModule::GameUiModule()
     finishDispatch();
   };
   menuHost.quitNow = [this] { menuBackend().quitGame(); };
+  menuHost.dispatchCommand = [this](const char *name) -> int32_t {
+    if (!Context || !services::nativeUiBridge().armed())
+      return 0;
+    if (std::string_view(name) == "votemenu")
+      Vote->open();
+    else if (std::string_view(name) == "+commandmenu")
+      Command->toggle();
+    else if (std::string_view(name) == "-commandmenu") {
+      // The press owns the toggle; release must not reopen the native menu.
+    } else if (std::string_view(name) == "inventory" ||
+               std::string_view(name) == "+inventory")
+      Inventory->open();
+    else if (std::string_view(name) == "-inventory")
+      Inventory->close();
+    else
+      return 0;
+    return 1;
+  };
 }
 
 VideoHost GameUiModule::MakeVideoHost() {
@@ -535,26 +550,35 @@ void GameUiModule::onInit() {
   // Parsing/loading finishes before any document or transaction observes it.
   abc::CREATE_CVAR("abc_ui_browser_hide_unresponsive", "1", abc::FCVAR_VALUE,
                    nullptr);
-  // Menu score (WS4): the shipped track plus its level; the music service
-  // reads the source once per presentation change and the volume live.
-  abc::CREATE_CVAR("abc_ui_menu_music",
-                   "abc/abcui/gameui/scence/audio/opfor.mp3", abc::FCVAR_VALUE,
-                   nullptr);
   // The character card's model source override; empty follows the player's
   // own `model` cvar (gameui::engine::playerCardFacts).
   abc::CREATE_CVAR("abc_ui_menu_model_path", "", abc::FCVAR_VALUE, nullptr);
   std::string ServerScript = readModFile("settings.scr");
   if (ServerScript.empty())
-    ServerScript = readModFile("abc/abcui/gameui/config/server_options.scr");
+    framework::ModuleVfs::readText(
+        (services::uiconfig::resourceRoot() + "/server_options.scr").c_str(),
+        ServerScript);
   Create->setOptions(services::creategame::parseServerOptions(ServerScript));
   if (Create->optionsEmpty()) {
     abc::ConsoleWarn("[AbcUi] settings.scr unavailable or malformed; using "
                      "shipped server option definitions\n");
-    Create->setOptions(services::creategame::parseServerOptions(
-        readModFile("abc/abcui/gameui/config/server_options.scr")));
+    framework::ModuleVfs::readText(
+        (services::uiconfig::resourceRoot() + "/server_options.scr").c_str(),
+        ServerScript);
+    Create->setOptions(services::creategame::parseServerOptions(ServerScript));
   }
   const auto Advanced = loadAdvancedScript();
-  UiConfig.load(abc::ModPath("abc/abcui/gameui/config"), Advanced.Rows);
+  const auto &root = services::uiconfig::resourceRoot();
+  if (!root.empty())
+    UiConfig.load(
+        root,
+        [](const std::string &uri, std::string &text) {
+          return framework::ModuleVfs::readText(uri.c_str(), text);
+        },
+        [](const std::string &uri) {
+          return framework::ModuleVfs::list(uri.c_str());
+        },
+        Advanced.Rows);
   for (const auto &Error : UiConfig.errors())
     abc::ConsoleWarn("[AbcUi] %s: %s: %s\n", Error.File.c_str(),
                      Error.Field.c_str(), Error.Message.c_str());
@@ -581,29 +605,33 @@ void GameUiModule::onInit() {
                                      scanModDirectories("models/player"));
     else if (Source == "logos")
       SettingsModel.setStringOptions(Row.Cvar, scanModFileBasenames("logos"));
-    else if (Source == "scence/video") {
-      // Menu background videos: the player drops files into the plugin
-      // tree; the dropdown lists them by stem and the cvar stores the
-      // path the backdrop decoder opens.
-      static const char *const VideoExtensions[] = {".mp4", ".webm", ".ivf",
-                                                    ".avi", ".mkv"};
-      SettingsModel.setStringChoices(
-          Row.Cvar,
-          scanModMediaFiles("abc/abcui/gameui/scence/video", VideoExtensions,
-                            static_cast<int>(std::size(VideoExtensions)),
-                            "abc/abcui/gameui/scence/video/"));
-    } else if (Source == "scence/audio") {
-      // Menu music: the engine's mp3 player resolves the path relative
-      // to the mod dir (the legacy plugin played media/*.mp3 the same
-      // way), so the scanned folder is the whole story.
-      static const char *const AudioExtensions[] = {".mp3"};
-      SettingsModel.setStringChoices(
-          Row.Cvar,
-          scanModMediaFiles("abc/abcui/gameui/scence/audio", AudioExtensions,
-                            static_cast<int>(std::size(AudioExtensions)),
-                            "abc/abcui/gameui/scence/audio/"));
+    else if (Source == "scence/video" || Source == "scence/audio") {
+      std::string directory;
+      const std::string suffix = Source == "scence/video" ? "video" : "audio";
+      framework::ModuleVfs::resolve(root + "/_", "../scence/" + suffix + "/_",
+                                    directory);
+      if (directory.size() >= 2)
+        directory.resize(directory.size() - 2);
+      std::vector<services::settings::StringChoice> choices;
+      for (const auto &uri : framework::ModuleVfs::list(directory.c_str())) {
+        const auto slash = uri.rfind('/');
+        const auto dot = uri.rfind('.');
+        if (dot == uri.npos || dot < slash)
+          continue;
+        const auto extension = uri.substr(dot);
+        const bool supported =
+            suffix == "audio" ? (extension == ".mp3" || extension == ".wav" ||
+                                 extension == ".ogg")
+                              : (extension == ".mp4" || extension == ".webm" ||
+                                 extension == ".mkv" || extension == ".avi" ||
+                                 extension == ".ivf");
+        if (supported && choices.size() < 512)
+          choices.push_back({uri, uri.substr(slash + 1, dot - slash - 1)});
+      }
+      SettingsModel.setStringChoices(Row.Cvar, std::move(choices));
     }
   }
+
   // T11 bind sources live in the mod dir (engine-owned data, not abcui
   // assets): the action list, the factory defaults and the label table.
   // Missing files degrade to an empty action table - the settings page
@@ -620,70 +648,12 @@ void GameUiModule::onInit() {
   // just one disk directory. Unreadable/missing -> empty catalog (the
   // page then refuses every request fail-closed with CG_ErrorUnavailable).
   Create->loadCatalog();
-  // The old ABCEnchance hook swallowed the client-side "votemenu" command
-  // and opened its own dialog. AbcUi now owns that command and page.
-  if (!VoteMenuCommandBound) {
-    if (abc::CChainedCommand *command = commands::get("votemenu")) {
-      command->Event().append([this]() {
-        Vote->open();
-        return false; // always keep the legacy GameUI dialog closed
-      });
-      VoteMenuCommandBound = true;
-    } else {
-      abc::ConsoleWarn("[AbcUi] votemenu command unavailable; pause entry "
-                       "still opens the vote page\n");
-    }
-  }
   if (!VoteMenuMapListBound) {
     netmsg::MapList.append([this](const netmsg::MapListData &data) {
       Vote->applyMapList(data.clearAll, data.allCount, data.start, data.end,
                          data.maps);
     });
     VoteMenuMapListBound = true;
-  }
-  if (!CommandMenuCommandBound) {
-    abc::CChainedCommand *open = commands::get("+commandmenu");
-    abc::CChainedCommand *release = commands::get("-commandmenu");
-    if (open && release) {
-      open->Event().append([this]() {
-        Command->toggle();
-        return false; // the native command menu never opens
-      });
-      release->Event().append([]() {
-        return false; // +commandmenu owns the whole toggle session
-      });
-      CommandMenuCommandBound = true;
-    } else {
-      abc::ConsoleWarn("[AbcUi] commandmenu commands unavailable; the Rml "
-                       "command menu cannot open\n");
-    }
-  }
-  // Issue 10: the native inventory window. The three client commands open
-  // the viewport panel (CInventoryPanel::ShowPanel); swallowing them here is
-  // what keeps that panel off-screen. `inventory` and `+inventory` both open
-  // (the native command did not toggle), `-inventory` closes.
-  if (!InventoryCommandBound) {
-    abc::CChainedCommand *open = commands::get("inventory");
-    abc::CChainedCommand *hold = commands::get("+inventory");
-    abc::CChainedCommand *release = commands::get("-inventory");
-    if (open && hold && release) {
-      open->Event().append([this]() {
-        Inventory->open();
-        return false; // the native CInventoryPanel never opens
-      });
-      hold->Event().append([this]() {
-        Inventory->open();
-        return false;
-      });
-      release->Event().append([this]() {
-        Inventory->close();
-        return false;
-      });
-      InventoryCommandBound = true;
-    } else {
-      abc::ConsoleWarn("[AbcUi] inventory commands unavailable; the Rml "
-                       "inventory window cannot open\n");
-    }
   }
   if (!InventoryFeedBound) {
     // The item stream feeds the model directly (the page owns only the DOM);

@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "title": "#abcui.gameui/MainMenu_Title",
+  "main": [
+    {
+      "id": "main-servers",
+      "label": "#abcui.gameui/MainMenu_Servers",
+      "action": "servers"
+    },
+    {
+      "id": "main-creategame",
+      "label": "#abcui.gameui/MainMenu_CreateGame",
+      "action": "creategame"
+    },
+    {
+      "id": "main-settings",
+      "label": "#abcui.gameui/MainMenu_Settings",
+      "action": "settings"
+    },
+    {
+      "id": "main-quit",
+      "label": "#abcui.gameui/MainMenu_Quit",
+      "action": "quit"
+    }
+  ],
+  "pause": [
+    {
+      "id": "pause-resume",
+      "label": "#abcui.gameui/MainMenu_Resume",
+      "action": "resume"
+    },
+    {
+      "id": "pause-disconnect",
+      "label": "#abcui.gameui/MainMenu_Disconnect",
+      "action": "disconnect"
+    },
+    {
+      "id": "pause-playerlist",
+      "label": "#abcui.gameui/MainMenu_PlayerList",
+      "action": "playerlist",
+      "condition": "multiplayer"
+    },
+    {
+      "id": "pause-votemenu",
+      "label": "#abcui.gameui/MainMenu_Vote",
+      "action": "votemenu",
+      "condition": "multiplayer"
+    },
+    {
+      "id": "pause-settings",
+      "label": "#abcui.gameui/MainMenu_Settings",
+      "action": "settings"
+    },
+    {
+      "id": "pause-quit",
+      "label": "#abcui.gameui/MainMenu_Quit",
+      "action": "quit"
+    }
+  ]
+}

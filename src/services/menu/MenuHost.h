@@ -57,6 +57,7 @@ struct Host {
   // Confirmed exit without the dialog (the emergency page's Quit button: a
   // fault-time exit must not depend on a page that may be the broken one).
   std::function<void()> quitNow;
+  std::function<int32_t(const char *)> dispatchCommand;
 };
 
 Host &host();

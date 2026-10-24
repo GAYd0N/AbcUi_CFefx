@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "id": "video",
+  "label": "#abcui.gameui/Settings_SecVideo",
+  "order": 40,
+  "components": [],
+  "sections": [
+    {
+      "id": "display",
+      "label": "#abcui.gameui/Settings_SecVideo",
+      "components": [
+        "video"
+      ]
+    }
+  ],
+  "items": [
+    {
+      "cvar": "gl_vsync",
+      "label": "#abcui.gameui/Settings_VSync",
+      "section": "display",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "brightness",
+      "label": "#abcui.gameui/Settings_Brightness",
+      "section": "display",
+      "kind": "float",
+      "min": 0.0,
+      "max": 2.0,
+      "step": 0.05,
+      "default": 1.0
+    },
+    {
+      "cvar": "gamma",
+      "label": "#abcui.gameui/Settings_Gamma",
+      "section": "display",
+      "kind": "float",
+      "min": 1.8,
+      "max": 3.0,
+      "step": 0.05,
+      "default": 2.5
+    }
+  ]
+}

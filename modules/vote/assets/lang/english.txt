@@ -1,0 +1,3 @@
+abcui.vote/Vote_DefaultMessage = A vote was cast
+abcui.vote/Vote_DefaultYes = Yes
+abcui.vote/Vote_DefaultNo = No

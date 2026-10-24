@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
 	<link type="text/rcss" href="../rcss/playerlist.rcss"/>
 </head>
@@ -13,12 +13,12 @@
      nothing mutable selected). -->
 <body id="menuplayerlist">
 	<div id="pl-panel">
-		<h1 id="pl-title">#PL_Title</h1>
+		<h1 id="pl-title">#abcui.gameui/PL_Title</h1>
 		<div id="pl-list"></div>
 		<p id="pl-status"></p>
 		<div id="pl-actions">
-			<button id="pl-mute" data-action="pl-mute" data-label="#PL_Mute"><span id="pl-mute-label">#PL_Mute</span></button>
-			<button id="pl-close" data-action="pl-close" data-label="#MainMenu_Return">#MainMenu_Return</button>
+			<button id="pl-mute" data-action="pl-mute" data-label="#abcui.gameui/PL_Mute"><span id="pl-mute-label">#abcui.gameui/PL_Mute</span></button>
+			<button id="pl-close" data-action="pl-close" data-label="#abcui.gameui/MainMenu_Return">#abcui.gameui/MainMenu_Return</button>
 		</div>
 	</div>
 </body>

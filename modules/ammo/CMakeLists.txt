@@ -8,3 +8,5 @@ target_compile_definitions(abcui_mod_ammo PRIVATE
                            WIN32 _WINDOWS _USRDLL _CRT_SECURE_NO_WARNINGS
                            NOMINMAX)
 target_compile_options(abcui_mod_ammo PRIVATE /W4)
+
+target_link_libraries(abcui_mod_ammo PRIVATE gdi32)

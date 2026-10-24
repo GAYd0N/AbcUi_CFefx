@@ -3,11 +3,13 @@
 // rmlui::PaintGate - the selective native-UI paint/input gate (T08 steps 1/4).
 //
 // The candidate seam (T02 §7; complete popup coverage still needs live proof):
-// VFT-hook IPanel (vgui2.dll, "VGUI_Panel007")
-// and drop every traversal whose IPanel::GetModuleName is a native-UI module
-// ("GameUI", "ServerBrowser" - the exact strings this install reports, T02
-// §6). The module string is read per traversal, so panel creation/destruction/
-// recreation needs no cache and no VPANEL identity.
+// VFT-hook IPanel (vgui2.dll, "VGUI_Panel007") and drop every traversal whose
+// IPanel::GetModuleName is a native-UI module ("GameUI", "ServerBrowser" -
+// the exact strings this install reports, T02 §6), plus the client viewport's
+// observer bottom bar when a module claims it on hud.native.draw. The module
+// string is read per traversal, so panel creation/destruction/recreation needs
+// no cache and no VPANEL identity; the observer panel is identified by its
+// constructor-stable child label names, also per traversal.
 //
 // Two VFT slots are taken (both validated to point into the vgui2 image):
 //   - slot 41 PaintTraverse: blocked entries are swallowed (the original is

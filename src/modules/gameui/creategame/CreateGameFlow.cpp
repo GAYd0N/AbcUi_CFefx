@@ -123,7 +123,6 @@ const char *CreateGameFlow::hintTokenFor(
   case Error::kNameCharset:
     return "#CG_ErrorName";
   default:
-    (void)validation.field;
     return "#CG_ErrorMap";
   }
 }

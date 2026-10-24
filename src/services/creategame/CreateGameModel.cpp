@@ -11,6 +11,7 @@
 #include <cstring>
 #include <cmath>
 #include <format>
+#include <string_view>
 
 namespace services {
 namespace creategame {
@@ -249,7 +250,7 @@ bool CreateGameModel::writeAndVerify(int index, const char *value) {
     return false;
   Wrote[index] = true;
   const char *back = Seams_.readCvar(name);
-  return back && value && std::strcmp(back, value) == 0;
+  return back && value && std::string_view(back) == value;
 }
 
 CreateGameModel::Launch CreateGameModel::restoreAndFail(int failIndex) {

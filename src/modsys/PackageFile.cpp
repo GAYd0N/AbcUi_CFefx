@@ -16,15 +16,16 @@ void fail(std::string *error, const char *message) {
     *error = message;
 }
 
-std::uint16_t readLE16(const std::uint8_t *p) {
-  return static_cast<std::uint16_t>(p[0] | (p[1] << 8));
+std::uint16_t readLE16(const std::byte *p) {
+  return static_cast<std::uint16_t>(std::to_integer<unsigned>(p[0]) |
+                                    (std::to_integer<unsigned>(p[1]) << 8));
 }
 
-std::uint32_t readLE32(const std::uint8_t *p) {
-  return static_cast<std::uint32_t>(p[0]) |
-         (static_cast<std::uint32_t>(p[1]) << 8) |
-         (static_cast<std::uint32_t>(p[2]) << 16) |
-         (static_cast<std::uint32_t>(p[3]) << 24);
+std::uint32_t readLE32(const std::byte *p) {
+  return static_cast<std::uint32_t>(std::to_integer<unsigned>(p[0])) |
+         (static_cast<std::uint32_t>(std::to_integer<unsigned>(p[1])) << 8) |
+         (static_cast<std::uint32_t>(std::to_integer<unsigned>(p[2])) << 16) |
+         (static_cast<std::uint32_t>(std::to_integer<unsigned>(p[3])) << 24);
 }
 
 } // namespace
@@ -41,7 +42,7 @@ std::unique_ptr<PackageFile> PackageFile::open(const void *base, size_t size,
     fail(error, "package image is not a readable zip archive");
     return nullptr;
   }
-  package->Base = static_cast<const std::uint8_t *>(base);
+  package->Base = static_cast<const std::byte *>(base);
   package->BaseSize = size;
   return package;
 }
@@ -88,6 +89,10 @@ bool PackageFile::read(const char *name, PackageEntry &out,
     return false;
   }
 
+  if (stat.m_uncomp_size > 128u * 1024 * 1024) {
+    fail(error, "package entry exceeds 128 MiB");
+    return false;
+  }
   const bool hasDescriptor = (stat.m_bit_flag & kDataDescriptorBit) != 0;
   if (stat.m_method == MZ_NO_COMPRESSION && !hasDescriptor) {
     // Zero-copy: the entry bytes sit in the mapped image behind the local
@@ -98,7 +103,7 @@ bool PackageFile::read(const char *name, PackageEntry &out,
       fail(error, "package entry local header is out of bounds");
       return false;
     }
-    const std::uint8_t *header = Base + headerOfs;
+    const std::byte *header = Base + headerOfs;
     if (readLE32(header) != kLocalHeaderSignature) {
       fail(error, "package entry local header signature mismatch");
       return false;
@@ -122,7 +127,7 @@ bool PackageFile::read(const char *name, PackageEntry &out,
     fail(error, "package entry extraction failed");
     return false;
   }
-  out.owned.reset(static_cast<std::uint8_t *>(extracted));
+  out.owned.reset(static_cast<std::byte *>(extracted));
   out.data = out.owned.get();
   out.size = extractedSize;
   return true;

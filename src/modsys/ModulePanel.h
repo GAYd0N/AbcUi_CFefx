@@ -4,19 +4,19 @@
 //
 // The module registers an AbcUiPanelDesc during onLoad; the framework owns
 // the C++/Rml side (document lifetime, visibility, pumps) and forwards the
-// pump virtuals to the descriptor callbacks. Callbacks are wrapped so an
-// escaping module exception is reported and contained instead of unwinding
-// through the engine frame.
+// pump virtuals through module ownership scopes. Host guards defensively
+// handle exceptions that reach them; modules must not throw across the ABI.
 
 #include <abcui/module_api.h>
 
 #include "../framework/HudPanel.h"
+#include "ModuleResources.h"
 
 namespace framework {
 
 class ModulePanel final : public ::framework::HudPanel {
 public:
-  explicit ModulePanel(const AbcUiPanelDesc &desc);
+  ModulePanel(const AbcUiPanelDesc &desc, module_resources::OwnerHandle owner);
 
 protected:
   void onDocumentReady() override;
@@ -26,6 +26,7 @@ protected:
 
 private:
   AbcUiPanelDesc Desc;
+  module_resources::OwnerHandle Owner;
 };
 
 } // namespace framework

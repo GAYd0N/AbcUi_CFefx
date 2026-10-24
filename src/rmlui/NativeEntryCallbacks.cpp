@@ -53,21 +53,14 @@ public:
     return 0;
   }
 
-  void Initialize(CreateInterfaceFn *factories, int count) override {
-    (void)factories;
-    (void)count;
-  }
-  void PreStart(struct cl_enginefuncs_s *engineFuncs, int interfaceVersion,
-                void *system) override {
-    (void)engineFuncs;
-    (void)interfaceVersion;
-    (void)system;
-  }
-  void Start(struct cl_enginefuncs_s *engineFuncs, int interfaceVersion,
-             void *system) override {
-    (void)engineFuncs;
-    (void)interfaceVersion;
-    (void)system;
+  void Initialize([[maybe_unused]] CreateInterfaceFn *factories,
+                  [[maybe_unused]] int count) override {}
+  void PreStart([[maybe_unused]] struct cl_enginefuncs_s *engineFuncs,
+                [[maybe_unused]] int interfaceVersion,
+                [[maybe_unused]] void *system) override {}
+  void Start([[maybe_unused]] struct cl_enginefuncs_s *engineFuncs,
+             [[maybe_unused]] int interfaceVersion,
+             [[maybe_unused]] void *system) override {
     // T14: with GameUI.dll mapped and started, the Sven password-prompt
     // slot gets its observation hook.
     if (Seams.installPasswordPromptHook)
@@ -99,12 +92,11 @@ public:
     }
   }
 
-  void
-  ActivateDemoUI(VGUI2Extension_CallbackContext *CallbackContext) override {
+  void ActivateDemoUI([[maybe_unused]] VGUI2Extension_CallbackContext
+                          *CallbackContext) override {
     // Not in scope (no demo UI); vanilla behaviour. Note: this wrapper
     // dispatches post unconditionally (hook-contract T4) - never rely on
     // it for one-shot work.
-    (void)CallbackContext;
   }
 
   void
@@ -131,16 +123,13 @@ public:
       services::nativeUiBridge().noteRunFrame();
   }
 
-  void
-  ConnectToServer(const char *&game, int &IP, int &port,
-                  VGUI2Extension_CallbackContext *CallbackContext) override {
+  void ConnectToServer([[maybe_unused]] const char *&game,
+                       [[maybe_unused]] int &IP, [[maybe_unused]] int &port,
+                       [[maybe_unused]] VGUI2Extension_CallbackContext
+                           *CallbackContext) override {
     // Connect is T14/T17 territory; the vanilla window never opens
     // because the menu answers stay ours and the paint gate is armed,
     // but the engine-side connect chain keeps working.
-    (void)game;
-    (void)IP;
-    (void)port;
-    (void)CallbackContext;
   }
   void DisconnectFromServer(
       VGUI2Extension_CallbackContext *CallbackContext) override {
@@ -338,9 +327,8 @@ public:
       CallbackContext->Result = VGUI2Extension_Result::SUPERCEDE;
     }
   }
-  void Initialize(VGUI2Extension_CallbackContext *CallbackContext) override {
-    (void)CallbackContext;
-  }
+  void Initialize([[maybe_unused]] VGUI2Extension_CallbackContext
+                      *CallbackContext) override {}
   void Hide(VGUI2Extension_CallbackContext *CallbackContext) override {
     auto &bridge = services::nativeUiBridge();
     if (!CallbackContext->IsPost)
@@ -396,11 +384,10 @@ public:
         str, str ? str->data() : nullptr, str ? str->length() : 0,
         CallbackContext->IsPost);
   }
-  void SetParent(vgui::VPANEL parent,
-                 VGUI2Extension_CallbackContext *CallbackContext) override {
+  void SetParent([[maybe_unused]] vgui::VPANEL parent,
+                 [[maybe_unused]] VGUI2Extension_CallbackContext
+                     *CallbackContext) override {
     // Parent wiring is engine plumbing; the original keeps it.
-    (void)parent;
-    (void)CallbackContext;
   }
 };
 
@@ -419,10 +406,8 @@ public:
   int GetAltitude() const override {
     return 0;
   }
-  void Initialize(CreateInterfaceFn *factories, int count) override {
-    (void)factories;
-    (void)count;
-  }
+  void Initialize([[maybe_unused]] CreateInterfaceFn *factories,
+                  [[maybe_unused]] int count) override {}
   void Shutdown() override {
     // vgui2 alive; unhook the IPanel gate and disarm. The strict
     // takeover rule holds: this runs only on the engine teardown path
@@ -438,27 +423,17 @@ public:
       Seams.detachPasswordPromptHook();
   }
   void Start() override {}
-  void SetParent(vgui::VPANEL parent) override {
-    (void)parent;
-  }
-  void UseVGUI1(VGUI2Extension_CallbackContext *CallbackContext) override {
-    (void)CallbackContext;
-  }
-  void
-  HideScoreBoard(VGUI2Extension_CallbackContext *CallbackContext) override {
-    (void)CallbackContext;
-  }
-  void
-  HideAllVGUIMenu(VGUI2Extension_CallbackContext *CallbackContext) override {
-    (void)CallbackContext;
-  }
-  void
-  ActivateClientUI(VGUI2Extension_CallbackContext *CallbackContext) override {
-    (void)CallbackContext;
-  }
-  void HideClientUI(VGUI2Extension_CallbackContext *CallbackContext) override {
-    (void)CallbackContext;
-  }
+  void SetParent([[maybe_unused]] vgui::VPANEL parent) override {}
+  void UseVGUI1([[maybe_unused]] VGUI2Extension_CallbackContext
+                    *CallbackContext) override {}
+  void HideScoreBoard([[maybe_unused]] VGUI2Extension_CallbackContext
+                          *CallbackContext) override {}
+  void HideAllVGUIMenu([[maybe_unused]] VGUI2Extension_CallbackContext
+                           *CallbackContext) override {}
+  void ActivateClientUI([[maybe_unused]] VGUI2Extension_CallbackContext
+                            *CallbackContext) override {}
+  void HideClientUI([[maybe_unused]] VGUI2Extension_CallbackContext
+                        *CallbackContext) override {}
 };
 
 NativeClientVGUICallbacks ClientVGUICallbacksInstance;

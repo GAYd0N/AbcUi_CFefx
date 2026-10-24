@@ -16,21 +16,26 @@
 // within a bucket the eventpp CallbackList keeps registration order. Veto
 // channels stop at the first sink that returns true - a higher-priority
 // interception hides the event from every sink below it. A sink must not
-// subscribe or unsubscribe its own channel while a dispatch is running.
+// subscribe or unsubscribe its own data/short-circuit-veto channel while a
+// dispatch is running. Aggregate veto dispatch snapshots its handlers: removed
+// handlers are skipped and new ones join the next dispatch.
 //
 // Subscriptions return an opaque token; unsubscribe is idempotent. The bus is
-// a process-lifetime service: module sinks must be unsubscribed or inert by
-// the time their DLL unloads (ModuleManager unloads in reverse load order
-// after shutdownAll, so sinks die before the bus does).
+// a process-lifetime service: SDK sinks retain their creating module's scope
+// and are revoked automatically on failure/final unload, not HUD_Shutdown.
+// Framework-only subscriptions with no module scope retain explicit lifetime.
 
 #include <cstdint>
 #include <cstddef>
 #include <map>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <utility>
 
 #include <abc/Events.h>
+
+#include "ModuleResources.h"
 
 namespace framework {
 
@@ -41,16 +46,17 @@ using EventSubscription = std::uint64_t;
 
 // Module-facing data sink. The payload pointer is only valid for the call.
 using EventSinkFn = void (*)(void *userdata, const void *payload);
-// Veto sink: returning true vetoes (intercepts) the event.
-using EventVetoFn = bool (*)(void *userdata, const void *payload);
+// Matches the C SDK callback exactly; every nonzero result is a veto.
+using EventVetoFn = int (*)(void *userdata, const void *payload);
 
 class EventBus {
 public:
+  ~EventBus();
   // Subscribes a module-facing sink. Same priority keeps registration order.
   // Returns 0 for a null channel or sink.
   EventSubscription subscribe(const char *channel, EventPriority priority,
                               EventSinkFn sink, void *userdata);
-  // Subscribes to a veto channel; the sink's bool joins the channel vote and
+  // Subscribes to a veto channel; a nonzero result joins the channel vote and
   // a true result stops the dispatch at this sink.
   EventSubscription subscribeVeto(const char *channel, EventPriority priority,
                                   EventVetoFn sink, void *userdata);
@@ -69,10 +75,10 @@ public:
   EventSubscription subscribeFn(const char *channel, EventPriority priority,
                                 Fn &&fn) {
     using Wrapper = FnWrapper<T, std::decay_t<Fn>>;
-    Wrapper *wrapper = new Wrapper(std::forward<Fn>(fn));
+    auto wrapper = std::make_unique<Wrapper>(std::forward<Fn>(fn));
     const EventSubscription token =
-        subscribe(channel, priority, &Wrapper::thunk, wrapper);
-    ownWrapper(token, wrapper);
+        subscribe(channel, priority, &Wrapper::thunk, wrapper.get());
+    ownWrapper(token, std::move(wrapper));
     return token;
   }
 
@@ -144,12 +150,14 @@ private:
     DataList::Handle dataHandle;
     VetoList::Handle vetoHandle;
     VetoList::Handle vetoAggregateHandle;
-    FnWrapperBase *wrapper = nullptr; // owned; set through ownWrapper
+    std::unique_ptr<FnWrapperBase> wrapper; // set through ownWrapper
+    module_resources::Registration lifetime;
   };
 
   Channel *find(const char *channel);
   const Channel *find(const char *channel) const;
-  void ownWrapper(EventSubscription token, FnWrapperBase *wrapper);
+  void ownWrapper(EventSubscription token,
+                  std::unique_ptr<FnWrapperBase> wrapper);
 
   std::map<std::string, Channel, std::less<>> Channels;
   std::map<EventSubscription, Record> Records;

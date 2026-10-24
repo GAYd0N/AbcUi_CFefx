@@ -65,14 +65,11 @@ public:
   // Exactly-once action per physical press of a claimed key (post
   // auto-repeat dedup). Called after the edge was fed to the UI; the owner
   // may release its own token inside (ESC closing the menu).
-  virtual void onClaimedKeyDown(int keynum) {
-    (void)keynum;
-  }
+  virtual void onClaimedKeyDown([[maybe_unused]] int keynum) {}
   // T11 capture seam: a claimed wheel pulse is offered to the top owner
   // BEFORE the scroll claim applies. True = the pulse was consumed (key
   // capture); false = the usual scroll path runs.
-  virtual bool onClaimedWheelPulse(int keynum) {
-    (void)keynum;
+  virtual bool onClaimedWheelPulse([[maybe_unused]] int keynum) {
     return false;
   }
   // Force-release notification (focus loss, reset, mid-stack removal) so

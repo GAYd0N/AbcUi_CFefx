@@ -6,12 +6,12 @@
 // renderer-facing concern and stays in the framework (the same rule that
 // keeps the render bridge, video decode and avatar textures framework-side).
 // This service owns the 1024^2 FBO, the meta-renderer callbacks (including
-// the frame-buffer regeneration seam) and the square/round mask textures, and
+// the frame-buffer regeneration seam) and a borrowed module-uploaded mask, and
 // registers the FBO colour texture with AbcRenderInterface as the external
 // "radarfbo://" texture family.
 //
 // The module drives it through the SDK `radar` section: setActive(true) while
-// the plate is on screen, setMaskRound() for the plate shape, and a
+// the plate is on screen, setMask() for the plate shape, and a
 // generation counter it appends to the texture URI (RmlUi caches textures per
 // source string, so a regenerated FBO needs a new suffix).
 
@@ -24,7 +24,8 @@ namespace radarrender {
 void setActive(bool active);
 
 // Selects the mask texture the external-texture draw applies (square/round).
-void setMaskRound(bool round);
+void setMask(int textureId);
+void forgetMask(int textureId);
 
 // Orthographic zoom (the hud_radar_zoom cvar): the visible span is
 // 2 * (4096 / zoom) world units.

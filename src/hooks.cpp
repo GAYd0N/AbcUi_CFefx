@@ -3,6 +3,8 @@
 
 #include "hooks.h"
 
+#include <iterator>
+
 #include <abc/Console.h>
 #include <abc/GameData.h>
 #include <abc/Plugin.h>
@@ -44,15 +46,16 @@ namespace {
 // Resolve the object by its canonical global name, without decoding VidInit.
 // Only the visible flag is changed; list ownership stays with the client.
 //
-// Index 3 is SKIPPED on purpose: every historical variant of the old code
-// left exactly one list slot visible (the dynamic_cast era commented out its
-// clear; the index era's switch is 0,1,2,4). Which SC panel that slot is was
-// not fully pinned down (candidates: CHudAmmoSecondary / CHudMenu); the port
-// reproduces the old code's observable behavior.
+// The supported Sven client initializes these list entries in this order:
+// health, battery, ammo, train, flashlight, crosshair. Never hide the train.
+// Suppression is a module veto and the visible bit is restored after redraw;
+// removing a claim cannot leave a native element permanently disabled.
 uint32_t VanillaHudFlagsOffset = 0;
-constexpr size_t kVanillaHudMaxPanels = 5;
-constexpr size_t kVanillaHudSkipIndex =
-    3; // deliberately NOT suppressed (old code parity)
+constexpr int32_t kVanillaHudElements[] = {
+    ABCUI_NATIVE_HUD_HEALTH,     ABCUI_NATIVE_HUD_BATTERY,
+    ABCUI_NATIVE_HUD_AMMO,       -1, // train
+    ABCUI_NATIVE_HUD_FLASHLIGHT, ABCUI_NATIVE_HUD_CROSSHAIR};
+constexpr size_t kVanillaHudMaxPanels = std::size(kVanillaHudElements);
 
 DWORD VanillaHudListAddr = 0;
 DWORD VanillaHudPanels[kVanillaHudMaxPanels] = {};
@@ -76,16 +79,38 @@ void rebuildVanillaHudPanels() {
   HudListNode *node =
       reinterpret_cast<HudListNode *>(*(DWORD *)VanillaHudListAddr);
   for (size_t i = 0; i < kVanillaHudMaxPanels && node; i++) {
-    if (node->panel && i != kVanillaHudSkipIndex)
-      VanillaHudPanels[VanillaHudPanelCount++] = node->panel;
+    VanillaHudPanels[VanillaHudPanelCount++] = node->panel;
     node = reinterpret_cast<HudListNode *>(node->next);
   }
 }
 
-void hideVanillaHudPanels() {
-  for (size_t i = 0; i < VanillaHudPanelCount; i++)
-    (*(DWORD *)(VanillaHudPanels[i] + VanillaHudFlagsOffset)) &= ~1;
-}
+class NativeHudDrawScope {
+public:
+  NativeHudDrawScope() {
+    for (size_t i = 0; i < VanillaHudPanelCount; ++i) {
+      if (kVanillaHudElements[i] < 0 || !VanillaHudPanels[i])
+        continue;
+      const AbcUiNativeHudEvent event{kVanillaHudElements[i]};
+      if (!framework::eventBus().publishVeto(ABCUI_CHANNEL_HUD_NATIVE_DRAW,
+                                             event))
+        continue;
+      auto *flags = reinterpret_cast<DWORD *>(VanillaHudPanels[i] +
+                                              VanillaHudFlagsOffset);
+      if (*flags & 1) {
+        Hidden[Count++] = flags;
+        *flags &= ~DWORD{1};
+      }
+    }
+  }
+  ~NativeHudDrawScope() {
+    for (size_t i = 0; i < Count; ++i)
+      *Hidden[i] |= DWORD{1};
+  }
+
+private:
+  DWORD *Hidden[kVanillaHudMaxPanels]{};
+  size_t Count = 0;
+};
 
 } // namespace
 
@@ -117,7 +142,6 @@ static void H_HUD_Init() {
     weaponres::init();
     playerres::init();
     textfeed::init();
-    commands::registerAll();
     rmlui::registerCommands();
     modules::registry().initAll();
   }
@@ -127,7 +151,7 @@ static int H_HUD_VidInit() {
   int result = gExportfuncs.HUD_VidInit();
   // Capture AFTER the client re-ran its own VidInit: if a client rebuilds
   // the gHUD chain per map, pointers grabbed before the call would be freed
-  // and hideVanillaHudPanels() wrote into them every frame.
+  // and native suppression wrote into them every frame.
   rebuildVanillaHudPanels();
   hudstate::reset();
   weaponres::reset();
@@ -150,8 +174,8 @@ static void H_HUD_Frame(double frametime) {
 }
 
 static int H_HUD_Redraw(float time, int intermission) {
-  // Old order: strip the vanilla panels' visible bit before the client
-  // redraws, then chain. The reposition pump runs in this phase (the old
+  // Temporarily strip module-claimed native elements before chaining the
+  // client redraw. The reposition pump runs in this phase (the old
   // vgui think phase - the only phase where pTriAPI->WorldToScreen sees the
   // live view matrices). HUD_Redraw's `time` is the absolute client clock
   // (not a delta like HUD_Frame's) - convert for the frame pumps.
@@ -160,11 +184,11 @@ static int H_HUD_Redraw(float time, int intermission) {
   LastRedrawTime = time;
   if (delta < 0.0f || delta > 0.5f)
     delta = 0.0f;
-  hideVanillaHudPanels();
   // Old Viewport::SetInterMission -> ShowPanel(intermission > 0); the
   // +/-showscores commands stay dead while it lasts.
   framework::scoreseat::setIntermission(intermission != 0);
   rmlui::onRedraw(delta);
+  const NativeHudDrawScope nativeDraw;
   return gExportfuncs.HUD_Redraw(time, intermission);
 }
 
@@ -275,6 +299,7 @@ H_HUD_GetStudioModelInterface(int version,
 }
 
 static void H_HUD_Shutdown() {
+  VanillaHudPanelCount = 0;
   services::voice::status().shutdown();
   rmlui::onHudShutdown();
   gExportfuncs.HUD_Shutdown();

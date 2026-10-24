@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
 	<link type="text/rcss" href="../rcss/loading.rcss"/>
 </head>
@@ -10,13 +10,13 @@
      before any engine call; refusals show the inline hint. -->
 <body id="menudirectconnect">
 	<div id="directconnect-box">
-		<h1 id="directconnect-title">#Loading_DirectConnectTitle</h1>
-		<p id="directconnect-lead">#Loading_DirectConnectLead</p>
-		<input id="directconnect-field" type="text" autofocus="autofocus" data-label="#Loading_AddressField"/>
+		<h1 id="directconnect-title">#abcui.gameui/Loading_DirectConnectTitle</h1>
+		<p id="directconnect-lead">#abcui.gameui/Loading_DirectConnectLead</p>
+		<input id="directconnect-field" type="text" autofocus="autofocus" data-label="#abcui.gameui/Loading_AddressField"/>
 		<p id="directconnect-hint" class="loading-sub"></p>
 		<div id="directconnect-actions">
-			<button id="directconnect-connect" data-action="directconnect-connect" data-label="#Loading_Connect">#Loading_Connect</button>
-			<button id="directconnect-cancel" data-action="directconnect-cancel" data-label="#Loading_Return">#Loading_Return</button>
+			<button id="directconnect-connect" data-action="directconnect-connect" data-label="#abcui.gameui/Loading_Connect">#abcui.gameui/Loading_Connect</button>
+			<button id="directconnect-cancel" data-action="directconnect-cancel" data-label="#abcui.gameui/Loading_Return">#abcui.gameui/Loading_Return</button>
 		</div>
 	</div>
 </body>

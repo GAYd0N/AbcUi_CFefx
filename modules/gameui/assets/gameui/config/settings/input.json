@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "keyboard",
+  "label": "#abcui.gameui/Settings_PageKeyboard",
+  "order": 20,
+  "components": [],
+  "sections": [
+    {
+      "id": "bindings",
+      "label": "#abcui.gameui/Settings_KeysTitle",
+      "components": [
+        "bindings"
+      ]
+    }
+  ],
+  "items": []
+}

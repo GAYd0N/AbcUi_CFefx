@@ -72,10 +72,7 @@ std::vector<std::string> splitLines(const char *content) {
 // A key that appears in exactly one draft: engine truth guarantees it on
 // snapshots, capture + conflict resolution + reset-defaults maintain it.
 std::vector<int>::iterator findKey(std::vector<int> &keys, int keynum) {
-  for (auto it = keys.begin(); it != keys.end(); ++it)
-    if (*it == keynum)
-      return it;
-  return keys.end();
+  return std::ranges::find(keys, keynum);
 }
 
 bool hasKey(const std::vector<int> &keys, int keynum) {

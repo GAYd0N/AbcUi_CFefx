@@ -1,6 +1,6 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
 	<link type="text/rcss" href="../rcss/stacks.rcss"/>
 </head>
 <body id="ammostack">

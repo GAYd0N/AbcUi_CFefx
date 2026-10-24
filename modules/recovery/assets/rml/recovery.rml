@@ -1,0 +1,25 @@
+<rml>
+<head>
+<style>
+body { background-color: #000000; font-family: Verdana; }
+div { display: block; }
+#panel { position: absolute; left: 60dp; top: 60dp;
+  width: 400dp; background-color: #101418; padding: 20dp;
+  border: 1dp #3a4148; }
+h1 { display: block; font-size: 14dp; font-weight: bold; color: #ff5500; }
+p { display: block; font-size: 10dp; color: #dedede; }
+button { display: inline-block; margin-right: 8dp; padding: 4dp 10dp;
+  font-size: 10dp; color: #dedede; background-color: #23292f;
+  border: 1dp #3a4148; }
+</style>
+</head>
+<body>
+<div id="panel">
+<h1>AbcUi emergency mode</h1>
+<p>Menu resources are missing or broken.</p>
+<p>Check the console log and repair the resources, then retry.</p>
+<button id="emergency-retry">Retry</button>
+<button id="emergency-quit">Quit</button>
+</div>
+</body>
+</rml>

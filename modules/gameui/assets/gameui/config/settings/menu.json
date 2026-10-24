@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "id": "menu",
+  "label": "#abcui.gameui/Settings_Menu",
+  "order": 85,
+  "components": [],
+  "sections": [
+    {
+      "id": "menu",
+      "label": "#abcui.gameui/Settings_Menu",
+      "components": []
+    }
+  ],
+  "items": [
+    {
+      "cvar": "abc_ui_menu_video",
+      "label": "#abcui.gameui/Settings_MenuVideo",
+      "section": "menu",
+      "kind": "string-enum",
+      "source": "scence/video",
+      "default": "mod://abcui.gameui/gameui/scence/video/trainstation.mp4"
+    },
+    {
+      "cvar": "abc_ui_menu_music",
+      "label": "#abcui.gameui/Settings_MenuMusic",
+      "section": "menu",
+      "kind": "string-enum",
+      "source": "scence/audio",
+      "default": "mod://abcui.gameui/gameui/scence/audio/opfor.mp3"
+    },
+    {
+      "cvar": "abc_ui_menu_model_path",
+      "label": "#abcui.gameui/Settings_MenuModel",
+      "section": "menu",
+      "kind": "text"
+    },
+    {
+      "cvar": "abc_ui_menu_backdrop_blur",
+      "label": "#abcui.gameui/Settings_MenuBlur",
+      "section": "menu",
+      "kind": "float",
+      "min": 0,
+      "max": 4,
+      "step": 1,
+      "default": 2
+    }
+  ]
+}

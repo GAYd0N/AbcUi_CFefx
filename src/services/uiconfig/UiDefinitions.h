@@ -21,7 +21,7 @@ struct MenuEntry {
 };
 
 struct MenuDefinition {
-  std::string Title = "#MainMenu_Title";
+  std::string Title;
   std::vector<MenuEntry> Main;
   std::vector<MenuEntry> Pause;
 };
@@ -109,7 +109,6 @@ public:
                         ConfigError &Error);
   static bool parsePage(const std::string &Text, SettingsPageDefinition &Output,
                         ConfigError &Error);
-  static MenuDefinition fallbackMenu();
 };
 
 } // namespace services::uiconfig

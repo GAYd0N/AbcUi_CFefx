@@ -1,0 +1,358 @@
+{
+  "version": 1,
+  "id": "advanced",
+  "label": "#abcui.gameui/Settings_PageAdvanced",
+  "order": 11,
+  "components": [
+    "user-script"
+  ],
+  "sections": [
+    {
+      "id": "gameplay",
+      "label": "#abcui.gameui/Settings_SecGameplay",
+      "components": []
+    },
+    {
+      "id": "interface",
+      "label": "#abcui.gameui/Settings_SecInterface",
+      "components": []
+    },
+    {
+      "id": "performance",
+      "label": "#abcui.gameui/Settings_SecPerformance",
+      "components": []
+    },
+    {
+      "id": "sound",
+      "label": "#abcui.gameui/Settings_SecSound",
+      "components": []
+    },
+    {
+      "id": "violence",
+      "label": "#abcui.gameui/Settings_SecViolence",
+      "components": []
+    },
+    {
+      "id": "system",
+      "label": "#abcui.gameui/Settings_SecSystem",
+      "components": []
+    },
+    {
+      "id": "scripted",
+      "label": "#abcui.gameui/Settings_SecScripted",
+      "components": []
+    }
+  ],
+  "scriptSection": "scripted",
+  "items": [
+    {
+      "cvar": "crosshair",
+      "label": "#abcui.gameui/Settings_AdvCrosshair",
+      "section": "gameplay",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "hud_weaponautoswitch",
+      "label": "#abcui.gameui/Settings_AdvAutoSwitch",
+      "section": "gameplay",
+      "kind": "enum",
+      "min": 0.0,
+      "max": 2.0,
+      "step": 1.0,
+      "default": 1.0,
+      "options": [
+        {
+          "value": 0.0,
+          "label": "#abcui.gameui/Settings_AutoSwitchNever"
+        },
+        {
+          "value": 1.0,
+          "label": "#abcui.gameui/Settings_AutoSwitchBetter"
+        },
+        {
+          "value": 2.0,
+          "label": "#abcui.gameui/Settings_AutoSwitchAlways"
+        }
+      ]
+    },
+    {
+      "cvar": "cl_showfps",
+      "label": "#abcui.gameui/Settings_AdvShowFps",
+      "section": "interface",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "hud_saytext",
+      "label": "#abcui.gameui/Settings_AdvSayText",
+      "section": "interface",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "hud_saytext_time",
+      "label": "#abcui.gameui/Settings_AdvSayTextTime",
+      "section": "interface",
+      "kind": "float",
+      "min": 0.0,
+      "max": 15.0,
+      "step": 1.0,
+      "default": 5.0
+    },
+    {
+      "cvar": "hud_saytext_lines",
+      "label": "#abcui.gameui/Settings_AdvSayTextLines",
+      "section": "interface",
+      "kind": "float",
+      "min": 0.0,
+      "max": 20.0,
+      "step": 1.0,
+      "default": 6.0
+    },
+    {
+      "cvar": "hud_saytext_block_muted",
+      "label": "#abcui.gameui/Settings_AdvSayTextBlock",
+      "section": "interface",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "cl_hidextra",
+      "label": "#abcui.gameui/Settings_AdvHideExtras",
+      "section": "interface",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "cl_hideadmin",
+      "label": "#abcui.gameui/Settings_AdvHideAdmin",
+      "section": "interface",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "r_borderless",
+      "label": "#abcui.gameui/Settings_AdvBorderless",
+      "section": "performance",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "hpk_maxsize",
+      "label": "#abcui.gameui/Settings_AdvHpkMaxsize",
+      "section": "performance",
+      "kind": "enum",
+      "min": -1.0,
+      "max": 16.0,
+      "step": 1.0,
+      "default": 4.0,
+      "options": [
+        {
+          "value": -1.0,
+          "label": "#abcui.gameui/Settings_HpkDisabled"
+        },
+        {
+          "value": 2.0,
+          "label": "#abcui.gameui/Settings_HpkSmall"
+        },
+        {
+          "value": 4.0,
+          "label": "#abcui.gameui/Settings_HpkNormal"
+        },
+        {
+          "value": 16.0,
+          "label": "#abcui.gameui/Settings_HpkLarge"
+        }
+      ]
+    },
+    {
+      "cvar": "mp_decals",
+      "label": "#abcui.gameui/Settings_AdvDecals",
+      "section": "performance",
+      "kind": "float",
+      "min": 1.0,
+      "max": 4096.0,
+      "step": 1.0,
+      "default": 4096.0
+    },
+    {
+      "cvar": "cl_particles_max",
+      "label": "#abcui.gameui/Settings_AdvParticles",
+      "section": "performance",
+      "kind": "float",
+      "min": 0.0,
+      "max": 4096.0,
+      "step": 1.0,
+      "default": 800.0
+    },
+    {
+      "cvar": "cl_bob",
+      "label": "#abcui.gameui/Settings_AdvBob",
+      "section": "gameplay",
+      "kind": "enum",
+      "min": 0.0,
+      "max": 0.025,
+      "step": 0.005,
+      "default": 0.025,
+      "options": [
+        {
+          "value": 0.0,
+          "label": "#abcui.gameui/Settings_BobOff"
+        },
+        {
+          "value": 0.01,
+          "label": "#abcui.gameui/Settings_BobNormal"
+        },
+        {
+          "value": 0.025,
+          "label": "#abcui.gameui/Settings_BobExtra"
+        }
+      ]
+    },
+    {
+      "cvar": "cl_rollangle",
+      "label": "#abcui.gameui/Settings_AdvRollAngle",
+      "section": "gameplay",
+      "kind": "enum",
+      "min": -5.0,
+      "max": 5.0,
+      "step": 0.5,
+      "default": 2.0,
+      "options": [
+        {
+          "value": 0.0,
+          "label": "#abcui.gameui/Settings_BobOff"
+        },
+        {
+          "value": 2.0,
+          "label": "#abcui.gameui/Settings_BobNormal"
+        },
+        {
+          "value": 5.0,
+          "label": "#abcui.gameui/Settings_BobExtra"
+        },
+        {
+          "value": -2.0,
+          "label": "#abcui.gameui/Settings_BobInverted"
+        },
+        {
+          "value": -5.0,
+          "label": "#abcui.gameui/Settings_BobInvertedExtra"
+        }
+      ]
+    },
+    {
+      "cvar": "s_mute_unfocused",
+      "label": "#abcui.gameui/Settings_AdvMuteUnfocused",
+      "section": "sound",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "s_force_dsound",
+      "label": "#abcui.gameui/Settings_AdvForceDSound",
+      "section": "sound",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "violence_ablood",
+      "label": "#abcui.gameui/Settings_AdvAlienBlood",
+      "section": "violence",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "violence_agibs",
+      "label": "#abcui.gameui/Settings_AdvAlienGibs",
+      "section": "violence",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "violence_hblood",
+      "label": "#abcui.gameui/Settings_AdvHumanBlood",
+      "section": "violence",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "violence_hgibs",
+      "label": "#abcui.gameui/Settings_AdvHumanGibs",
+      "section": "violence",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "cl_discord",
+      "label": "#abcui.gameui/Settings_AdvDiscord",
+      "section": "system",
+      "kind": "enum",
+      "min": 0.0,
+      "max": 2.0,
+      "step": 1.0,
+      "default": 2.0,
+      "options": [
+        {
+          "value": 0.0,
+          "label": "#abcui.gameui/Settings_DiscordGame"
+        },
+        {
+          "value": 1.0,
+          "label": "#abcui.gameui/Settings_DiscordStats"
+        },
+        {
+          "value": 2.0,
+          "label": "#abcui.gameui/Settings_DiscordInvites"
+        }
+      ]
+    },
+    {
+      "cvar": "con_mono",
+      "label": "#abcui.gameui/Settings_AdvMonoConsole",
+      "section": "interface",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "developer",
+      "label": "#abcui.gameui/Settings_AdvDeveloper",
+      "section": "system",
+      "kind": "enum",
+      "min": 0.0,
+      "max": 4.0,
+      "step": 1.0,
+      "default": 0.0,
+      "options": [
+        {
+          "value": 0.0,
+          "label": "#abcui.gameui/Settings_DeveloperOff"
+        },
+        {
+          "value": 1.0,
+          "label": "#abcui.gameui/Settings_DeveloperStandard"
+        },
+        {
+          "value": 2.0,
+          "label": "#abcui.gameui/Settings_DeveloperVerbose"
+        },
+        {
+          "value": 3.0,
+          "label": "#abcui.gameui/Settings_DeveloperVery"
+        },
+        {
+          "value": 4.0,
+          "label": "#abcui.gameui/Settings_DeveloperExtreme"
+        }
+      ]
+    },
+    {
+      "cvar": "abc_ui_browser_hide_unresponsive",
+      "label": "#abcui.gameui/Settings_HideUnresponsive",
+      "section": "system",
+      "kind": "bool",
+      "default": 1
+    }
+  ]
+}

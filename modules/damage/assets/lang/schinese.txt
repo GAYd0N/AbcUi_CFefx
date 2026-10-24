@@ -1,0 +1,14 @@
+abcui.damage/DMGTiles_Poison = 中毒
+abcui.damage/DMGTiles_Acid = 酸蚀
+abcui.damage/DMGTiles_Freeze = 冻伤
+abcui.damage/DMGTiles_Drown = 窒息
+abcui.damage/DMGTiles_Burn = 烧伤
+abcui.damage/DMGTiles_Gas = 毒气
+abcui.damage/DMGTiles_Radiation = 辐射
+abcui.damage/DMGTiles_Shock = 电击
+abcui.damage/DMGTiles_Energybeam = 激光
+abcui.damage/DMGTiles_Sonic = 噪声
+abcui.damage/PopNumber_O = {0}
+abcui.damage/PopNumber_K = {0}千
+abcui.damage/PopNumber_M = {0}百万
+abcui.damage/PopNumber_B = {0}亿

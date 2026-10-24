@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "id": "renderer",
+  "label": "#abcui.gameui/Settings_PageRenderer",
+  "description": "#abcui.gameui/Settings_RendererHint",
+  "order": 60,
+  "components": [],
+  "sections": [
+    {
+      "id": "visuals",
+      "label": "#abcui.gameui/Settings_SecVisuals",
+      "components": []
+    },
+    {
+      "id": "lighting",
+      "label": "#abcui.gameui/Settings_SecLighting",
+      "components": []
+    }
+  ],
+  "items": [
+    {
+      "cvar": "r_detailtextures",
+      "label": "#abcui.gameui/GameUI_DetailTextures",
+      "section": "visuals",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "r_water",
+      "label": "#abcui.gameui/GameUI_WaterShader",
+      "section": "visuals",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "r_shadow",
+      "label": "#abcui.gameui/GameUI_DynamicShadow",
+      "section": "visuals",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "r_ssao",
+      "label": "#abcui.gameui/GameUI_AmbientOcclusion",
+      "section": "visuals",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "r_deferred_lighting",
+      "label": "#abcui.gameui/GameUI_DeferredShading",
+      "section": "visuals",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "r_ssr",
+      "label": "#abcui.gameui/GameUI_ScreenSpaceReflection",
+      "section": "visuals",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "r_studio_celshade",
+      "label": "#abcui.gameui/GameUI_CelShade",
+      "section": "visuals",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "r_fxaa",
+      "label": "#abcui.gameui/GameUI_AntiAliasing",
+      "section": "visuals",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "r_wsurf_sky_fog",
+      "label": "#abcui.gameui/GameUI_SkyFog",
+      "section": "visuals",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "r_wsurf_zprepass",
+      "label": "#abcui.gameui/Settings_UnsupportedZPrepass",
+      "section": "visuals",
+      "kind": "bool",
+      "default": 0,
+      "readOnly": true
+    },
+    {
+      "cvar": "r_hdr",
+      "label": "#abcui.gameui/GameUI_HDR",
+      "section": "lighting",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "r_gamma_blend",
+      "label": "#abcui.gameui/GameUI_GammaBlending",
+      "section": "lighting",
+      "kind": "bool",
+      "default": 1.0
+    },
+    {
+      "cvar": "r_hdr_exposure",
+      "label": "#abcui.gameui/GameUI_HDRExposure",
+      "section": "lighting",
+      "kind": "float",
+      "min": 0.1,
+      "max": 2.0,
+      "step": 0.01,
+      "default": 1.0
+    },
+    {
+      "cvar": "r_hdr_darkness",
+      "label": "#abcui.gameui/GameUI_HDRDarkness",
+      "section": "lighting",
+      "kind": "float",
+      "min": 0.1,
+      "max": 2.0,
+      "step": 0.01,
+      "default": 1.5
+    },
+    {
+      "cvar": "r_hdr_blurwidth",
+      "label": "#abcui.gameui/GameUI_BloomIntensity",
+      "section": "lighting",
+      "kind": "float",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.075
+    },
+    {
+      "cvar": "r_shadow_intensity",
+      "label": "#abcui.gameui/Settings_UnsupportedShadowIntensity",
+      "section": "lighting",
+      "kind": "float",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.0,
+      "readOnly": true
+    },
+    {
+      "cvar": "texgamma",
+      "label": "#abcui.gameui/GameUI_TexGamma",
+      "section": "lighting",
+      "kind": "float",
+      "min": 1.8,
+      "max": 3.0,
+      "step": 0.01
+    },
+    {
+      "cvar": "lightgamma",
+      "label": "#abcui.gameui/GameUI_LightGamma",
+      "section": "lighting",
+      "kind": "float",
+      "min": 1.8,
+      "max": 3.0,
+      "step": 0.01
+    },
+    {
+      "cvar": "gl_ansio",
+      "label": "#abcui.gameui/GameUI_AnisotropicFiltering",
+      "section": "lighting",
+      "kind": "enum",
+      "min": 1,
+      "max": 16,
+      "default": 1,
+      "options": [
+        {
+          "value": 1,
+          "label": "1X"
+        },
+        {
+          "value": 2,
+          "label": "2X"
+        },
+        {
+          "value": 4,
+          "label": "4X"
+        },
+        {
+          "value": 8,
+          "label": "8X"
+        },
+        {
+          "value": 16,
+          "label": "16X"
+        }
+      ]
+    }
+  ]
+}

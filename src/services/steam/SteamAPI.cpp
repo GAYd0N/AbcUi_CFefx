@@ -64,4 +64,15 @@ bool avatar(SteamId64 id, AvatarRgba &out) {
   return Active ? Active->avatar(id, out) : false;
 }
 
+AvatarAnimationState animatedAvatar(SteamId64 id, AvatarAnimation &out) {
+  ensure();
+  return Active ? Active->animatedAvatar(id, out)
+                : AvatarAnimationState::Unavailable;
+}
+
+void abandonAnimatedAvatar(SteamId64 id) {
+  if (Active)
+    Active->abandonAnimatedAvatar(id);
+}
+
 } // namespace steamapi

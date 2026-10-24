@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
 	<link type="text/rcss" href="../rcss/creategame.rcss"/>
 	<link type="text/rcss" href="../rcss/range.rcss"/>
@@ -25,20 +25,20 @@
 	<div id="cg-panel">
 		<div id="cg-head">
 			<div id="cg-brand">Sven Co-op</div>
-			<h1 id="cg-title">#CG_Title</h1>
+			<h1 id="cg-title">#abcui.gameui/CG_Title</h1>
 		</div>
 
 		<!-- Module 1: the map picker. The bar carries the module title and the
 		     filtered/total count; the search field narrows the list live. -->
 		<div id="cg-map-module">
 			<div id="cg-map-bar">
-				<div id="cg-map-caption" class="abc-sectitle">#CG_Map</div>
+				<div id="cg-map-caption" class="abc-sectitle">#abcui.gameui/CG_Map</div>
 				<div id="cg-map-count"></div>
 			</div>
 			<div class="cg-row" id="cg-map-search">
-				<div class="cg-row-label">#CG_MapSearch</div>
+				<div class="cg-row-label">#abcui.gameui/CG_MapSearch</div>
 				<input id="cg-map-filter" type="text" maxlength="64"
-					data-label="#CG_MapSearch" autofocus="autofocus"/>
+					data-label="#abcui.gameui/CG_MapSearch" autofocus="autofocus"/>
 			</div>
 			<div id="cg-map-list"></div>
 			<select id="cg-map"></select>
@@ -49,26 +49,26 @@
 		     numeric server options (services::creategame::ServerOptions). -->
 		<div id="cg-form-module">
 			<div id="cg-form-bar">
-				<div id="cg-form-caption" class="abc-sectitle">#CG_Settings</div>
+				<div id="cg-form-caption" class="abc-sectitle">#abcui.gameui/CG_Settings</div>
 			</div>
 			<div id="cg-form-body">
 				<div class="cg-row">
-					<div class="cg-row-label">#CG_Players</div>
+					<div class="cg-row-label">#abcui.gameui/CG_Players</div>
 					<input id="cg-players" class="cg-slider" type="range" min="1" max="32" step="1"
-						data-label="#CG_Players"/>
+						data-label="#abcui.gameui/CG_Players"/>
 					<span id="cg-players-value" class="row-value">8</span>
 				</div>
 				<div class="cg-row">
-					<div class="cg-row-label">#CG_Name</div>
-					<input id="cg-name" type="text" data-label="#CG_Name"/>
+					<div class="cg-row-label">#abcui.gameui/CG_Name</div>
+					<input id="cg-name" type="text" data-label="#abcui.gameui/CG_Name"/>
 				</div>
 				<div class="cg-row">
-					<div class="cg-row-label">#CG_Password</div>
-					<input id="cg-password" type="password" data-label="#CG_Password"/>
+					<div class="cg-row-label">#abcui.gameui/CG_Password</div>
+					<input id="cg-password" type="password" data-label="#abcui.gameui/CG_Password"/>
 				</div>
 				<div class="cg-row">
-					<div class="cg-row-label">#CG_Lan</div>
-					<button id="cg-lan" data-action="cg-lan" data-label="#CG_Lan">#Settings_Off</button>
+					<div class="cg-row-label">#abcui.gameui/CG_Lan</div>
+					<button id="cg-lan" data-action="cg-lan" data-label="#abcui.gameui/CG_Lan">#abcui.gameui/Settings_Off</button>
 				</div>
 				<div id="cg-options"></div>
 			</div>
@@ -76,8 +76,8 @@
 
 		<p id="cg-hint"></p>
 		<div id="cg-actions">
-			<button id="cg-apply" data-action="cg-apply" data-label="#CG_Apply">#CG_Apply</button>
-			<button id="cg-cancel" data-action="cg-cancel" data-label="#MainMenu_Return">#MainMenu_Return</button>
+			<button id="cg-apply" data-action="cg-apply" data-label="#abcui.gameui/CG_Apply">#abcui.gameui/CG_Apply</button>
+			<button id="cg-cancel" data-action="cg-cancel" data-label="#abcui.gameui/MainMenu_Return">#abcui.gameui/MainMenu_Return</button>
 		</div>
 	</div>
 </body>

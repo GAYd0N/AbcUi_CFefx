@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <format>
 
 namespace services {
 namespace settings {
@@ -14,9 +15,7 @@ namespace {
 constexpr const char *kRendererName = "gl";
 
 std::string resolutionCommand(int width, int height) {
-  char buffer[64];
-  std::snprintf(buffer, sizeof(buffer), "_setvideomode %d %d\n", width, height);
-  return buffer;
+  return std::format("_setvideomode {} {}\n", width, height);
 }
 
 std::string rendererCommand(bool windowed) {
@@ -393,10 +392,8 @@ bool VideoModeModel::tick() {
 }
 
 std::string VideoModeModel::describe(const VideoMode &mode) {
-  char buffer[64];
-  std::snprintf(buffer, sizeof(buffer), "%d x %d %s", mode.Width, mode.Height,
-                mode.Windowed ? "windowed" : "fullscreen");
-  return buffer;
+  return std::format("{} x {} {}", mode.Width, mode.Height,
+                     mode.Windowed ? "windowed" : "fullscreen");
 }
 
 } // namespace settings

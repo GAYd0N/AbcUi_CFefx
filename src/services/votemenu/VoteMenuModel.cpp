@@ -181,9 +181,9 @@ bool VoteMenuModel::refresh() {
   return true;
 }
 
-void VoteMenuModel::applyMapList(int clearAll, int allCount, int start, int end,
+void VoteMenuModel::applyMapList(int clearAll, int allCount,
+                                 [[maybe_unused]] int start, int end,
                                  const std::vector<std::string> &maps) {
-  (void)start;
   if (clearAll == 0) {
     Maps.clear();
     if (allCount > 0) {

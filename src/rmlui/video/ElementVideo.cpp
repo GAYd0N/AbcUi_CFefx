@@ -3,6 +3,7 @@
 #include "../../services/video/AsyncDecoder.h"
 #include "../../services/video/Options.h"
 #include "VideoTexture.h"
+#include "modsys/ModuleVfs.h"
 
 #include <windows.h>
 
@@ -15,6 +16,7 @@
 #include <abc/Paths.h>
 
 #include <algorithm>
+#include <format>
 #include <cmath>
 #include <cstring>
 #include <vector>
@@ -138,9 +140,7 @@ void ElementVideo::applyPlacement(Rml::Vector2i box, float width,
     if (Placement[i] == values[i])
       continue;
     Placement[i] = values[i];
-    char text[32];
-    _snprintf_s(text, sizeof(text), _TRUNCATE, "%.2fpx", values[i]);
-    Image->SetProperty(names[i], text);
+    Image->SetProperty(names[i], std::format("{:.2f}px", values[i]).c_str());
   }
 }
 
@@ -173,7 +173,11 @@ Rml::Vector2i ElementVideo::applyFit(Rml::Vector2i box) {
 }
 
 bool ElementVideo::openMedia(const char *reason) {
-  const std::string path = abc::ModPath(Config->Source.c_str());
+  std::string path;
+  const auto *document = GetOwnerDocument();
+  if (!document || !framework::ModuleVfs::resolve(document->GetSourceURL(),
+                                                  Config->Source, path))
+    return false;
   const int width = DecodeSize.x > 0 ? DecodeSize.x : kMaxDecodeEdge;
   const int height = DecodeSize.y > 0 ? DecodeSize.y : kMaxDecodeEdge;
   if (Media->open(path.c_str(), width, height)) {

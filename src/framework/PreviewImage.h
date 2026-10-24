@@ -1,5 +1,7 @@
 #pragma once
 #include "ImageLoader.h"
+#include <cstddef>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -15,6 +17,6 @@ struct PreviewRequest {
 };
 bool parsePreviewUri(const std::string &Uri, PreviewRequest &Output);
 bool decodePreview(const PreviewRequest &Request,
-                   const std::vector<unsigned char> &Bytes,
+                   std::span<const std::byte> Bytes,
                    ImageLoader::DecodedImage &Output);
 } // namespace framework

@@ -58,17 +58,7 @@ struct ServerFilter {
   // The client-side twin of the master rules (case-insensitive gamedir).
   // Unknown entries pass value filters only when HideUnresponsive is false.
   bool accepts(const ServerEntry &entry) const;
-  bool operator==(const ServerFilter &other) const {
-    return hideEmpty == other.hideEmpty && hideFull == other.hideFull &&
-           secureOnly == other.secureOnly && gameDir == other.gameDir &&
-           HideUnresponsive == other.HideUnresponsive &&
-           NoPassword == other.NoPassword &&
-           InsecureOnly == other.InsecureOnly && MaxPing == other.MaxPing &&
-           Name == other.Name && Map == other.Map;
-  }
-  bool operator!=(const ServerFilter &other) const {
-    return !(*this == other);
-  }
+  bool operator==(const ServerFilter &) const = default;
 };
 
 // Sort keys (the data columns of the list). Ping treats "unknown" specially.

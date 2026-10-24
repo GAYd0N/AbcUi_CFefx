@@ -8,6 +8,7 @@
 #include "services/playerlist/MuteBackend.h"
 #include <cstring>
 #include <string>
+#include <string_view>
 #include "modules/gameui/engine/MenuBindings.h"
 namespace gameui::engine {
 namespace {
@@ -114,7 +115,7 @@ services::playerlist::PlayerListModel::Seams playerListSeams() {
       // the same engine call, so the classification matches the shipped
       // dialog exactly.
       const char *bot = gEngfuncs.PlayerInfo_ValueForKey(i, "*bot");
-      entry.bot = bot && std::strcmp(bot, "1") == 0;
+      entry.bot = bot && std::string_view(bot) == "1";
     }
     return count;
   };

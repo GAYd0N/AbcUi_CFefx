@@ -1,7 +1,7 @@
 #include "ConfigRepository.h"
 
 #include <algorithm>
-#include <fstream>
+
 #include <set>
 
 namespace services::uiconfig {
@@ -36,61 +36,45 @@ SettingDefinition copyRow(const settings::SettingRow &Row) {
 }
 } // namespace
 
-bool ConfigRepository::read(const std::filesystem::path &Path,
-                            std::string &Text) {
-  std::ifstream Stream(Path, std::ios::binary | std::ios::ate);
-  const auto Size = Stream ? Stream.tellg() : std::streampos(-1);
-  if (Size < 0 || Size > 1024 * 1024) {
-    Errors.push_back(
-        {Path.generic_string(), "$", "cannot read file or file exceeds 1 MiB"});
+bool ConfigRepository::read(const std::string &Path, std::string &Text) {
+  if (!Read || !Read(Path, Text) || Text.size() > 1024 * 1024) {
+    Errors.push_back({Path, "$", "cannot read package entry or exceeds 1 MiB"});
     return false;
   }
-  Text.resize(static_cast<size_t>(Size));
-  Stream.seekg(0);
-  if (!Text.empty() &&
-      !Stream.read(Text.data(), static_cast<std::streamsize>(Text.size()))) {
-    Errors.push_back({Path.generic_string(), "$", "incomplete file read"});
-    return false;
-  }
-  // UTF-8 BOM is accepted, UTF-16 is deliberately not.
-  if (Text.compare(0, 3, "\xef\xbb\xbf") == 0)
+  if (Text.starts_with("\xef\xbb\xbf"))
     Text.erase(0, 3);
   return true;
 }
 
-void ConfigRepository::load(const std::filesystem::path &Root,
+void ConfigRepository::load(const std::string &Root, Reader reader,
+                            Listing listing,
                             const std::vector<settings::SettingRow> &Advanced) {
   Rows.clear();
   Pages.clear();
   Errors.clear();
-  Menu = DefinitionParser::fallbackMenu();
+  Read = std::move(reader);
+  Menu = {};
   std::string Text;
-  const auto MenuPath = Root / "mainmenu.json";
+  const auto MenuPath = Root + "/mainmenu.json";
   if (read(MenuPath, Text)) {
-    ConfigError Error{MenuPath.generic_string()};
+    ConfigError Error{MenuPath};
     if (!DefinitionParser::parseMenu(Text, Menu, Error))
       Errors.push_back(std::move(Error));
   }
-  std::error_code EC;
-  std::vector<std::filesystem::path> Files;
-  std::filesystem::directory_iterator It(Root / "settings", EC), End;
-  for (; !EC && It != End; It.increment(EC)) {
-    if (It->is_regular_file(EC) && It->path().extension() == ".json")
-      Files.push_back(It->path());
-  }
-  if (EC)
-    Errors.push_back({(Root / "settings").generic_string(), "$", EC.message()});
+  auto Files =
+      listing ? listing(Root + "/settings") : std::vector<std::string>{};
+  std::erase_if(
+      Files, [](const std::string &file) { return !file.ends_with(".json"); });
   std::sort(Files.begin(), Files.end());
   if (Files.size() > 64) {
-    Errors.push_back({Root.generic_string(), "$",
-                      "settings directory exceeds 64 JSON files"});
+    Errors.push_back({Root, "$", "settings directory exceeds 64 JSON files"});
     Files.resize(64);
   }
   std::set<std::string> PageIds, Cvars, Components;
   for (const auto &File : Files) {
     if (!read(File, Text))
       continue;
-    ConfigError Error{File.generic_string()};
+    ConfigError Error{File};
     SettingsPageDefinition Page;
     if (!DefinitionParser::parsePage(Text, Page, Error)) {
       Errors.push_back(std::move(Error));
@@ -154,7 +138,7 @@ void ConfigRepository::load(const std::filesystem::path &Root,
         Conflict = "component already assigned: " + Component;
     }
     if (!Conflict.empty()) {
-      Errors.push_back({File.generic_string(), "$", Conflict});
+      Errors.push_back({File, "$", Conflict});
       continue;
     }
     PageIds.insert(Page.Id);

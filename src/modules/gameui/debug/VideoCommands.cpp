@@ -5,6 +5,7 @@
 #include "modules/gameui/GameUiModule.h"
 #include "DebugCommands.h"
 #include <abc/Console.h>
+#include <abc/Parse.h>
 #include <abc/Plugin.h>
 #include "modsys/ApiTable.h"
 #include "rmlui/VGUI2ExtensionImport.h"
@@ -57,8 +58,8 @@ void DebugCommands::videoStageCommand() {
     abc::ConsoleWarn("[AbcUi] usage: abc_ui_video_stage <width> <height>\n");
     return;
   }
-  const int w = atoi(gEngfuncs.Cmd_Argv(1));
-  const int h = atoi(gEngfuncs.Cmd_Argv(2));
+  const int w = abc::ParseInt(gEngfuncs.Cmd_Argv(1)).value_or(0);
+  const int h = abc::ParseInt(gEngfuncs.Cmd_Argv(2)).value_or(0);
   if (w <= 0 || h <= 0) {
     abc::ConsoleWarn("[AbcUi] bad dimensions\n");
     return;
@@ -110,7 +111,7 @@ void DebugCommands::videoWindowCommand() {
   }
   int seconds = 0;
   if (gEngfuncs.Cmd_Argc() >= 2)
-    seconds = atoi(gEngfuncs.Cmd_Argv(1));
+    seconds = abc::ParseInt(gEngfuncs.Cmd_Argv(1)).value_or(0);
   currentModule()->VideoModel.setConfirmWindowMsForTesting(
       seconds > 0 ? seconds * 1000 : 0);
   abc::ConsolePrint("[AbcUi] video confirm window: %ds\n",

@@ -2,6 +2,7 @@
 // command menu's model and navigation). See ApiTable.h for how it joins the
 // module table.
 #include "ApiTable.h"
+#include "ApiSnapshot.h"
 
 #include <algorithm>
 #include <cstring>
@@ -112,10 +113,7 @@ int32_t apiItemAt(int32_t column, int32_t index, AbcUiCommandMenuItem *out) {
   copyText(item.Label, full.label, sizeof(full.label));
 
   // The caller's declared size wins: never write past an older header.
-  const uint32_t declared = out->structSize == 0
-                                ? static_cast<uint32_t>(sizeof(full))
-                                : out->structSize;
-  std::memcpy(out, &full, std::min<size_t>(declared, sizeof(full)));
+  abi::copySnapshot(out, full);
   return 1;
 }
 

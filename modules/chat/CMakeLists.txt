@@ -1,6 +1,7 @@
 # abcui.chat - chat log + input line module (see sdk/abcui/abi.h for the
 # module build contract).
-add_library(abcui_mod_chat MODULE src/ChatModule.cpp)
+add_library(abcui_mod_chat MODULE src/ChatModule.cpp
+                          src/saytext/SayText.cpp)
 target_include_directories(abcui_mod_chat PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk")
 set_target_properties(abcui_mod_chat PROPERTIES OUTPUT_NAME "abcui_chat")

@@ -2,9 +2,12 @@
 // from: ABCEnchance/src/core/resource/spriteresource.* (hud.txt half);
 // .spr pixel decoding per SPRView.Net Core/SprReader.cs + FrameDecoder.cs.
 #include <metahook.h>
+#include <cstddef>
 
 #include "SpriteResource.h"
+#include <abcui/module_api.h>
 #include "SpriteUri.h"
+#include "modsys/ModuleVfs.h"
 #include "../../framework/ResourceLimits.h"
 #include "../../framework/ResourceFile.h"
 #include <unordered_set>
@@ -27,11 +30,11 @@ namespace {
 constexpr int kSprSignature = 0x50534449; // "IDSP"
 constexpr int kSprVersion = 2;
 
-enum SpriteFormat {
-  kFormatNormal = 0,
-  kFormatAdditive = 1,
-  kFormatIndexAlpha = 2,
-  kFormatAlphaTest = 3,
+enum class SpriteFormat {
+  kNormal = 0,
+  kAdditive = 1,
+  kIndexAlpha = 2,
+  kAlphaTest = 3,
 };
 
 struct HudEntry {
@@ -47,17 +50,21 @@ struct DecodedAtlas {
 
 std::unordered_map<std::string, HudEntry> HudEntries;
 std::unordered_map<std::string, DecodedAtlas> Atlases;
+std::unordered_map<std::string, int> &atlasErrors() {
+  static std::unordered_map<std::string, int> instance;
+  return instance;
+}
 std::unordered_map<std::string, int> CropTextures;
 bool ChannelWarned = false;
 int HudResolution = 0;
 
-// SPR_GetList paths are relative to the sprite root. The engine itself opens
-// "sprites/<szSprite>.spr", so an entry may legitimately climb out with ".."
-// (the ABC fallback list ships "../abc/abcui/hud/spr/weapon_error"); prefix
-// first and let the engine filesystem normalize, exactly like SPR_Load does.
-// Paths already carrying the "sprites/" prefix are used as-is.
+// Native sprite paths use the engine's sprite root; module-owned fallback
+// atlases have explicit mod:// URIs and never fall through to engine files.
 bool readSpriteFile(const std::string &atlasFile,
-                    std::vector<unsigned char> &bytes) {
+                    std::vector<std::byte> &bytes) {
+  if (framework::ModuleVfs::isModuleUri(atlasFile))
+    return framework::ResourceFile::read(
+        atlasFile, bytes, framework::ResourceLimits::MaxFileBytes);
   std::string normalized;
   if (atlasFile.starts_with("sprites/") || atlasFile.starts_with("sprites\\")) {
     if (!framework::ResourceFile::normalize(atlasFile, normalized))
@@ -83,8 +90,9 @@ void decodeFramePixels(const unsigned char *indexed, int pixelCount,
                        const unsigned char *palette, int paletteSize,
                        int format, unsigned char *rgba) {
   const bool fullPalette = paletteSize == 256;
-  const bool indexIsAlpha = format == kFormatIndexAlpha;
-  const bool blackIsEmpty = format == kFormatAdditive;
+  const bool indexIsAlpha =
+      format == static_cast<int>(SpriteFormat::kIndexAlpha);
+  const bool blackIsEmpty = format == static_cast<int>(SpriteFormat::kAdditive);
   // Key colour = palette entry 255 (colour compare, not index compare) for
   // every non-IndexAlpha format with a full palette (SPRView rule).
   unsigned char keyR = 0, keyG = 0, keyB = 0;
@@ -115,7 +123,7 @@ void decodeFramePixels(const unsigned char *indexed, int pixelCount,
 }
 
 bool loadSpr(const std::string &atlasFile, DecodedAtlas &out) {
-  std::vector<unsigned char> file;
+  std::vector<std::byte> file;
   if (!readSpriteFile(atlasFile, file)) {
     abc::ConsoleWarn("[AbcUi] sprite atlas not found: sprites/%s\n",
                      atlasFile.c_str());
@@ -125,10 +133,13 @@ bool loadSpr(const std::string &atlasFile, DecodedAtlas &out) {
   const auto readInt = [&file](size_t offset, int &value) {
     if (!framework::ResourceLimits::span(offset, 4, file.size()))
       return false;
-    value = static_cast<int>(file[offset]) |
-            (static_cast<int>(file[offset + 1]) << 8) |
-            (static_cast<int>(file[offset + 2]) << 16) |
-            (static_cast<int>(file[offset + 3]) << 24);
+    value = static_cast<int>(std::to_integer<unsigned char>(file[offset])) |
+            (static_cast<int>(std::to_integer<unsigned char>(file[offset + 1]))
+             << 8) |
+            (static_cast<int>(std::to_integer<unsigned char>(file[offset + 2]))
+             << 16) |
+            (static_cast<int>(std::to_integer<unsigned char>(file[offset + 3]))
+             << 24);
     return true;
   };
 
@@ -152,8 +163,9 @@ bool loadSpr(const std::string &atlasFile, DecodedAtlas &out) {
   int paletteSize = 0;
   if (offset + 2 > file.size())
     return false;
-  paletteSize = static_cast<int>(file[offset]) |
-                (static_cast<int>(file[offset + 1]) << 8);
+  paletteSize =
+      static_cast<int>(std::to_integer<unsigned char>(file[offset])) |
+      (static_cast<int>(std::to_integer<unsigned char>(file[offset + 1])) << 8);
   offset += 2;
   if (paletteSize <= 0 || paletteSize > 256 ||
       offset + static_cast<size_t>(paletteSize) * 3 > file.size()) {
@@ -161,7 +173,8 @@ bool loadSpr(const std::string &atlasFile, DecodedAtlas &out) {
                      atlasFile.c_str());
     return false;
   }
-  const unsigned char *palette = file.data() + offset;
+  const unsigned char *palette =
+      reinterpret_cast<const unsigned char *>(file.data()) + offset;
   offset += static_cast<size_t>(paletteSize) * 3;
 
   // First readable frame; malformed tails end the table (SPRView rule -
@@ -188,7 +201,7 @@ bool loadSpr(const std::string &atlasFile, DecodedAtlas &out) {
     const size_t pixelCount = byteCount / 4;
     if (!framework::ResourceLimits::span(offset, pixelCount, file.size()))
       break;
-    pixels = file.data() + offset;
+    pixels = reinterpret_cast<const unsigned char *>(file.data()) + offset;
     offset += pixelCount;
   }
   if (!pixels) {
@@ -226,9 +239,13 @@ DecodedAtlas *ensureAtlas(const std::string &atlasFile) {
   auto itor = Atlases.find(key);
   if (itor != Atlases.end())
     return &itor->second;
-  DecodedAtlas atlas;
-  if (!loadSpr(key, atlas))
+  if (atlasErrors().count(key))
     return nullptr;
+  DecodedAtlas atlas;
+  if (!loadSpr(key, atlas)) {
+    atlasErrors()[key] = ABCUI_ERROR_DECODE;
+    return nullptr;
+  }
   return &Atlases.emplace(key, std::move(atlas)).first->second;
 }
 
@@ -270,6 +287,7 @@ void shutdown() {
       framework::texture::release(id);
   CropTextures.clear();
   Atlases.clear();
+  atlasErrors().clear();
   HudEntries.clear();
   HudResolution = 0;
 }
@@ -281,6 +299,18 @@ bool findHudSprite(const char *name, std::string &atlasFile, wrect_t &rect) {
   atlasFile = itor->second.atlasFile;
   rect = itor->second.rect;
   return true;
+}
+
+int resourceStatus(const std::string &atlasFile, const wrect_t &rect) {
+  const auto *atlas = ensureAtlas(atlasFile);
+  if (!atlas)
+    return ABCUI_ERROR_DECODE;
+  int x = 0, y = 0, width = 0, height = 0;
+  return framework::ResourceLimits::crop(rect.left, rect.top, rect.right,
+                                         rect.bottom, atlas->width,
+                                         atlas->height, x, y, width, height)
+             ? ABCUI_OK
+             : ABCUI_ERROR_INVALID;
 }
 
 int croppedTexture(const std::string &atlasFile, const wrect_t &rect,
@@ -384,16 +414,18 @@ int textureForUri(const std::string &uri, int &width, int &height) {
 
 #ifndef NDEBUG
 namespace {
-int readProbeInt(const std::vector<unsigned char> &file, size_t offset,
-                 bool &ok) {
+int readProbeInt(const std::vector<std::byte> &file, size_t offset, bool &ok) {
   if (offset + 4 > file.size()) {
     ok = false;
     return 0;
   }
-  return static_cast<int>(file[offset]) |
-         (static_cast<int>(file[offset + 1]) << 8) |
-         (static_cast<int>(file[offset + 2]) << 16) |
-         (static_cast<int>(file[offset + 3]) << 24);
+  return static_cast<int>(std::to_integer<unsigned char>(file[offset])) |
+         (static_cast<int>(std::to_integer<unsigned char>(file[offset + 1]))
+          << 8) |
+         (static_cast<int>(std::to_integer<unsigned char>(file[offset + 2]))
+          << 16) |
+         (static_cast<int>(std::to_integer<unsigned char>(file[offset + 3]))
+          << 24);
 }
 } // namespace
 
@@ -401,7 +433,7 @@ void debugDumpAtlas(const std::string &atlasFile) {
   std::string normalized;
   const bool normalizedOk =
       framework::ResourceFile::normalize(atlasFile, normalized);
-  std::vector<unsigned char> bytes;
+  std::vector<std::byte> bytes;
   const bool readOk = readSpriteFile(atlasFile, bytes);
   abc::ConsolePrint("[AbcUi] sprdbg atlas='%s' norm='%s' normOk=%d read=%d "
                     "bytes=%u cached=%d\n",

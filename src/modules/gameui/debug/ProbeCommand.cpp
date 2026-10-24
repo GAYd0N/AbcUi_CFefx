@@ -10,6 +10,7 @@
 
 #include <abc/Console.h>
 #include <abc/CvarCmd.h>
+#include <abc/Parse.h>
 
 #include <keydefs.h>
 #include <abc/Math.h>
@@ -33,7 +34,6 @@
 #include "../../../rmlui/VGUI2ExtensionImport.h"
 #include "../../../rmlui/backdrop/ElementBackdrop.h"
 #include "../../../rmlui/backdrop/Backdrop.h"
-#include "../../../services/menumusic/MenuMusic.h"
 #include "../../../services/friends/FriendsModel.h"
 #include "../../../services/GameUiBridge.h"
 #include "../../../services/console/ConsoleBackend.h"
@@ -109,7 +109,7 @@ void consoleStatusCommand() {
 void consoleDumpCommand() {
   int newest = 10;
   if (gEngfuncs.Cmd_Argc() >= 2)
-    newest = atoi(gEngfuncs.Cmd_Argv(1));
+    newest = abc::ParseInt(gEngfuncs.Cmd_Argv(1)).value_or(0);
   if (newest <= 0)
     newest = 10;
   if (newest > 64)
@@ -445,14 +445,6 @@ void probeCommand() {
                       service.Width, service.Height, service.VideoOpen ? 1 : 0,
                       service.VideoSeconds);
   }
-  // Menu score (UI overhaul WS4): the track the module hands to the engine's
-  // mp3 player (looping and loudness are the engine's own; see MenuMusic).
-  {
-    const auto &music = menumusic::menuMusic();
-    abc::ConsolePrint("[AbcUi] probe: music src='%s' on=%d playing=%d\n",
-                      music.source().c_str(), music.enabled() ? 1 : 0,
-                      music.playing() ? 1 : 0);
-  }
   // Friends board (UI overhaul WS4): provider reach, the row set and each
   // row's joinability.
   {
@@ -481,28 +473,7 @@ void probeCommand() {
                       rmlui::uiMouseOwner() ? 1 : 0,
                       framework::scoreseat::wantsWheel() ? 1 : 0);
   }
-  const char *rml =
-      "<rml>"
-      "<head>"
-      "<link type=\"text/rcss\" href=\"abc/abcui/rcss/base.rcss\"/>"
-      "<style>"
-      "	body { margin: 0dp; width: 640dp; height: 640dp;"
-      "		background-color: #101418e0; }"
-      "	div { display: block; }"
-      "	#a { font-family: \"Verdana\"; font-size: 40px; color: #ff0000; }"
-      "	#b { font-family: \"Microsoft YaHei\"; font-size: 40px; color: "
-      "#00ff00; }"
-      "	#c { font-size: 40px; color: #ffff00; }"
-      "</style>"
-      "</head>"
-      "<body>"
-      "<div id=\"a\">PROBE-VERDANA-123</div>"
-      "<div id=\"b\">PROBE-YAHEI-ABC abc \xe6\xb5\x8b\xe8\xaf\x95</div>"
-      "<div id=\"c\">PROBE-UNSPECIFIED-456</div>"
-      "<div id=\"d\" class=\"font-default\">PROBE-BASECSS-789</div>"
-      "</body>"
-      "</rml>";
-  ProbeDoc = context->LoadDocumentFromMemory(rml);
+  ProbeDoc = context->LoadDocument("mod://abcui.gameui/debug/probe.rml");
   if (ProbeDoc) {
     ProbeDoc->Show();
     // Keydown follows the focus chain; the doc must own focus for the
@@ -633,9 +604,12 @@ void wheelDownCommand() {
 
 // Deterministic client-key seam; does not pretend to be hardware input.
 void mouseKeyCommand() {
-  const int key =
-      gEngfuncs.Cmd_Argc() > 1 ? atoi(gEngfuncs.Cmd_Argv(1)) : K_MOUSE2;
-  const int down = gEngfuncs.Cmd_Argc() > 2 ? atoi(gEngfuncs.Cmd_Argv(2)) : 1;
+  const int key = gEngfuncs.Cmd_Argc() > 1
+                      ? abc::ParseInt(gEngfuncs.Cmd_Argv(1)).value_or(K_MOUSE2)
+                      : K_MOUSE2;
+  const int down = gEngfuncs.Cmd_Argc() > 2
+                       ? abc::ParseInt(gEngfuncs.Cmd_Argv(2)).value_or(1)
+                       : 1;
   const int result = hooks::debugKeyEvent(down, key);
   abc::ConsolePrint("[AbcUi] input-test key=%d down=%d result=%d owner=%d "
                     "cursor=%d wheel=%d\n",
@@ -672,7 +646,9 @@ void inputTextCommand() {
 
 void inputComposeCommand() {
   const char *text = gEngfuncs.Cmd_Argc() > 1 ? gEngfuncs.Cmd_Argv(1) : "";
-  const int start = gEngfuncs.Cmd_Argc() > 2 ? atoi(gEngfuncs.Cmd_Argv(2)) : 0;
+  const int start = gEngfuncs.Cmd_Argc() > 2
+                        ? abc::ParseInt(gEngfuncs.Cmd_Argv(2)).value_or(0)
+                        : 0;
   rmlui::feedTextEditing(text, start);
   printFocusedValue("compose");
 }
@@ -720,7 +696,7 @@ void nativeCommand() {
                     bridge.menuUp() ? 1 : 0, bridge.pageShown() ? 1 : 0,
                     c.BaseUiKeyEvents, c.BaseUiToggles);
   const char *buckets[] = {"gameui", "serverbrowser", "other"};
-  for (int i = 0; i < (int)services::PaintBucket::kCount; i++) {
+  for (int i = 0; i < static_cast<int>(services::PaintBucket::kCount); i++) {
     abc::ConsolePrint(
         "[AbcUi] native paint %s attempts=%u blocked=%u allowed=%u\n",
         buckets[i], c.PaintAttempts[i], c.PaintBlocked[i],
@@ -777,8 +753,12 @@ void domAtCommand() {
   Rml::Context *ctx = rmlui::context();
   if (!ctx)
     return;
-  const int px = gEngfuncs.Cmd_Argc() > 1 ? atoi(gEngfuncs.Cmd_Argv(1)) : -1;
-  const int py = gEngfuncs.Cmd_Argc() > 2 ? atoi(gEngfuncs.Cmd_Argv(2)) : -1;
+  const int px = gEngfuncs.Cmd_Argc() > 1
+                     ? abc::ParseInt(gEngfuncs.Cmd_Argv(1)).value_or(-1)
+                     : -1;
+  const int py = gEngfuncs.Cmd_Argc() > 2
+                     ? abc::ParseInt(gEngfuncs.Cmd_Argv(2)).value_or(-1)
+                     : -1;
   abc::ConsolePrint("[AbcUi] dom-at point=(%d,%d) documents=%d\n", px, py,
                     ctx->GetNumDocuments());
   for (int i = 0; i < ctx->GetNumDocuments(); ++i) {

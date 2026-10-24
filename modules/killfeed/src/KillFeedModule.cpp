@@ -174,11 +174,14 @@ void addItem(const char *victim, const char *attacker, const char *inflictor) {
 
 // ---- event sinks ----
 
-void onKillFeed(void *, const void *payload) {
+int onKillFeed(void *, const void *payload) {
+  if (!panelDocument())
+    return 0;
   const auto *event = static_cast<const AbcUiKillFeedEvent *>(payload);
   addItem(event->victim ? event->victim : "",
           event->attacker ? event->attacker : "",
           event->inflictor ? event->inflictor : "");
+  return 1;
 }
 
 void onHideToken(void *, const void *payload) {
@@ -253,8 +256,8 @@ void onModuleLoad() {
   Panel.reset = &panelReset;
   Api->panels->registerPanel(&Panel);
 
-  Api->events->subscribe(ABCUI_CHANNEL_TEXTFEED_KILL_FEED, 0, &onKillFeed,
-                         nullptr);
+  Api->events->subscribeVeto(ABCUI_CHANNEL_TEXTFEED_KILL_FEED, 0, &onKillFeed,
+                             nullptr);
   Api->events->subscribe(ABCUI_CHANNEL_HUD_HIDE_TOKEN, 0, &onHideToken,
                          nullptr);
 }
@@ -279,10 +282,11 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->console || !api->data)
@@ -294,7 +298,7 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.killfeed";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = &onModuleInit;
   out->onContextReady = nullptr;

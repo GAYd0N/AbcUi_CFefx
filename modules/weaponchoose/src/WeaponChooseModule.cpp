@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <format>
 #include <string>
 #include <vector>
 
@@ -153,11 +154,10 @@ void setContentSize(float width, float height) {
   AbcUiElement *content = Api->ui->querySelector(doc, "content");
   if (!content)
     return;
-  char value[32];
-  std::snprintf(value, sizeof(value), "%gdp", width);
-  Api->ui->elementSetProperty(content, "width", value);
-  std::snprintf(value, sizeof(value), "%gdp", height);
-  Api->ui->elementSetProperty(content, "height", value);
+  const std::string widthValue = std::format("{:g}dp", width);
+  Api->ui->elementSetProperty(content, "width", widthValue.c_str());
+  const std::string heightValue = std::format("{:g}dp", height);
+  Api->ui->elementSetProperty(content, "height", heightValue.c_str());
 }
 
 // Rebuilds the bar DOM from the weapon registry (old PerformLayout); keeps the
@@ -172,11 +172,14 @@ void rebuild() {
 
   // Owned weapons grouped by slot (old InsertWeapon slot lists; the registry
   // also carries the full WeaponList - ownership filters it).
-  std::vector<AbcUiWeaponInfo> registry(
-      static_cast<size_t>(std::max(0, Api->weapons->list(nullptr, 0))));
+  std::vector<AbcUiWeaponInfo> registry(static_cast<size_t>(
+      std::max(0, Api->weapons->list(nullptr, 0, sizeof(AbcUiWeaponInfo)))));
   if (!registry.empty()) {
+    for (auto &weapon : registry)
+      weapon.structSize = sizeof(weapon);
     const int32_t total = Api->weapons->list(
-        registry.data(), static_cast<int32_t>(registry.size()));
+        registry.data(), static_cast<uint32_t>(registry.size()),
+        sizeof(AbcUiWeaponInfo));
     if (total >= 0 && static_cast<size_t>(total) < registry.size())
       registry.resize(static_cast<size_t>(total));
   }
@@ -209,7 +212,7 @@ void rebuild() {
   // m_pHandledWeapon GetBounds - the bucket rides them, y included).
   float selX = 0.0f, selY = 0.0f, selW = 0.0f, selH = 0.0f;
   bool selFound = false;
-  char buffer[1024];
+  std::string buffer;
 
   // Old item bars: abw=w/10, abx=w/20, abg=w/30, abh=h/10; fill rides the
   // reserve count over max (scheme AmmoBar colors, empty = Red).
@@ -230,15 +233,14 @@ void rebuild() {
               ? std::clamp(static_cast<float>(count) / maxes[bar], 0.0f, 1.0f)
               : 1.0f;
       const float bx = abx + bar * (abw + abg);
-      std::snprintf(buffer, sizeof(buffer),
-                    "<div class='bar-bg' style='left:%.1fdp; top:0dp; "
-                    "width:%.1fdp; height:%.1fdp;'></div>"
-                    "<div class='bar-fill' style='left:%.1fdp; top:0dp; "
-                    "width:%.1fdp; height:%.1fdp; "
-                    "background-color: %s;'></div>",
-                    bx, abw, abh, bx, abw * ratio, abh,
-                    count > 0 ? "rgba(255, 255, 0, 125)"
-                              : "rgba(255, 0, 0, 255)");
+      buffer = std::format(
+          "<div class='bar-bg' style='left:{:.1f}dp; top:0dp; "
+          "width:{:.1f}dp; height:{:.1f}dp;'></div>"
+          "<div class='bar-fill' style='left:{:.1f}dp; top:0dp; "
+          "width:{:.1f}dp; height:{:.1f}dp; "
+          "background-color: {};'></div>",
+          bx, abw, abh, bx, abw * ratio, abh,
+          count > 0 ? "rgba(255, 255, 0, 125)" : "rgba(255, 0, 0, 255)");
       rml += buffer;
     }
   };
@@ -249,10 +251,9 @@ void rebuild() {
     // slotN_icon assets; the icons tint by scheme SlotColor). Additive
     // (modadd://) like the rest of the HUD ink, so the digits glow over the
     // scene instead of sitting on it.
-    std::snprintf(
-        buffer, sizeof(buffer),
-        "<div class='slot' style='left:%.0fdp; top:0dp;'>"
-        "<img src='modadd://abcui.weaponchoose/hud/img/slot%d_icon.png' "
+    buffer = std::format(
+        "<div class='slot' style='left:{:.0f}dp; top:0dp;'>"
+        "<img src='modadd://abcui.weaponchoose/hud/img/slot{}_icon.png' "
         "style='image-color: rgba(255, 176, 0, 160);'/></div>",
         x, (slot + 1) % 10);
     rml += buffer;
@@ -281,23 +282,31 @@ void rebuild() {
 
       // Active sprite while highlighted, inactive otherwise; the ammo bar
       // pair rides the item top (old item PerformLayout).
-      const AbcUiWeaponSprite &source =
-          active ? weapon.active : weapon.inactive;
+      AbcUiWeaponSprite source = active ? weapon.active : weapon.inactive;
+      if (source.status != ABCUI_OK) {
+        source.status = ABCUI_OK;
+        std::snprintf(source.atlas, sizeof(source.atlas), "%s",
+                      "mod://abcui.weaponchoose/hud/spr/weapon_error.spr");
+        source.rect[0] = 0;
+        source.rect[1] = active ? 46 : 0;
+        source.rect[2] = 170;
+        source.rect[3] = source.rect[1] + 45;
+      }
       std::string img;
-      if (source.valid) {
-        std::snprintf(buffer, sizeof(buffer),
-                      "<img src='spricon://%s/%d,%d,%d,%d' style='width:100%%; "
-                      "height:100%%; image-color: rgba(%d, %d, %d, %d);'/>",
-                      source.atlas, source.rect[0], source.rect[1],
-                      source.rect[2], source.rect[3], active ? r : ri,
-                      active ? g : gi, active ? b : bi, active ? a : ai);
+      if ((source.status == ABCUI_OK)) {
+        buffer = std::format(
+            "<img src='spricon://{}/{},{},{},{}' style='width:100%; "
+            "height:100%; image-color: rgba({}, {}, {}, {});'/>",
+            source.atlas, source.rect[0], source.rect[1], source.rect[2],
+            source.rect[3], active ? r : ri, active ? g : gi, active ? b : bi,
+            active ? a : ai);
         img = buffer;
       }
 
-      std::snprintf(buffer, sizeof(buffer),
-                    "<div class='item%s' style='left:%.0fdp; top:%.0fdp; "
-                    "width:%.0fdp; height:%.0fdp;'>",
-                    active ? " active" : "", x, y, w, h);
+      buffer =
+          std::format("<div class='item{}' style='left:{:.0f}dp; top:{:.0f}dp; "
+                      "width:{:.0f}dp; height:{:.0f}dp;'>",
+                      active ? " active" : "", x, y, w, h);
       rml += buffer;
       if (active) {
         selX = x;
@@ -321,11 +330,10 @@ void rebuild() {
   // list (dropped while shown) hides the frame, like the old ChooseWeapon
   // empty-slot path.
   if (selFound) {
-    std::snprintf(
-        buffer, sizeof(buffer),
+    buffer = std::format(
         "<img id='bucket' "
         "src='mod://abcui.weaponchoose/hud/img/select_icon.png' "
-        "style='left:%.0fdp; top:%.0fdp; width:%.0fdp; height:%.0fdp; "
+        "style='left:{:.0f}dp; top:{:.0f}dp; width:{:.0f}dp; height:{:.0f}dp; "
         "image-color: rgba(255, 255, 0, 255);'/>",
         selX, selY, selW, selH);
     rml += buffer;
@@ -425,6 +433,8 @@ void panelReset(void *) {
 // ---- lifecycle ----
 
 int onSlotCommand(void *userdata, const void *) {
+  if (!panelDocument())
+    return 0;
   // The old weaponres slot handler ran the selection walk and left the
   // original engine slot command chained; the TextMenu owns the keys while
   // its menu is open (left entirely to the textmenu module then).
@@ -436,20 +446,33 @@ int onSlotCommand(void *userdata, const void *) {
 }
 
 int onInvNext(void *, const void *) {
+  if (!panelDocument())
+    return 0;
   Api->weapons->selectSlot(Api->weapons->selectedSlot(), 1, 1);
   return 0;
 }
 
 int onInvPrev(void *, const void *) {
+  if (!panelDocument())
+    return 0;
   Api->weapons->selectSlot(Api->weapons->selectedSlot(), -1, 1);
   return 0;
 }
 
 int onAttack(void *, const void *) {
+  if (!panelDocument())
+    return 0;
   return attackConfirm();
 }
 
+int onNativeHudDraw(void *, const void *payload) {
+  const auto *event = static_cast<const AbcUiNativeHudEvent *>(payload);
+  return panelDocument() && (event->element == ABCUI_NATIVE_HUD_AMMO);
+}
+
 void onModuleLoad() {
+  Api->events->subscribeVeto(ABCUI_CHANNEL_HUD_NATIVE_DRAW, 0, &onNativeHudDraw,
+                             nullptr);
   Panel.structSize = sizeof(Panel);
   Panel.name = kPanelName;
   Panel.documentPath = kDocumentPath;
@@ -471,9 +494,8 @@ void onModuleLoad() {
                          nullptr);
 
   for (intptr_t i = 0; i < ABCUI_WEAPON_SLOT_COUNT; i++) {
-    char name[8];
-    std::snprintf(name, sizeof(name), "slot%d", static_cast<int>(i) + 1);
-    Api->commands->subscribeCommand(name, 0, &onSlotCommand,
+    const std::string name = std::format("slot{}", i + 1);
+    Api->commands->subscribeCommand(name.c_str(), 0, &onSlotCommand,
                                     reinterpret_cast<void *>(i));
   }
   Api->commands->subscribeCommand("invnext", 0, &onInvNext, nullptr);
@@ -498,10 +520,11 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->console || !api->data ||
@@ -511,13 +534,13 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
   // whose tables are shorter than the members used below.
   if (api->ui->structSize < sizeof(AbcUiUiApi) ||
       api->console->structSize < sizeof(AbcUiConsoleApi) ||
-      api->weapons->structSize < sizeof(AbcUiWeaponsApi))
+      !ABCUI_API_HAS_MEMBER(AbcUiWeaponsApi, api->weapons, ammoIcon))
     return 0;
   Api = api;
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.weaponchoose";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = &onModuleInit;
   out->onContextReady = nullptr;

@@ -52,9 +52,8 @@ uint32_t pageRevision() {
   return state().Revision;
 }
 
-void setSprayResult(bool ok, const std::string &message,
+void setSprayResult([[maybe_unused]] bool ok, const std::string &message,
                     const std::string &previewUri) {
-  (void)ok;
   state().SprayStatus = message;
   state().SprayPreviewUri = previewUri;
   bumpPageRevision();

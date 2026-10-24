@@ -29,8 +29,8 @@ void GameUiModule::endKeyCapture() {
 }
 
 void GameUiModule::onCapturedKeyEdge(int keynum) {
-  const auto result = BindModel.captureKey(keynum);
-  (void)result; // only the Debug trace reads it
+  // Only the Debug trace reads the result.
+  [[maybe_unused]] const auto result = BindModel.captureKey(keynum);
 #ifndef NDEBUG
   abc::ConsolePrint("[AbcUi] capture key=%d result=%d conflict=%d\n", keynum,
                     static_cast<int>(result),
@@ -46,9 +46,8 @@ void GameUiModule::onKeyCaptureForceLost() {
   rmlui::setKeyCaptureClamp(false);
 }
 
-bool GameUiModule::claimsKey(int down, int keynum) {
-  (void)down;
-  (void)keynum;
+bool GameUiModule::claimsKey([[maybe_unused]] int down,
+                             [[maybe_unused]] int keynum) {
   return true;
 }
 

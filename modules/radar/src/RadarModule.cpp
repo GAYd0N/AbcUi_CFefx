@@ -14,10 +14,12 @@
 // stay raw pixels, exactly the old code's mixed-unit behaviour.
 #include <abcui/events.h>
 #include <abcui/module_api.h>
+#include "../../common/Avatars.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <format>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -42,6 +44,7 @@ AbcUiCvarHandle RadarAvatar = nullptr;
 AbcUiCvarHandle RadarAvatarSize = nullptr;
 
 bool Scaled = false;
+AbcUiTexture Masks[2]{};
 
 // Avatar <img> elements keyed by player index (rebuilt incrementally; a row
 // that leaves the plate is removed).
@@ -68,9 +71,7 @@ void setProperty(AbcUiElement *element, const char *name, const char *value) {
 }
 
 std::string pixelValue(float value) {
-  char text[32];
-  std::snprintf(text, sizeof(text), "%gpx", static_cast<double>(value));
-  return text;
+  return std::format("{:g}px", value);
 }
 
 void setPlateSize(bool scaled) {
@@ -99,6 +100,13 @@ void clearAvatars() {
 }
 
 // ---- panel callbacks ----
+
+void panelReady(void *) {
+  Api->textures->load("mod://abcui.radar/hud/img/radar/radar_mask.png", 0,
+                      &Masks[0]);
+  Api->textures->load("mod://abcui.radar/hud/img/radar/radar_roundmask.png", 0,
+                      &Masks[1]);
+}
 
 void panelReset(void *) {
   // Old CRadarPanel::Reset: SetScale(false).
@@ -145,7 +153,7 @@ void panelOnData(void *, double) {
   const bool roundPlate = cvarFloat(Radar, 1.0f) > 1.0f;
   setProperty(square, "display", roundPlate ? "none" : "block");
   setProperty(round, "display", roundPlate ? "block" : "none");
-  Api->radar->setMaskRound(roundPlate ? 1 : 0);
+  Api->radar->setMask(Masks[roundPlate ? 1 : 0]);
 
   const float zoom = cvarFloat(RadarZoom, 2.5f);
   Api->radar->setZoom(zoom > 0.0f ? zoom : 2.5f);
@@ -153,12 +161,11 @@ void panelOnData(void *, double) {
   // Map <img>: the external FBO texture through the registered URI; the
   // generation suffix re-resolves after frame-buffer regeneration.
   if (Api->radar->ready()) {
-    char uri[64];
-    std::snprintf(uri, sizeof(uri), "radarfbo://map?gen=%d",
-                  Api->radar->generation());
+    const std::string uri =
+        std::format("radarfbo://map?gen={}", Api->radar->generation());
     if (MapUri != uri) {
       MapUri = uri;
-      Api->ui->elementSetAttribute(map, "src", uri);
+      Api->ui->elementSetAttribute(map, "src", uri.c_str());
     }
     setProperty(map, "display", "block");
   } else {
@@ -249,10 +256,8 @@ void panelOnData(void *, double) {
 
     // Old SetPlayer(i+1, 32x32): the avatar texture resolves through the
     // framework avatar service with the cache-bust generation.
-    char uri[96];
-    std::snprintf(uri, sizeof(uri), "avatar://%llu?gen=%d",
-                  static_cast<unsigned long long>(info.steamId64),
-                  Api->players->avatarGeneration(info.steamId64));
+    const std::string uri = moduleui::avatarUri(
+        Api, info.steamId64, "mod://abcui.radar/img/default_avatar.png");
     used.insert(index);
     AbcUiElement *&image = AvatarElements[index];
     if (!image) {
@@ -265,7 +270,7 @@ void panelOnData(void *, double) {
     std::string &appliedUri = AvatarUris[index];
     if (appliedUri != uri) {
       appliedUri = uri;
-      Api->ui->elementSetAttribute(image, "src", uri);
+      Api->ui->elementSetAttribute(image, "src", uri.c_str());
     }
     setProperty(image, "display", "block");
     const std::string left = pixelValue(screenX);
@@ -300,7 +305,7 @@ void onModuleLoad() {
   // the scoreboard) readable.
   Panel.zIndex = -1;
   Panel.userdata = nullptr;
-  Panel.onDocumentReady = nullptr;
+  Panel.onDocumentReady = &panelReady;
   Panel.onData = &panelOnData;
   Panel.onRedraw = nullptr;
   Panel.reset = &panelReset;
@@ -319,6 +324,7 @@ void onModuleInit() {
 }
 
 void onModuleShutdown() {
+  Masks[0] = Masks[1] = 0;
   // The document dies with the context; stop the world pass and drop the
   // avatar handles (they belonged to the dead document).
   Api->radar->setActive(0);
@@ -333,10 +339,11 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->console || !api->data ||
@@ -352,7 +359,7 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.radar";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = &onModuleInit;
   out->onContextReady = nullptr;

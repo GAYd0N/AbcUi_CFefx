@@ -6,6 +6,7 @@
 #include <abc/Console.h>
 
 #include <utility>
+#include <algorithm>
 
 namespace framework {
 
@@ -50,6 +51,14 @@ HudPanel *PanelManager::find(const char *name) {
       return panel.get();
   }
   return nullptr;
+}
+
+void PanelManager::remove(const char *name) {
+  if (!name)
+    return;
+  auto &panels = Panels();
+  std::erase_if(panels,
+                [name](const auto &panel) { return panel->getName() == name; });
 }
 
 void PanelManager::shutdown() {

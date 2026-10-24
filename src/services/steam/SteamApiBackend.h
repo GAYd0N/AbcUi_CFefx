@@ -20,6 +20,9 @@ public:
   virtual SteamId64 localSteamId() = 0;
   virtual std::string personaName(SteamId64 id) = 0;
   virtual bool avatar(SteamId64 id, AvatarRgba &out) = 0;
+  virtual AvatarAnimationState animatedAvatar(SteamId64 id,
+                                              AvatarAnimation &out) = 0;
+  virtual void abandonAnimatedAvatar(SteamId64 id) = 0;
 };
 
 // Backend accessors for the selector (SteamAPI.cpp). Each returns a static

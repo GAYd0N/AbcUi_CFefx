@@ -3,7 +3,7 @@
 // <animimg> - the generic animated image element.
 //
 // One element owns one animated image (rmlui::animated::AnimatedImage: WebP
-// today, APNG for Steam animated avatars later) and an internal <img> child
+// and APNG, the latter also for Steam animated avatars) and an internal <img>
 // draws the current frame, so clipping, opacity, transforms and z-order come
 // from the ordinary Rml renderer. Frames decode sequentially into one
 // DynamicTexture per element (the VGUI2 surface texture channel): a steady
@@ -16,7 +16,8 @@
 //
 // Attribute contract:
 //   src       mod-relative image path, e.g.
-//             abc/abcui/hud/img/water/face_rainleft.webp
+//             mod://abcui.hudeffects/hud/img/water/face_rainleft.webp, or
+//             "avataranim://<steamid64>?gen=<n>" for a cached Steam animation
 //   loop      true|false (default true): restart at the end of the sequence
 //   autoplay  true|false (default true): start playing once the source loads
 //   speed     0.05 .. 8 playback multiplier (default 1)
@@ -85,6 +86,9 @@ private:
   // Decodes the next frame (wrapping when `loop` allows).
   bool advanceFrame();
   bool uploadFrame(const FrameView &frame);
+  // Animated-avatar sources resume at the shared playback origin instead of
+  // restarting when the scoreboard rebuilds a row.
+  void seekToClock(double startSeconds, double now);
 
   std::unique_ptr<AnimatedImage> Image;
   std::unique_ptr<services::texture::DynamicTexture> Texture;

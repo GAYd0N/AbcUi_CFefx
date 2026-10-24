@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "id": "mouse",
+  "label": "#abcui.gameui/Settings_SecMouse",
+  "order": 21,
+  "components": [],
+  "sections": [
+    {
+      "id": "mouse",
+      "label": "#abcui.gameui/Settings_SecMouse",
+      "components": []
+    }
+  ],
+  "items": [
+    {
+      "cvar": "sensitivity",
+      "label": "#abcui.gameui/Settings_Sensitivity",
+      "section": "mouse",
+      "kind": "float",
+      "min": 0.2,
+      "max": 20.0,
+      "step": 0.1,
+      "default": 3.0
+    },
+    {
+      "cvar": "m_pitch",
+      "label": "#abcui.gameui/Settings_ReverseMouse",
+      "section": "mouse",
+      "kind": "negate",
+      "min": -20.0,
+      "max": 20.0,
+      "step": 0.0,
+      "default": 0.022
+    },
+    {
+      "cvar": "m_filter",
+      "label": "#abcui.gameui/Settings_MouseFilter",
+      "section": "mouse",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "joystick",
+      "label": "#abcui.gameui/Settings_Joystick",
+      "section": "mouse",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "in_mlook",
+      "label": "#abcui.gameui/Settings_MouseLook",
+      "section": "mouse",
+      "kind": "command-toggle",
+      "default": 0.0
+    },
+    {
+      "cvar": "in_jlook",
+      "label": "#abcui.gameui/Settings_JoystickLook",
+      "section": "mouse",
+      "kind": "command-toggle",
+      "default": 0.0
+    },
+    {
+      "cvar": "m_rawinput",
+      "label": "#abcui.gameui/Settings_RawInput",
+      "section": "mouse",
+      "kind": "bool",
+      "default": 0.0
+    },
+    {
+      "cvar": "sv_aim",
+      "label": "#abcui.gameui/Settings_AutoAim",
+      "section": "mouse",
+      "kind": "bool",
+      "default": 1.0
+    }
+  ]
+}

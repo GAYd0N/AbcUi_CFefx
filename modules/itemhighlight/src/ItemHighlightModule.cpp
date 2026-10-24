@@ -21,14 +21,18 @@
 // - the pickup prompt hides when the aim item walks out of the 86u reach.
 // - a malformed item list warns and drops the trailing record.
 // - entity-index reuse re-assigns the tracked item.
+#include "items/ItemList.h"
+
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <format>
 #include <cstring>
 #include <string>
+#include <utility>
 #include <unordered_map>
 #include <vector>
 
@@ -214,7 +218,10 @@ void loadItemList() {
   if (ListLoaded || ListWarned)
     return;
   ListWarned = true;
-  AbcUiFileView *view = Api->vfs->open(kItemListModule, kItemListPath);
+  AbcUiFileView *view = nullptr;
+  const std::string uri =
+      std::string("mod://") + kItemListModule + "/" + kItemListPath;
+  Api->vfs->open(uri.c_str(), &view);
   if (!view) {
     Api->core->warn("itemhighlight: no item list file %s", kItemListPath);
     return;
@@ -225,35 +232,20 @@ void loadItemList() {
   std::string content;
   if (data && size > 0 && size <= kItemListMaxBytes)
     content.assign(data, size);
+  std::vector<itemlist::Entry> parsed;
   Api->vfs->viewFree(view);
   if (content.empty())
     return;
 
-  // Tokenize on whitespace (the old COM_ParseFile contract).
-  std::vector<std::string> tokens;
-  size_t at = 0;
-  while (at < content.size()) {
-    while (at < content.size() && (content[at] == ' ' || content[at] == '\t' ||
-                                   content[at] == '\r' || content[at] == '\n'))
-      at++;
-    const size_t begin = at;
-    while (at < content.size() && content[at] != ' ' && content[at] != '\t' &&
-           content[at] != '\r' && content[at] != '\n')
-      at++;
-    if (at > begin)
-      tokens.push_back(content.substr(begin, at - begin));
-  }
-  const size_t records = tokens.size() / 6;
-  for (size_t r = 0; r < records; r++) {
+  const bool complete = itemlist::parse(content, parsed);
+  for (itemlist::Entry &entry : parsed) {
     Item item;
-    item.path = tokens[r * 6];
-    item.nameToken = tokens[r * 6 + 1];
-    for (int c = 0; c < 4; c++)
-      item.color[c] = static_cast<unsigned char>(
-          std::clamp(atoi(tokens[r * 6 + 2 + c].c_str()), 0, 255));
+    item.path = std::move(entry.path);
+    item.nameToken = std::move(entry.nameToken);
+    std::memcpy(item.color, entry.color, sizeof(item.color));
     Items.push_back(std::move(item));
   }
-  if (tokens.size() % 6 != 0)
+  if (!complete)
     Api->core->warn("itemhighlight: %s has a trailing partial record (dropped)",
                     kItemListPath);
   Api->core->print("itemhighlight: %d item(s) on the highlight list",
@@ -371,18 +363,15 @@ Marker *updateMarker(int entindex, int itemIndex, float ratio,
       std::memcmp(marker.bounds, bounds, sizeof(bounds)) != 0) {
     marker.boundsValid = true;
     std::memcpy(marker.bounds, bounds, sizeof(bounds));
-    char left[32];
-    char top[32];
-    char width[32];
-    std::snprintf(left, sizeof(left), "%gpx", static_cast<double>(bounds[0]));
-    std::snprintf(top, sizeof(top), "%gpx", static_cast<double>(bounds[1]));
-    std::snprintf(width, sizeof(width), "%gpx", static_cast<double>(bounds[2]));
-    setProperty(marker.box, "width", width);
-    setProperty(marker.box, "height", width);
-    setProperty(marker.box, "left", left);
-    setProperty(marker.box, "top", top);
+    const std::string left = std::format("{:g}px", bounds[0]);
+    const std::string top = std::format("{:g}px", bounds[1]);
+    const std::string width = std::format("{:g}px", bounds[2]);
+    setProperty(marker.box, "width", width.c_str());
+    setProperty(marker.box, "height", width.c_str());
+    setProperty(marker.box, "left", left.c_str());
+    setProperty(marker.box, "top", top.c_str());
     setProperty(marker.box, "display", "block");
-    setProperty(marker.label, "line-height", width);
+    setProperty(marker.label, "line-height", width.c_str());
   }
 
   // Default (non-aim) state each frame - the aim pass re-flags the target.
@@ -654,10 +643,11 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->console || !api->data || !api->vfs)
@@ -671,7 +661,7 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.itemhighlight";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = &onModuleInit;
   out->onContextReady = nullptr;

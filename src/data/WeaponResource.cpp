@@ -19,6 +19,7 @@
 #include <abc/CvarCmd.h>
 
 #include <abcui/events.h>
+#include <string_view>
 
 #include "modsys/EventBus.h"
 
@@ -151,7 +152,7 @@ const client_sprite_t *findSpriteEntry(const client_sprite_t *list, int count,
   if (!list)
     return nullptr;
   for (int i = 0; i < count; i++, list++) {
-    if (strcmp(name, list->szName) == 0 && list->iRes == res)
+    if (std::string_view(name) == list->szName && list->iRes == res)
       return list;
   }
   return nullptr;
@@ -159,13 +160,15 @@ const client_sprite_t *findSpriteEntry(const client_sprite_t *list, int count,
 
 void fillSpriteSource(Weapon::SpriteSource &source, const char *atlasName,
                       const wrect_t &rect) {
+  if (!atlasName || !framework::ResourceLimits::resourceName(atlasName))
+    return;
   source.atlas = std::string(atlasName) + ".spr";
   source.rect = rect;
   source.valid = true;
 }
 
-// Old GetSpriteList-based loadSprite lambda with the same fallback chain
-// (deltas default to the primary slot's source).
+// Record only actual server-provided sprite entries. Presentation fallbacks
+// belong to consumers, not the registry.
 void loadWeaponSprites(Weapon &weapon, const char *customSpr) {
   weapon.active = {};
   weapon.inactive = {};
@@ -192,33 +195,25 @@ void loadWeaponSprites(Weapon &weapon, const char *customSpr) {
   int count = 0;
   const client_sprite_t *list =
       gEngfuncs.pfnSPR_GetList(listPath.data(), &count);
-  if (!list) {
-    count = 0;
-    list = gEngfuncs.pfnSPR_GetList(
-        const_cast<char *>("abc/abcui/hud/spr/weapon_error.txt"), &count);
-    if (!list)
-      return;
-  }
+  if (!list)
+    return;
 
   const int screenW = framework::ScreenWidth();
   const int res = screenW < 640 ? 320 : 640;
 
-  const auto load = [&](const char *type, Weapon::SpriteSource &source,
-                        const Weapon::SpriteSource *fallback = nullptr) {
+  const auto load = [&](const char *type, Weapon::SpriteSource &source) {
     if (const client_sprite_t *entry = findSpriteEntry(list, count, type, res))
       fillSpriteSource(source, entry->szSprite, entry->rc);
-    else if (fallback && fallback->valid)
-      source = *fallback;
   };
 
   load("crosshair", weapon.crosshair);
   load("autoaim", weapon.autoaim);
-  load("zoom", weapon.zoomedCrosshair, &weapon.crosshair);
-  load("zoom_autoaim", weapon.zoomedAutoaim, &weapon.zoomedCrosshair);
+  load("zoom", weapon.zoomedCrosshair);
+  load("zoom_autoaim", weapon.zoomedAutoaim);
   load("weapon", weapon.inactive);
   load("weapon_s", weapon.active);
   load("ammo", weapon.ammo);
-  load("ammo2", weapon.ammo2, &weapon.ammo);
+  load("ammo2", weapon.ammo2);
 }
 
 // Old WeaponList::Add - duplicate ids rejected, position collisions bump the

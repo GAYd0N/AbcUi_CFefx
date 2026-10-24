@@ -13,10 +13,10 @@
 
 #include <keydefs.h>
 
-#include "../framework/Assets.h"
 #include "../framework/FatalExit.h"
 #include "../framework/Localization.h"
 #include "../framework/PanelManager.h"
+#include "../modsys/ModuleResources.h"
 #include "../framework/Theme.h"
 #include "../render/Render.h"
 #include "texture/Avatars.h"
@@ -37,9 +37,13 @@
 #include "InputBridge.h"
 #include "PaintGate.h"
 #include "ImeOverlay.h"
+#include "modsys/ApiAudio.h"
 #include "TextInput.h"
 #include "VGUI2ExtensionImport.h"
 #include "../services/GameUiBridge.h"
+
+#include <format>
+#include <string>
 
 namespace rmlui {
 
@@ -77,7 +81,16 @@ constexpr const char *kFontFiles[] = {
     "msyhbd.ttc",   // Microsoft YaHei bold
     "consola.ttf",  // Consolas (fallback face)
 };
-constexpr const char *kFontDirectory = "C:\\Windows\\Fonts\\";
+const std::string &systemFontDirectory() {
+  static const std::string directory = [] {
+    char root[MAX_PATH]{};
+    const UINT length = GetWindowsDirectoryA(root, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH)
+      return std::string{};
+    return std::string(root, length) + "\\Fonts\\";
+  }();
+  return directory;
+}
 
 // Context/renderer singletons (declared before RendererCallbacks: its
 // renderFrame reads them).
@@ -201,15 +214,16 @@ int LoadedFonts = 0;
 
 void loadFonts(const char *directory, int &loaded) {
   loaded = 0;
+  if (!directory || !*directory)
+    return;
   for (const char *file : kFontFiles) {
-    char path[MAX_PATH];
-    _snprintf_s(path, sizeof(path), _TRUNCATE, "%s%s", directory, file);
-    if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES)
+    const std::string path = std::format("{}{}", directory, file);
+    if (GetFileAttributesA(path.c_str()) == INVALID_FILE_ATTRIBUTES)
       continue;
     if (Rml::LoadFontFace(path, true))
       loaded++;
     else
-      abc::ConsoleWarn("[AbcUi] font load failed: %s\n", path);
+      abc::ConsoleWarn("[AbcUi] font load failed: %s\n", path.c_str());
   }
 }
 
@@ -223,7 +237,7 @@ const char *fontDirectoryOverride() {
       next && *next)
     return next;
 #endif
-  return kFontDirectory;
+  return systemFontDirectory().c_str();
 }
 
 // T21 first-frame evidence (Debug only). The acceptance forbids "a
@@ -250,12 +264,18 @@ void captureFirstFrameEvidence() {
       abc::ConsolePrint(
           "[AbcUi] first-frame: delayed capture counters paint gameui=%u/%u "
           "serverbrowser=%u/%u allowed-other=%u\n",
-          c.PaintBlocked[(int)services::PaintBucket::kGameUi],
-          c.PaintAttempts[(int)services::PaintBucket::kGameUi],
-          c.PaintBlocked[(int)services::PaintBucket::kServerBrowser],
-          c.PaintAttempts[(int)services::PaintBucket::kServerBrowser],
-          c.PaintAttempts[(int)services::PaintBucket::kOther] -
-              c.PaintBlocked[(int)services::PaintBucket::kOther]);
+          c.PaintBlocked[static_cast<std::size_t>(
+              services::PaintBucket::kGameUi)],
+          c.PaintAttempts[static_cast<std::size_t>(
+              services::PaintBucket::kGameUi)],
+          c.PaintBlocked[static_cast<std::size_t>(
+              services::PaintBucket::kServerBrowser)],
+          c.PaintAttempts[static_cast<std::size_t>(
+              services::PaintBucket::kServerBrowser)],
+          c.PaintAttempts[static_cast<std::size_t>(
+              services::PaintBucket::kOther)] -
+              c.PaintBlocked[static_cast<std::size_t>(
+                  services::PaintBucket::kOther)]);
       gEngfuncs.pfnClientCmd("screenshot\n");
       abc::ConsolePrint("[AbcUi] first-frame: screenshot issued (capture frame "
                         "after the first rendered menu frame)\n");
@@ -273,14 +293,19 @@ void captureFirstFrameEvidence() {
       "serverbrowser=%u/%u allowed-other=%u hittest-gameui=%u/%u\n",
       rmlui::paintGateInstalled() ? 1 : 0,
       services::nativeUiBridge().armed() ? 1 : 0,
-      c.PaintBlocked[(int)services::PaintBucket::kGameUi],
-      c.PaintAttempts[(int)services::PaintBucket::kGameUi],
-      c.PaintBlocked[(int)services::PaintBucket::kServerBrowser],
-      c.PaintAttempts[(int)services::PaintBucket::kServerBrowser],
-      c.PaintAttempts[(int)services::PaintBucket::kOther] -
-          c.PaintBlocked[(int)services::PaintBucket::kOther],
-      c.HitTestBlocked[(int)services::PaintBucket::kGameUi],
-      c.HitTestAttempts[(int)services::PaintBucket::kGameUi]);
+      c.PaintBlocked[static_cast<std::size_t>(services::PaintBucket::kGameUi)],
+      c.PaintAttempts[static_cast<std::size_t>(services::PaintBucket::kGameUi)],
+      c.PaintBlocked[static_cast<std::size_t>(
+          services::PaintBucket::kServerBrowser)],
+      c.PaintAttempts[static_cast<std::size_t>(
+          services::PaintBucket::kServerBrowser)],
+      c.PaintAttempts[static_cast<std::size_t>(services::PaintBucket::kOther)] -
+          c.PaintBlocked[static_cast<std::size_t>(
+              services::PaintBucket::kOther)],
+      c.HitTestBlocked[static_cast<std::size_t>(
+          services::PaintBucket::kGameUi)],
+      c.HitTestAttempts[static_cast<std::size_t>(
+          services::PaintBucket::kGameUi)]);
   // ~2s at the shipped frame rate: the startup window settles, the UI stays
   // as first presented (no input is injected between the two lines).
   FirstFrameScreenshotCountdown = 120;
@@ -402,16 +427,12 @@ void init() {
   framework::Localization::load();
   framework::Theme::applyScale(Context);
   sprites::vidInit();
-  avatars::init();
-  framework::Assets::verifyInstalled();
+  // HUD document ready callbacks run before the menu/context lifecycle beat.
+  framework::module_resources::contextRegistrationsOpen() = true;
   framework::PanelManager::initAll(Context);
 
   Rml::Debugger::Initialise(Context);
   Rml::Debugger::SetVisible(false);
-  // IME composition/candidate overlay: a plain document on this context, so
-  // it serves the HUD, the menus and the console alike.
-  ime::init(Context);
-
   abc::MetaRenderer()->RegisterRenderCallbacks(&Callbacks);
   Initialised = true;
   abc::ConsolePrint("[AbcUi] RmlUi %s ready (context %dx%d)\n",
@@ -424,6 +445,8 @@ void init() {
 }
 
 void shutdown() {
+  // No new DOM listeners or input claims may be created by teardown callbacks.
+  framework::module_resources::contextRegistrationsOpen() = false;
   // Ownership first (T06): tokens release and the pairing cleanups run
   // while every owner can still clean up and the context (for the synth
   // UI keyups) still exists. Teardown form: HUD_Shutdown runs after the
@@ -472,11 +495,6 @@ void shutdown() {
 
 void registerCommands() {
   abc::ADD_COMMAND("abc_ui_debugger", debuggerCommand);
-  // Menu backdrop knobs (the element reads them every sync; an explicit
-  // attribute on the <backdrop> node still wins).
-  abc::CREATE_CVAR("abc_ui_menu_video", menubackdrop::kDefaultVideoSource,
-                   abc::FCVAR_VALUE, nullptr);
-  abc::CREATE_CVAR("abc_ui_menu_backdrop_blur", "2", abc::FCVAR_VALUE, nullptr);
 }
 
 void onFrame(double frameTime) {
@@ -512,6 +530,7 @@ void onFrame(double frameTime) {
   // same Context::Update (order contract, modules/Module.h).
   if (Sink.frame)
     Sink.frame(frameTime);
+  framework::AudioApi::pump();
   // Queued <colorpicker> change events fire here, outside the drag/event
   // stack: a page handler may destroy the picker (see pumpChanges).
   colorpicker::ElementColorPicker::pumpChanges();

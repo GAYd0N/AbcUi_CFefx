@@ -160,17 +160,18 @@ public:
 
 struct NativeUiCounters {
   // Paint/input gate.
-  uint32_t PaintAttempts[(int)PaintBucket::kCount] = {};
-  uint32_t PaintBlocked[(int)PaintBucket::kCount] = {};
-  uint32_t HitTestAttempts[(int)PaintBucket::kCount] = {};
-  uint32_t HitTestBlocked[(int)PaintBucket::kCount] = {};
+  uint32_t PaintAttempts[static_cast<std::size_t>(PaintBucket::kCount)] = {};
+  uint32_t PaintBlocked[static_cast<std::size_t>(PaintBucket::kCount)] = {};
+  uint32_t HitTestAttempts[static_cast<std::size_t>(PaintBucket::kCount)] = {};
+  uint32_t HitTestBlocked[static_cast<std::size_t>(PaintBucket::kCount)] = {};
   // Native panels whose keyboard/mouse input flags this plugin cleared
   // (the input gate; steady state is a fixed number, growth means new
   // native panels appeared).
   uint32_t InputFlagsCleared = 0;
   // Entry layer (IGameUI funnel).
-  uint32_t ActivateRequests[(int)NativeUiOrigin::kCount] = {};
-  uint32_t HideRequests[(int)NativeUiOrigin::kCount] = {};
+  uint32_t ActivateRequests[static_cast<std::size_t>(NativeUiOrigin::kCount)] =
+      {};
+  uint32_t HideRequests[static_cast<std::size_t>(NativeUiOrigin::kCount)] = {};
   uint32_t MenuUpTransitions = 0;
   uint32_t MenuDownTransitions = 0;
   uint32_t PageShows = 0;
@@ -219,8 +220,25 @@ public:
   // one.
   void arm();
   void disarm();
+  void setTakeoverEnabled(bool enabled) {
+    if (TakeoverEnabled == enabled)
+      return;
+    TakeoverEnabled = enabled;
+    if (enabled && Armed) {
+      arm(); // Replay console intent even when the gate installed first.
+      if (!HasLevel)
+        requestMenuUp(NativeUiOrigin::kOwnUi);
+    }
+    if (!enabled) {
+      MenuUp = false;
+      PageShown = false;
+      ConsoleRequested = false;
+      PendingConsoleOpen = false;
+      PendingConsoleClose = false;
+    }
+  }
   bool armed() const {
-    return Armed;
+    return Armed && TakeoverEnabled;
   }
 
   // PaintTraverse gate: true = swallow the traversal (never call the
@@ -389,6 +407,7 @@ private:
   INativeMenuSink *MenuSink = nullptr;
   NativeUiCounters Counters;
   bool Armed = false;
+  bool TakeoverEnabled = false;
   bool MenuUp = false;
   bool PageShown = false;
   bool HasLevel = false;

@@ -1,0 +1,68 @@
+/* spectator.rcss - observer bottom bar. The native panel is a dark plate with
+   three bordered cells (health, armor, mode : target) anchored bottom-centre;
+   the replacement keeps that geometry in dp and uses the HUD accent for the
+   values. When no target is shown the two vital cells are display:none and
+   the mode cell stretches across the bar. */
+
+#spectator-bar {
+	position: absolute;
+	left: 24%;
+	width: 52%;
+	bottom: 8dp;
+	height: 30dp;
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	background-color: #000000bf;
+	border: 1dp solid #3b3a22;
+}
+
+.spec-cell {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	padding: 0 10dp;
+	border-right: 1dp solid #3b3a22;
+	white-space: nowrap;
+}
+
+#spec-mode {
+	flex: 1 1 auto;
+	min-width: 0;
+	border-right: none;
+}
+
+.spec-vital {
+	flex: 0 0 auto;
+}
+
+#spec-health {
+	min-width: 96dp;
+}
+
+#spec-armor {
+	min-width: 88dp;
+}
+
+.spec-label {
+	font-family: Verdana;
+	font-size: 8.9dp;
+	color: #c8c8c8;
+	opacity: 0.8;
+	margin-right: 6dp;
+}
+
+.spec-value {
+	font-family: Verdana;
+	font-weight: bold;
+	font-size: 10.7dp;
+	color: var(--abc-hud-accent);
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+#spec-mode .spec-value {
+	color: #e8e8e8;
+}

@@ -24,6 +24,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -72,7 +73,7 @@ public:
 
 protected:
   // Backend-filled metadata; the backend owns the decoder state itself.
-  std::vector<unsigned char> Bytes;
+  std::vector<std::byte> Bytes;
   std::string SourceName;
   const char *FormatName = "unknown";
   int PixelWidth = 0;
@@ -88,7 +89,7 @@ std::unique_ptr<AnimatedImage> openFile(const std::string &path,
 
 // In-memory source: Steam animated avatars arrive as bytes, never as files, so
 // the format layer takes a buffer as well.
-std::unique_ptr<AnimatedImage> openMemory(std::vector<unsigned char> bytes,
+std::unique_ptr<AnimatedImage> openMemory(std::vector<std::byte> bytes,
                                           std::string source,
                                           std::string &error);
 
@@ -98,8 +99,8 @@ namespace detail {
 // Open() takes ownership of the resident bytes.
 struct Backend {
   const char *Name;
-  bool (*Probe)(const unsigned char *data, std::size_t size);
-  std::unique_ptr<AnimatedImage> (*Open)(std::vector<unsigned char> bytes,
+  bool (*Probe)(std::span<const std::byte> data);
+  std::unique_ptr<AnimatedImage> (*Open)(std::vector<std::byte> bytes,
                                          std::string source,
                                          std::string &error);
 };

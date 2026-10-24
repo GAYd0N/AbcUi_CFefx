@@ -3,8 +3,8 @@
 // rmlui::AbcSystemInterface + AbcFileInterface - RmlUi platform seams.
 // Plan 05 §3.3: elapsed time (QPC), logging (-> abc::Console levels),
 // clipboard (Win32 CF_UNICODETEXT), localization hook; plus the file
-// interface resolving RML/RCSS/image paths through the engine IFileSystem
-// (the same mounted filesystem VGUI2Extension uses), not the process CWD.
+// interface resolving UI resources inside module packages. Native content
+// uses explicit engine:// paths; system font faces use their OS paths.
 //
 // T07: ActivateKeyboard/DeactivateKeyboard position the platform IME
 // (composition + candidate windows) at the editing caret - the pin's
@@ -20,6 +20,8 @@ namespace rmlui {
 class AbcSystemInterface : public Rml::SystemInterface {
 public:
   double GetElapsedTime() override;
+  void JoinPath(Rml::String &out, const Rml::String &base,
+                const Rml::String &path) override;
   int TranslateString(Rml::String &translated,
                       const Rml::String &input) override;
   bool LogMessage(Rml::Log::Type type, const Rml::String &message) override;

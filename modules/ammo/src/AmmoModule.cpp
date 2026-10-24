@@ -9,9 +9,11 @@
 // container draws nothing.
 #include <abcui/events.h>
 #include <abcui/module_api.h>
+#include "../../common/Glyphs.h"
 
 #include <algorithm>
 #include <cstdio>
+#include <format>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -19,6 +21,7 @@
 namespace {
 
 const AbcUiModuleApi *Api = nullptr;
+moduleui::Glyphs GlyphInk;
 
 constexpr const char *kBarPanel = "ammobar";
 constexpr const char *kAmmoStackPanel = "ammostack";
@@ -91,11 +94,14 @@ void setPoolVisible(int pool, bool visible) {
   PoolRml[pool].clear();
 }
 
-std::string spriteUri(const AbcUiWeaponSprite &sprite) {
-  char uri[256];
-  std::snprintf(uri, sizeof(uri), "spricon://%s/%d,%d,%d,%d", sprite.atlas,
-                sprite.rect[0], sprite.rect[1], sprite.rect[2], sprite.rect[3]);
-  return uri;
+std::string spriteUri(const AbcUiWeaponSprite &sprite, bool weapon = false) {
+  if (sprite.status != ABCUI_OK)
+    return weapon ? "spricon://mod://abcui.ammo/hud/spr/weapon_error.spr/"
+                    "0,0,170,45"
+                  : "spricon://mod://abcui.ammo/hud/spr/weapon_error.spr/"
+                    "16,106,48,138";
+  return std::format("spricon://{}/{},{},{},{}", sprite.atlas, sprite.rect[0],
+                     sprite.rect[1], sprite.rect[2], sprite.rect[3]);
 }
 
 void updatePool(int pool, const AbcUiWeaponSprite &sprite,
@@ -109,13 +115,7 @@ void updatePool(int pool, const AbcUiWeaponSprite &sprite,
   // One inline line: sprite + large clip + optional small reserve. Being
   // inline, every part shares the font baseline (ammobar.rcss note).
   std::string rml;
-  if (sprite.valid) {
-    rml = "<img class=\"icon\" src=\"" + spriteUri(sprite) + "\"/>";
-  } else {
-    // Keep the sprite slot (the CSS box is 20dp regardless of the source) so
-    // a weapon without a usable ammo sprite cannot shift the line box.
-    rml = "<img class=\"icon\" style=\"visibility:hidden\"/>";
-  }
+  rml = "<img class=\"icon\" src=\"" + spriteUri(sprite) + "\"/>";
   // Plain type: the pool spans are the readout (ammobar.rcss draws the 1px
   // outline). The clip span carries no class - the pool styles it.
   rml += "<span>" + clip + "</span>";
@@ -174,7 +174,9 @@ void refreshAmmo() {
     } else {
       clip = std::to_string(ammoLeft2);
     }
-    updatePool(1, BarWeapon.ammo2, clip, reserve);
+    const auto &icon =
+        BarWeapon.ammo2.status == ABCUI_OK ? BarWeapon.ammo2 : BarWeapon.ammo;
+    updatePool(1, icon, clip, reserve);
   }
 
   // The divider only means something between two live pools.
@@ -287,18 +289,16 @@ void tickStack(StackState &stack, double frameTime) {
     }
     if (item.fadeInPending) {
       item.fadeInPending = false;
-      char transition[64];
-      std::snprintf(transition, sizeof(transition), "opacity %.2fs linear-in",
-                    stack.fadeIn);
-      Api->ui->elementSetProperty(item.element, "transition", transition);
+      Api->ui->elementSetProperty(
+          item.element, "transition",
+          std::format("opacity {:.2f}s linear-in", stack.fadeIn).c_str());
       Api->ui->elementSetProperty(item.element, "opacity", "1");
     }
     if (item.fadeStartTime < 0.0 && stack.clientTimeNow >= item.expireTime) {
       item.fadeStartTime = stack.clientTimeNow;
-      char transition[64];
-      std::snprintf(transition, sizeof(transition), "opacity %.2fs linear-in",
-                    stack.fadeOut);
-      Api->ui->elementSetProperty(item.element, "transition", transition);
+      Api->ui->elementSetProperty(
+          item.element, "transition",
+          std::format("opacity {:.2f}s linear-in", stack.fadeOut).c_str());
       Api->ui->elementSetProperty(item.element, "opacity", "0");
     }
     if (item.fadeStartTime >= 0.0 &&
@@ -329,17 +329,13 @@ std::string escapeText(const char *text) {
 void addAmmoPickup(int index, int count) {
   AbcUiWeaponSprite sprite{};
   // Old AddAmmoPickup: icon from any weapon carrying the ammo type.
-  if (!Api->weapons->ammoIcon(index, &sprite))
-    return;
+  Api->weapons->ammoIcon(index, &sprite);
   // Count: ink-only additive glyphs (no black backing), the same readout ink
   // as the score and the flashlight percentage; a value outside the glyph set
   // falls back to plain type.
   const std::string countText = std::to_string(count);
-  char ink[256];
-  const std::string countInk =
-      Api->ui->inkMarkup(countText.c_str(), nullptr, ink, sizeof(ink))
-          ? std::string(ink)
-          : countText;
+  const std::string ink = GlyphInk.ink(Api, countText);
+  const std::string &countInk = ink.empty() ? countText : ink;
   const std::string item = "<img class=\"icon\" src=\"" + spriteUri(sprite) +
                            "\"/><div class=\"count font-default\">" + countInk +
                            "</div>";
@@ -348,9 +344,9 @@ void addAmmoPickup(int index, int count) {
 
 void addWeaponPickup(int id) {
   AbcUiWeaponInfo weapon{};
-  if (!Api->weapons->getById(id, &weapon) || !weapon.inactive.valid)
+  if (!Api->weapons->getById(id, &weapon))
     return;
-  const std::string uri = spriteUri(weapon.inactive);
+  const std::string uri = spriteUri(weapon.inactive, true);
   AbcUiElement *item =
       appendStackItem(WeaponStack, "<img class=\"icon\" src=\"" + uri + "\"/>");
   if (!item)
@@ -385,8 +381,8 @@ void updateWeaponStack() {
     AbcUiWeaponInfo weapon{};
     if (!Api->weapons->getById(item.weaponId, &weapon))
       continue;
-    if (weapon.inactive.valid) {
-      const std::string uri = spriteUri(weapon.inactive);
+    {
+      const std::string uri = spriteUri(weapon.inactive, true);
       if (uri != item.iconUri) {
         item.iconUri = uri;
         Api->ui->elementSetInnerRML(
@@ -517,7 +513,14 @@ void registerPanel(AbcUiPanelDesc &desc, const char *name, const char *doc,
   Api->panels->registerPanel(&desc);
 }
 
+int onNativeHudDraw(void *, const void *payload) {
+  const auto *event = static_cast<const AbcUiNativeHudEvent *>(payload);
+  return barDocument() && (event->element == ABCUI_NATIVE_HUD_AMMO);
+}
+
 void onModuleLoad() {
+  Api->events->subscribeVeto(ABCUI_CHANNEL_HUD_NATIVE_DRAW, 0, &onNativeHudDraw,
+                             nullptr);
   AmmoStack.panelName = kAmmoStackPanel;
   AmmoStack.maxItems = 200 / 20; // tall 200 / item_tall 20
   WeaponStack.panelName = kWeaponStackPanel;
@@ -554,6 +557,7 @@ void onModuleLoad() {
 }
 
 void onModuleShutdown() {
+  GlyphInk.reset();
   // The documents die with the context; the element handles must not survive
   // into the next cycle.
   AmmoStack.items.clear();
@@ -568,23 +572,25 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
-      !api->events || !api->ui || !api->console || !api->data || !api->weapons)
+      !api->textures || !api->events || !api->ui || !api->console ||
+      !api->data || !api->weapons)
     return 0;
   if (api->ui->structSize < sizeof(AbcUiUiApi) ||
       api->console->structSize < sizeof(AbcUiConsoleApi) ||
-      api->weapons->structSize < sizeof(AbcUiWeaponsApi))
+      !ABCUI_API_HAS_MEMBER(AbcUiWeaponsApi, api->weapons, ammoIcon))
     return 0;
   Api = api;
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.ammo";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = nullptr;
   out->onContextReady = nullptr;

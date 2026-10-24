@@ -36,7 +36,11 @@ bool positiveFloat(std::string_view Text, float Min, float Max, float &Output) {
 bool Options::isVideoPath(std::string_view Path) {
   if (Path.empty() || Path.size() >= 192)
     return false;
-  if (Path.find("..") != Path.npos ||
+  if (Path.starts_with("mod://"))
+    Path.remove_prefix(6);
+  // Root containment and package authorization are enforced by the VFS when
+  // resolving against the owning document. Parent references are legitimate.
+  if (Path.empty() || Path.front() == '/' ||
       Path.find_first_of("\\:\r\n\t") != Path.npos)
     return false;
   static constexpr std::string_view kExtensions[] = {

@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
 	<link type="text/rcss" href="../rcss/loading.rcss"/>
 </head>
@@ -11,7 +11,7 @@
      dynamic text is injected escaped by panels::loading::LoadingPage. -->
 <body id="menuloading">
 	<div id="loading-box">
-		<h1 id="loading-title">#Loading_Title</h1>
+		<h1 id="loading-title">#abcui.gameui/Loading_Title</h1>
 		<p id="loading-target" class="loading-sub"></p>
 		<p id="loading-status"></p>
 		<progress id="loading-progress" max="1" value="0"/>
@@ -20,7 +20,7 @@
 		<p id="loading-secondary-text" class="loading-sub"></p>
 		<p id="loading-resource" class="loading-sub"></p>
 		<div id="loading-actions">
-			<button id="loading-cancel" data-action="loading-cancel" data-label="#Loading_Cancel">#Loading_Cancel</button>
+			<button id="loading-cancel" data-action="loading-cancel" data-label="#abcui.gameui/Loading_Cancel">#abcui.gameui/Loading_Cancel</button>
 		</div>
 	</div>
 </body>

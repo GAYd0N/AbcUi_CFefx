@@ -8,6 +8,7 @@
 // glyph ink (plain text is the fallback when a character has no glyph).
 #include <abcui/events.h>
 #include <abcui/module_api.h>
+#include "../../common/Glyphs.h"
 
 #include <algorithm>
 #include <cmath>
@@ -18,6 +19,7 @@
 namespace {
 
 const AbcUiModuleApi *Api = nullptr;
+moduleui::Glyphs GlyphInk;
 AbcUiPanelDesc Panel = {};
 
 // Old CSidePanel ctor default (persisted contract - never rename).
@@ -125,11 +127,9 @@ void panelOnData(void *, double) {
     // the scene like the flashlight percentage); a template with characters
     // outside the glyph set falls back to plain text (escaped: the template
     // is document-owned, but the numbers ride the same set-inner path).
-    char ink[1024];
-    if (Api->ui->inkMarkup(text.c_str(), nullptr, ink, sizeof(ink)))
-      Api->ui->elementSetInnerRML(message, ink);
-    else
-      Api->ui->elementSetInnerRML(message, text.c_str());
+    const std::string ink = GlyphInk.ink(Api, text);
+    Api->ui->elementSetInnerRML(message,
+                                ink.empty() ? text.c_str() : ink.c_str());
   }
 }
 
@@ -162,6 +162,7 @@ void onModuleInit() {
 }
 
 void onModuleShutdown() {
+  GlyphInk.reset();
   // The document dies with the context; the template reloads on the next
   // one.
   TemplateLoaded = false;
@@ -176,13 +177,14 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
-      !api->events || !api->ui || !api->console || !api->data)
+      !api->textures || !api->events || !api->ui || !api->console || !api->data)
     return 0;
   if (api->ui->structSize < sizeof(AbcUiUiApi) ||
       api->console->structSize < sizeof(AbcUiConsoleApi) ||
@@ -192,7 +194,7 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.sidetext";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = &onModuleInit;
   out->onContextReady = nullptr;

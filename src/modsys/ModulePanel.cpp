@@ -1,47 +1,31 @@
 // framework::ModulePanel implementation - see ModulePanel.h.
 #include "ModulePanel.h"
 
-#include <abc/Console.h>
+#include <utility>
 
 namespace framework {
-namespace {
-
-template <typename Fn>
-void guarded(const char *panel, const char *what, Fn &&fn) {
-  try {
-    fn();
-  } catch (...) {
-    abc::ConsoleError("[AbcUi] module panel \"%s\": exception escaped %s\n",
-                      panel, what);
-  }
-}
-
-} // namespace
-
-ModulePanel::ModulePanel(const AbcUiPanelDesc &desc)
-    : HudPanel(desc.name, desc.documentPath, desc.zIndex), Desc(desc) {}
+ModulePanel::ModulePanel(const AbcUiPanelDesc &desc,
+                         module_resources::OwnerHandle owner)
+    : HudPanel(desc.name, desc.documentPath, desc.zIndex), Desc(desc),
+      Owner(std::move(owner)) {}
 
 void ModulePanel::onDocumentReady() {
-  if (Desc.onDocumentReady)
-    guarded(Name.c_str(), "onDocumentReady",
-            [&] { Desc.onDocumentReady(Desc.userdata); });
+  module_resources::invoke(Owner, "panel ready", Desc.onDocumentReady,
+                           Desc.userdata);
 }
 
 void ModulePanel::onData(double frameTime) {
-  if (Desc.onData)
-    guarded(Name.c_str(), "onData",
-            [&] { Desc.onData(Desc.userdata, frameTime); });
+  module_resources::invoke(Owner, "panel data", Desc.onData, Desc.userdata,
+                           frameTime);
 }
 
 void ModulePanel::onRedraw(double frameTime) {
-  if (Desc.onRedraw)
-    guarded(Name.c_str(), "onRedraw",
-            [&] { Desc.onRedraw(Desc.userdata, frameTime); });
+  module_resources::invoke(Owner, "panel redraw", Desc.onRedraw, Desc.userdata,
+                           frameTime);
 }
 
 void ModulePanel::reset() {
-  if (Desc.reset)
-    guarded(Name.c_str(), "reset", [&] { Desc.reset(Desc.userdata); });
+  module_resources::invoke(Owner, "panel reset", Desc.reset, Desc.userdata);
 }
 
 } // namespace framework

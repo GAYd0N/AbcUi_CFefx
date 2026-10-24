@@ -1,0 +1,3 @@
+abcui.vote/Vote_DefaultMessage = 发起了一个投票
+abcui.vote/Vote_DefaultYes = 是
+abcui.vote/Vote_DefaultNo = 否

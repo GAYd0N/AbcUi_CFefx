@@ -19,6 +19,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <format>
 #include <cstring>
 #include <string>
 
@@ -125,9 +126,7 @@ int cvarInt(AbcUiCvarHandle cvar, int fallback) {
 }
 
 std::string pixelValue(float value) {
-  char text[32];
-  std::snprintf(text, sizeof(text), "%gpx", static_cast<double>(value));
-  return text;
+  return std::format("{:g}px", value);
 }
 
 // Writes one crosshair part when its target state differs from the applied
@@ -226,14 +225,32 @@ void drawDefaultCrosshair() {
     AbcUiHudState state{};
     state.structSize = sizeof(state);
     Api->data->hudState(&state);
+    // The module, not the registry, selects the game's default crosshair.
+    const auto fallback = [](AbcUiWeaponSprite &sprite, bool target) {
+      if (sprite.status == ABCUI_OK)
+        return;
+      sprite.status = ABCUI_OK;
+      std::snprintf(sprite.atlas, sizeof(sprite.atlas), "%s", "crosshairs.spr");
+      sprite.rect[0] = target ? 72 : 0;
+      sprite.rect[1] = target ? 72 : 48;
+      sprite.rect[2] = sprite.rect[0] + 24;
+      sprite.rect[3] = sprite.rect[1] + 24;
+    };
+    fallback(weapon.crosshair, false);
+    fallback(weapon.autoaim, true);
+    if (weapon.zoomedCrosshair.status != ABCUI_OK)
+      weapon.zoomedCrosshair = weapon.crosshair;
+    if (weapon.zoomedAutoaim.status != ABCUI_OK)
+      weapon.zoomedAutoaim = weapon.zoomedCrosshair;
     const bool onTarget = (weapon.state & kStateOnTarget) != 0;
     const float defaultFov = cvarValue(DefaultFov, 90.0f);
     const bool zoomed = state.fov < defaultFov;
     if (!zoomed) {
-      source = (onTarget && weapon.autoaim.valid) ? &weapon.autoaim
-                                                  : &weapon.crosshair;
+      source = (onTarget && (weapon.autoaim.status == ABCUI_OK))
+                   ? &weapon.autoaim
+                   : &weapon.crosshair;
     } else {
-      source = (onTarget && weapon.zoomedAutoaim.valid)
+      source = (onTarget && (weapon.zoomedAutoaim.status == ABCUI_OK))
                    ? &weapon.zoomedAutoaim
                    : &weapon.zoomedCrosshair;
     }
@@ -242,22 +259,21 @@ void drawDefaultCrosshair() {
   // cvar / missing sprite, and vgui repainted the spr fresh every frame, so a
   // stale image could not linger - the Rml img needs an explicit hide
   // wherever this frame does not draw it.
-  if (!haveWeapon || !source || !source->valid) {
+  if (!haveWeapon || !source || source->status != ABCUI_OK) {
     SprUri.clear();
     Api->ui->elementSetProperty(spr, "display", "none");
     return;
   }
 
-  char uri[256];
-  std::snprintf(uri, sizeof(uri), "spralpha://%s/%d,%d,%d,%d", source->atlas,
-                source->rect[0], source->rect[1], source->rect[2],
-                source->rect[3]);
+  const std::string uri =
+      std::format("spralpha://{}/{},{},{},{}", source->atlas, source->rect[0],
+                  source->rect[1], source->rect[2], source->rect[3]);
   const float w = static_cast<float>(source->rect[2] - source->rect[0]);
   const float h = static_cast<float>(source->rect[3] - source->rect[1]);
 
   if (SprUri != uri) {
     SprUri = uri;
-    Api->ui->elementSetAttribute(spr, "src", uri);
+    Api->ui->elementSetAttribute(spr, "src", uri.c_str());
   }
   const std::string left = pixelValue(CenterX - w / 2.0f);
   const std::string top = pixelValue(CenterY - h / 2.0f);
@@ -413,7 +429,14 @@ void panelOnRedraw(void *, double frameTime) {
 
 // ---- lifecycle ----
 
+int onNativeHudDraw(void *, const void *payload) {
+  const auto *event = static_cast<const AbcUiNativeHudEvent *>(payload);
+  return panelDocument() && (event->element == ABCUI_NATIVE_HUD_CROSSHAIR);
+}
+
 void onModuleLoad() {
+  Api->events->subscribeVeto(ABCUI_CHANNEL_HUD_NATIVE_DRAW, 0, &onNativeHudDraw,
+                             nullptr);
   Panel.structSize = sizeof(Panel);
   Panel.name = kPanelName;
   Panel.documentPath = kDocumentPath;
@@ -472,10 +495,11 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->console || !api->data || !api->weapons)
@@ -483,13 +507,13 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
   if (api->ui->structSize < sizeof(AbcUiUiApi) ||
       api->console->structSize < sizeof(AbcUiConsoleApi) ||
       api->data->structSize < sizeof(AbcUiDataApi) ||
-      api->weapons->structSize < sizeof(AbcUiWeaponsApi))
+      !ABCUI_API_HAS_MEMBER(AbcUiWeaponsApi, api->weapons, ammoIcon))
     return 0;
   Api = api;
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.crosshair";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = &onModuleInit;
   out->onContextReady = nullptr;

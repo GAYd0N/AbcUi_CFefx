@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
 	<link type="text/rcss" href="../rcss/settings.rcss"/>
 	<link type="text/rcss" href="../rcss/range.rcss"/>
@@ -21,7 +21,7 @@
 	<div id="panel">
 		<div id="settings-head">
 			<div id="settings-brand">Sven Co-op</div>
-			<h1 id="title">#Settings_Title</h1>
+			<h1 id="title">#abcui.gameui/Settings_Title</h1>
 		</div>
 		<div id="settings-status"></div>
 		<p id="settings-description"></p>
@@ -40,7 +40,7 @@
 				controllers="127 127 127 127" blending="127 127"
 						camera-origin="120 0 0" camera-angles="0 180 0" fov="40"
 						ambient="96" shade="110" light-color="1 0.96 0.9" light-direction="-0.6 -0.35 -1"/>
-					<div id="model-preview-hint">#Settings_PlayerModelHint</div>
+					<div id="model-preview-hint">#abcui.gameui/Settings_PlayerModelHint</div>
 				</div>
 			</div>
 			<div class="settings-widget" id="widget-model-picker">
@@ -51,9 +51,9 @@
 				     toggles the favorite. The section renderer keeps the
 				     current engine model selected. -->
 				<div id="model-picker">
-					<div class="model-picker-label">#Settings_ModelFilter</div>
+					<div class="model-picker-label">#abcui.gameui/Settings_ModelFilter</div>
 					<input class="row-input model-picker-filter" id="model-picker-filter" type="text"/>
-					<button class="row-toggle model-picker-favonly" id="model-picker-favonly" data-action="model-picker-favonly">#Settings_ModelFavOnly</button>
+					<button class="row-toggle model-picker-favonly" id="model-picker-favonly" data-action="model-picker-favonly">#abcui.gameui/Settings_ModelFavOnly</button>
 					<div id="model-picker-list"></div>
 					<div id="model-picker-status"></div>
 				</div>
@@ -61,7 +61,7 @@
 			<div class="settings-widget" id="widget-spray-preview">
 				<div class="preview-box">
 					<img id="spray-preview"/>
-					<div id="spray-preview-hint">#Settings_SprayPreviewHint</div>
+					<div id="spray-preview-hint">#abcui.gameui/Settings_SprayPreviewHint</div>
 				</div>
 			</div>
 			<div class="settings-widget" id="widget-spray-maker">
@@ -71,8 +71,8 @@
 				     the outcome line. -->
 				<div class="preview-box">
 					<img id="spray-made-preview"/>
-					<div id="spray-maker-hint">#Settings_SprayMakerHintTitle</div>
-					<button id="spray-maker-choose" data-action="spray-choose">#Settings_SprayMakerChoose</button>
+					<div id="spray-maker-hint">#abcui.gameui/Settings_SprayMakerHintTitle</div>
+					<button id="spray-maker-choose" data-action="spray-choose">#abcui.gameui/Settings_SprayMakerChoose</button>
 					<div id="spray-maker-status"></div>
 				</div>
 			</div>
@@ -95,7 +95,7 @@
 						<div id="cx-core-left" class="cx-core"></div>
 						<div id="cx-core-right" class="cx-core"></div>
 					</div>
-					<div id="crosshair-preview-hint">#Settings_CrosshairPreviewHint</div>
+					<div id="crosshair-preview-hint">#abcui.gameui/Settings_CrosshairPreviewHint</div>
 				</div>
 			</div>
 			<div class="settings-widget" id="widget-crosshair-color">
@@ -104,11 +104,11 @@
 				     transaction backbone but are not drawn as sliders). The
 				     widget stacks under the preview in the same column. -->
 				<div class="color-row">
-					<div class="row-label">#Settings_CrosshairColor</div>
+					<div class="row-label">#abcui.gameui/Settings_CrosshairColor</div>
 					<colorpicker id="crosshair-color" value="#32fa32c8"/>
 				</div>
 				<div class="color-row">
-					<div class="row-label">#Settings_CrosshairOutlineColor</div>
+					<div class="row-label">#abcui.gameui/Settings_CrosshairOutlineColor</div>
 					<colorpicker id="crosshair-outline-color" value="#000000ff"/>
 				</div>
 			</div>
@@ -119,16 +119,16 @@
 			<div class="settings-widget" id="widget-video">
 				<div id="video-section">
 					<div class="row" id="video-row-resolution">
-						<div class="row-label">#Settings_VideoResolution</div>
+						<div class="row-label">#abcui.gameui/Settings_VideoResolution</div>
 						<select class="video-select" id="video-resolution"></select>
 					</div>
 					<div class="row" id="video-row-windowed">
-						<div class="row-label">#Settings_VideoWindowed</div>
+						<div class="row-label">#abcui.gameui/Settings_VideoWindowed</div>
 						<button class="row-toggle" id="video-windowed" data-action="video-toggle-windowed"></button>
 					</div>
 					<div id="video-status"></div>
 					<div id="video-actions">
-						<button id="video-apply" data-action="video-apply" data-label="#Settings_VideoApply">#Settings_VideoApply</button>
+						<button id="video-apply" data-action="video-apply" data-label="#abcui.gameui/Settings_VideoApply">#abcui.gameui/Settings_VideoApply</button>
 					</div>
 				</div>
 			</div>
@@ -140,75 +140,75 @@
 				     missing. -->
 				<div id="voice-section">
 					<div class="row" id="voice-row-volume">
-						<div class="row-label">#Settings_MicVolume</div>
+						<div class="row-label">#abcui.gameui/Settings_MicVolume</div>
 						<input class="row-input row-slider" type="range" min="0" max="100" step="1" id="voice-mic-volume"/>
 						<span id="voice-mic-value" class="row-value"></span>
 					</div>
 					<div class="row" id="voice-row-boost">
-						<div class="row-label">#Settings_MicBoost</div>
+						<div class="row-label">#abcui.gameui/Settings_MicBoost</div>
 						<button class="row-toggle" id="voice-mic-boost" data-action="voice-mic-boost"></button>
 					</div>
 					<div class="row" id="voice-row-test">
-						<div class="row-label">#Settings_MicTest</div>
+						<div class="row-label">#abcui.gameui/Settings_MicTest</div>
 						<button class="row-toggle" id="voice-mic-test" data-action="voice-test"></button>
 					</div>
 					<div id="voice-status"></div>
-					<div id="voice-meter" aria-label="#Settings_MicLevel"><div id="voice-meter-fill"></div></div>
+					<div id="voice-meter" aria-label="#abcui.gameui/Settings_MicLevel"><div id="voice-meter-fill"></div></div>
 				</div>
 			</div>
 		</div>
 	</div>
 	<div id="settings-actions">
-		<button id="settings-apply" data-action="apply" data-label="#Settings_Apply" autofocus="autofocus">#Settings_Apply</button>
-		<button id="settings-return" data-action="return" data-label="#MainMenu_Return">#MainMenu_Return</button>
-		<button id="settings-reset" data-action="reset-defaults" data-label="#Settings_ResetDefaults">#Settings_ResetDefaults</button>
+		<button id="settings-apply" data-action="apply" data-label="#abcui.gameui/Settings_Apply" autofocus="autofocus">#abcui.gameui/Settings_Apply</button>
+		<button id="settings-return" data-action="return" data-label="#abcui.gameui/MainMenu_Return">#abcui.gameui/MainMenu_Return</button>
+		<button id="settings-reset" data-action="reset-defaults" data-label="#abcui.gameui/Settings_ResetDefaults">#abcui.gameui/Settings_ResetDefaults</button>
 		<!-- The key-binding defaults entry rides the same row: it is only
 		     visible on the keyboard page, where the page defaults entry is
 		     absent, so the row never shows two destructive entries. -->
-		<button id="bind-reset" data-action="bind-reset-defaults" data-label="#Settings_BindResetDefaults">#Settings_BindResetDefaults</button>
+		<button id="bind-reset" data-action="bind-reset-defaults" data-label="#abcui.gameui/Settings_BindResetDefaults">#abcui.gameui/Settings_BindResetDefaults</button>
 	</div>
 	<!-- Page-internal layers live OUTSIDE the scrollable panel: they
 	     anchor to the document and stay viewport-covering no matter how
 	     far the rows are scrolled (absolute layers inside the scroll
 	     container scroll out of the visible area - live-caught). -->
 	<div id="reset-confirm" class="settings-layer">
-		<h1 class="settings-layer-title">#Settings_ResetConfirmTitle</h1>
-		<p id="reset-confirm-text">#Settings_ResetConfirm</p>
-		<button id="reset-yes" data-action="reset-yes" data-label="#Settings_ResetYes">#Settings_ResetYes</button>
-		<button id="reset-no" data-action="reset-no" data-label="#Settings_Cancel" autofocus="autofocus">#Settings_Cancel</button>
+		<h1 class="settings-layer-title">#abcui.gameui/Settings_ResetConfirmTitle</h1>
+		<p id="reset-confirm-text">#abcui.gameui/Settings_ResetConfirm</p>
+		<button id="reset-yes" data-action="reset-yes" data-label="#abcui.gameui/Settings_ResetYes">#abcui.gameui/Settings_ResetYes</button>
+		<button id="reset-no" data-action="reset-no" data-label="#abcui.gameui/Settings_Cancel" autofocus="autofocus">#abcui.gameui/Settings_Cancel</button>
 	</div>
 	<div id="leave-confirm" class="settings-layer">
-		<h1 class="settings-layer-title">#Settings_UnsavedConfirmTitle</h1>
-		<p id="leave-confirm-text">#Settings_UnsavedConfirm</p>
-		<button id="leave-discard" data-action="leave-discard" data-label="#Settings_DiscardReturn">#Settings_DiscardReturn</button>
-		<button id="leave-stay" data-action="leave-stay" data-label="#Settings_Stay" autofocus="autofocus">#Settings_Stay</button>
+		<h1 class="settings-layer-title">#abcui.gameui/Settings_UnsavedConfirmTitle</h1>
+		<p id="leave-confirm-text">#abcui.gameui/Settings_UnsavedConfirm</p>
+		<button id="leave-discard" data-action="leave-discard" data-label="#abcui.gameui/Settings_DiscardReturn">#abcui.gameui/Settings_DiscardReturn</button>
+		<button id="leave-stay" data-action="leave-stay" data-label="#abcui.gameui/Settings_Stay" autofocus="autofocus">#abcui.gameui/Settings_Stay</button>
 	</div>
 	<div id="bind-conflict" class="settings-layer">
-		<h1 class="settings-layer-title">#Settings_BindConflictTitle</h1>
+		<h1 class="settings-layer-title">#abcui.gameui/Settings_BindConflictTitle</h1>
 		<p id="bind-conflict-text"></p>
-		<button id="bind-conflict-yes" data-action="bind-conflict-yes" data-label="#Settings_BindConflictYes">#Settings_BindConflictYes</button>
-		<button id="bind-conflict-no" data-action="bind-conflict-no" data-label="#Settings_Cancel" autofocus="autofocus">#Settings_Cancel</button>
+		<button id="bind-conflict-yes" data-action="bind-conflict-yes" data-label="#abcui.gameui/Settings_BindConflictYes">#abcui.gameui/Settings_BindConflictYes</button>
+		<button id="bind-conflict-no" data-action="bind-conflict-no" data-label="#abcui.gameui/Settings_Cancel" autofocus="autofocus">#abcui.gameui/Settings_Cancel</button>
 	</div>
 	<div id="bind-reset-confirm" class="settings-layer">
-		<h1 class="settings-layer-title">#Settings_BindResetConfirmTitle</h1>
-		<p id="bind-reset-confirm-text">#Settings_BindResetConfirm</p>
-		<button id="bind-reset-yes" data-action="bind-reset-yes" data-label="#Settings_ResetYes">#Settings_ResetYes</button>
-		<button id="bind-reset-no" data-action="bind-reset-no" data-label="#Settings_Cancel" autofocus="autofocus">#Settings_Cancel</button>
+		<h1 class="settings-layer-title">#abcui.gameui/Settings_BindResetConfirmTitle</h1>
+		<p id="bind-reset-confirm-text">#abcui.gameui/Settings_BindResetConfirm</p>
+		<button id="bind-reset-yes" data-action="bind-reset-yes" data-label="#abcui.gameui/Settings_ResetYes">#abcui.gameui/Settings_ResetYes</button>
+		<button id="bind-reset-no" data-action="bind-reset-no" data-label="#abcui.gameui/Settings_Cancel" autofocus="autofocus">#abcui.gameui/Settings_Cancel</button>
 	</div>
 	<!-- The spray picker: a wider prompt holding the directory model's view -
 	     quick roots, the current path, the entry list and the actions. Rows
 	     are injected by sections::SpraySection; a click selects, confirm
 	     starts the maker. -->
 	<div id="spray-file" class="settings-layer settings-layer-wide">
-		<h1 class="settings-layer-title">#Settings_SprayMakerTitle</h1>
+		<h1 class="settings-layer-title">#abcui.gameui/Settings_SprayMakerTitle</h1>
 		<div id="spray-file-roots"></div>
 		<div id="spray-file-path"></div>
 		<div id="spray-file-list"></div>
 		<div id="spray-file-status"></div>
 		<div id="spray-file-actions">
-			<button id="spray-file-confirm" data-action="spray-file-confirm">#Settings_SprayMakerMake</button>
-			<button id="spray-file-up" data-action="spray-file-up">#Settings_SprayMakerUp</button>
-			<button id="spray-file-cancel" data-action="spray-file-cancel" autofocus="autofocus">#Settings_Cancel</button>
+			<button id="spray-file-confirm" data-action="spray-file-confirm">#abcui.gameui/Settings_SprayMakerMake</button>
+			<button id="spray-file-up" data-action="spray-file-up">#abcui.gameui/Settings_SprayMakerUp</button>
+			<button id="spray-file-cancel" data-action="spray-file-cancel" autofocus="autofocus">#abcui.gameui/Settings_Cancel</button>
 		</div>
 	</div>
 	<!-- I16 model picker favorite menu: opened by right-click on a picker

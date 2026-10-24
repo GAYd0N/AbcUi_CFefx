@@ -64,6 +64,10 @@ void onTxferLocalOverrides(const clientdata_s *client);
 bool hasSuit();
 bool hasLongJump();
 bool isSpectate();
+// Local player observer mode and target (entity_state iuser1/iuser2).
+// 0 when not spectating; the module-facing snapshot exposes the same pair.
+int spectateMode();
+int spectateTarget();
 // Raw hide tokens, last write wins (old Viewport parity): the most recent
 // HideWeapon/HideHUD message's token replaces the previous one - bits do
 // not accumulate across messages.

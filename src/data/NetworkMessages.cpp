@@ -84,6 +84,10 @@ pfnUserMsgHook original_FlashBat = nullptr;
 pfnUserMsgHook original_Flashlight = nullptr;
 pfnUserMsgHook original_TextMsg = nullptr;
 pfnUserMsgHook original_SayText = nullptr;
+// Handler displaced from the head of the SayText chain by
+// ensureSayTextFirst(); only the outermost link forwards to it.
+pfnUserMsgHook upstream_SayText = nullptr;
+int sayTextDepth = 0;
 pfnUserMsgHook original_Damage = nullptr;
 pfnUserMsgHook original_MetaHook = nullptr;
 // hud_vote gate for the VoteMenu consumer (set by the vote module through
@@ -298,9 +302,10 @@ int __MsgFunc_ShowMenu(const char *pszName, int iSize, void *pbuf) {
   const AbcUiShowMenuEvent moduleEvent{validSlots, displaySeconds, bits,
                                        text.c_str()};
   framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_SHOW_MENU, moduleEvent);
-  // The old hook unconditionally swallowed ShowMenu so the vanilla VGUI
-  // menu never flashes - the TextMenu panel owns this message.
-  return 1;
+  return framework::eventBus().publishVeto(ABCUI_CHANNEL_NETMSG_SHOW_MENU,
+                                           moduleEvent)
+             ? 1
+             : original_ShowMenu(pszName, iSize, pbuf);
 }
 
 int __MsgFunc_FlashBat(const char *pszName, int iSize, void *pbuf) {
@@ -353,6 +358,16 @@ int __MsgFunc_TextMsg(const char *pszName, int iSize, void *pbuf) {
 // strings, so whatever remains on the wire is read as parameters and a short
 // message still parses (no field is required past the line itself).
 int __MsgFunc_SayText(const char *pszName, int iSize, void *pbuf) {
+  // A bridge promoted by ensureSayTextFirst() leaves its old link in the
+  // chain below. Only the outermost link parses and publishes; the nested
+  // link forwards to the chain tail so a chained plugin cannot draw twice.
+  if (sayTextDepth > 0)
+    return original_SayText ? original_SayText(pszName, iSize, pbuf) : 0;
+  ++sayTextDepth;
+  struct DepthGuard {
+    int &depth;
+    ~DepthGuard() { --depth; }
+  } guard{sayTextDepth};
   abc::MsgReader msg(pbuf, iSize);
   SayTextData data;
   data.client = msg.readByte();
@@ -378,8 +393,11 @@ int __MsgFunc_SayText(const char *pszName, int iSize, void *pbuf) {
        data.params[3].c_str()}};
   const bool moduleConsumed = framework::eventBus().publishVeto(
       ABCUI_CHANNEL_TEXTFEED_SAY_TEXT, moduleEvent);
-  return (chain && !moduleConsumed) ? original_SayText(pszName, iSize, pbuf)
-                                    : 1;
+  if (!chain || moduleConsumed)
+    return 1;
+  const pfnUserMsgHook next =
+      upstream_SayText ? upstream_SayText : original_SayText;
+  return next ? next(pszName, iSize, pbuf) : 1;
 }
 
 int __MsgFunc_Damage(const char *pszName, int iSize, void *pbuf) {
@@ -477,7 +495,10 @@ int __MsgFunc_VoteMenu(const char *pszName, int iSize, void *pbuf) {
   const AbcUiVoteMenuEvent moduleEvent{data.type, data.content.c_str(),
                                        data.yes.c_str(), data.no.c_str()};
   framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_VOTE_MENU, moduleEvent);
-  return 1;
+  return framework::eventBus().publishVeto(ABCUI_CHANNEL_NETMSG_VOTE_MENU,
+                                           moduleEvent)
+             ? 1
+             : original_VoteMenu(pszName, iSize, pbuf);
 }
 
 int __MsgFunc_EndVote(const char *pszName, int iSize, void *pbuf) {
@@ -640,6 +661,9 @@ bool isClientCode(uintptr_t address) {
 }
 
 void registerUserMsgHooks() {
+  // A rebuilt client table invalidates the head displaced for SayText; the
+  // next ownership decision re-captures the current head.
+  upstream_SayText = nullptr;
   installHook("AmmoX", __MsgFunc_AmmoX, original_AmmoX);
   installHook("WeaponList", __MsgFunc_WeaponList, original_WeaponList);
   installHook("InitHUD", __MsgFunc_InitHUD, original_InitHUD);
@@ -691,6 +715,26 @@ void registerUserMsgHooks() {
 }
 
 } // namespace
+
+int32_t ensureSayTextFirst() {
+  if (!g_pMetaHookAPI || !g_pMetaHookAPI->FindUserMsgHook ||
+      !g_pMetaHookAPI->HookUserMsg)
+    return 0;
+  // Never move a frame that is currently dispatching.
+  if (sayTextDepth > 0)
+    return 0;
+  usermsg_t *head = g_pMetaHookAPI->FindUserMsgHook("SayText");
+  if (!head || !head->function)
+    return 0;
+  if (head->function == &__MsgFunc_SayText)
+    return 1;
+  const pfnUserMsgHook previous =
+      g_pMetaHookAPI->HookUserMsg("SayText", __MsgFunc_SayText);
+  if (!previous || previous == &__MsgFunc_SayText)
+    return 0;
+  upstream_SayText = previous;
+  return 1;
+}
 
 void init() {
   // Installed once per process. HUD_Init can repeat (map cycles), but the

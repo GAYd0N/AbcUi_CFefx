@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
 	<link type="text/rcss" href="../rcss/loading.rcss"/>
 </head>
@@ -10,11 +10,11 @@
      reason is escaped by panels::loading::ConnectionErrorOverlay. -->
 <body id="menuconnerror">
 	<div id="connerror-box">
-		<h1 id="connerror-title">#Loading_ErrorTitle</h1>
+		<h1 id="connerror-title">#abcui.gameui/Loading_ErrorTitle</h1>
 		<p id="connerror-reason"></p>
 		<div id="connerror-actions">
-			<button id="connerror-retry" data-action="error-retry" data-label="#Loading_Retry">#Loading_Retry</button>
-			<button id="connerror-return" data-action="error-return" data-label="#Loading_Return" autofocus="autofocus">#Loading_Return</button>
+			<button id="connerror-retry" data-action="error-retry" data-label="#abcui.gameui/Loading_Retry">#abcui.gameui/Loading_Retry</button>
+			<button id="connerror-return" data-action="error-return" data-label="#abcui.gameui/Loading_Return" autofocus="autofocus">#abcui.gameui/Loading_Return</button>
 		</div>
 	</div>
 </body>

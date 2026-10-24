@@ -74,6 +74,14 @@ SteamApiBackend *bridgeBackend() {
     bool avatar(SteamId64, AvatarRgba &) override {
       return false;
     }
+
+    AvatarAnimationState animatedAvatar(SteamId64, AvatarAnimation &) override {
+      // The bridge C ABI has no animated-avatar surface yet; the native
+      // backend keeps serving and the scoreboard keeps its static avatar.
+      return AvatarAnimationState::Unavailable;
+    }
+
+    void abandonAnimatedAvatar(SteamId64) override {}
   } instance;
   return &instance;
 }

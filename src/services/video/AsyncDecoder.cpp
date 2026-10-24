@@ -1,5 +1,6 @@
 // New implementation; see AsyncDecoder.h for the thread ownership contract.
 #include "AsyncDecoder.h"
+#include "modsys/ModuleVfs.h"
 
 #include <algorithm>
 #include <condition_variable>
@@ -11,6 +12,7 @@ namespace video {
 struct AsyncDecoder::State {
   struct Request {
     std::string Path;
+    std::shared_ptr<const framework::PackageEntry> Source;
     int Width = 0;
     int Height = 0;
     double Delta = 0;
@@ -54,7 +56,7 @@ struct AsyncDecoder::State {
                            Work.Width != Applied.Width ||
                            Work.Height != Applied.Height;
       if (Changed) {
-        Opened = Media.open(Work.Path.c_str(), Work.Width, Work.Height);
+        Opened = Media.open(Work.Source, Work.Width, Work.Height);
         Applied = Work;
       }
       Media.setLooping(Work.Loop);
@@ -99,7 +101,11 @@ bool AsyncDecoder::open(const char *Path, int Width, int Height) {
   if (Data->Next.Path == Path && Data->Next.Width == Width &&
       Data->Next.Height == Height)
     return true;
+  auto source = std::make_shared<framework::PackageEntry>();
+  if (!framework::ModuleVfs::open(Path, *source, &Error))
+    return false;
   ++Data->Next.Generation;
+  Data->Next.Source = std::move(source);
   Data->Next.Path = Path;
   Data->Next.Width = Width;
   Data->Next.Height = Height;

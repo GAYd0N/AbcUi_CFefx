@@ -5,12 +5,43 @@
 #include "modules/gameui/GameUiModule.h"
 #include "DebugCommands.h"
 #include <abc/Console.h>
+#include <abc/Parse.h>
 #include <abc/Plugin.h>
-#include <cstdio>
-#include <cstdlib>
-#include <vector>
+#include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
+
 namespace gameui {
+
+namespace {
+
+// "a.b.c.d" with each octet in 0..255.
+std::optional<uint32_t> parseIpv4(std::string_view text) {
+  uint32_t address = 0;
+  std::size_t at = 0;
+  for (int part = 0; part < 4; ++part) {
+    if (part > 0) {
+      if (at >= text.size() || text[at] != '.')
+        return std::nullopt;
+      ++at;
+    }
+    const std::size_t dot = text.find('.', at);
+    if (part < 3 && dot == std::string_view::npos)
+      return std::nullopt;
+    const std::size_t end = part < 3 ? dot : text.size();
+    const auto octet = abc::ParseInt(text.substr(at, end - at));
+    if (!octet || *octet < 0 || *octet > 255)
+      return std::nullopt;
+    address = (address << 8) | static_cast<uint32_t>(*octet);
+    at = end + 1;
+  }
+  return address;
+}
+
+} // namespace
+
 void DebugCommands::serverQueryCommand() {
   if (!currentModule()) {
     abc::ConsoleWarn("[AbcUi] no module instance\n");
@@ -128,7 +159,7 @@ void DebugCommands::serverDetailCommand() {
     return;
   }
   const std::string kind = gEngfuncs.Cmd_Argv(1);
-  const int index = atoi(gEngfuncs.Cmd_Argv(2));
+  const int index = abc::ParseInt(gEngfuncs.Cmd_Argv(2)).value_or(-1);
   const auto *server = self.ServerBrowser.Query.entry(index);
   if (!server) {
     abc::ConsoleWarn("[AbcUi] no server at index %d\n", index);
@@ -211,19 +242,23 @@ void DebugCommands::serverHistoryCommand() {
     return;
   }
   // ip accepts dotted quads (the same text form the UI shows).
-  unsigned a = 0, b = 0, c = 0, d = 0;
-  if (std::sscanf(gEngfuncs.Cmd_Argv(1), "%u.%u.%u.%u", &a, &b, &c, &d) != 4) {
+  const auto ip = parseIpv4(gEngfuncs.Cmd_Argv(1));
+  if (!ip) {
     abc::ConsoleWarn("[AbcUi] bad ip\n");
     return;
   }
-  const uint32_t ip = (a << 24) | (b << 16) | (c << 8) | d;
-  const uint16_t conn = static_cast<uint16_t>(atoi(gEngfuncs.Cmd_Argv(2)));
-  const uint16_t query = static_cast<uint16_t>(atoi(gEngfuncs.Cmd_Argv(3)));
+  const uint16_t conn =
+      static_cast<uint16_t>(abc::ParseInt(gEngfuncs.Cmd_Argv(2)).value_or(0));
+  const uint16_t query =
+      static_cast<uint16_t>(abc::ParseInt(gEngfuncs.Cmd_Argv(3)).value_or(0));
   auto *favorites = services::serverbrowser::steamFavorites();
-  const bool ok = favorites->addHistory(ip, conn, query);
-  abc::ConsolePrint("[AbcUi] history %u.%u.%u.%u:%u/%u: %s (histCount=%d)\n", a,
-                    b, c, d, conn, query, ok ? "OK" : "FAILED",
-                    favorites->historyCount());
+  const bool ok = favorites->addHistory(*ip, conn, query);
+  abc::ConsolePrint("[AbcUi] history %u.%u.%u.%u:%u/%u: %s (histCount=%d)\n",
+                    static_cast<unsigned>((*ip >> 24) & 0xFF),
+                    static_cast<unsigned>((*ip >> 16) & 0xFF),
+                    static_cast<unsigned>((*ip >> 8) & 0xFF),
+                    static_cast<unsigned>(*ip & 0xFF), conn, query,
+                    ok ? "OK" : "FAILED", favorites->historyCount());
 }
 
 void DebugCommands::serverConnectCommand() {
@@ -254,7 +289,7 @@ void DebugCommands::serverTimeoutCommand() {
     abc::ConsoleWarn("[AbcUi] usage: abc_ui_server_timeout <ms|0>\n");
     return;
   }
-  const int ms = atoi(gEngfuncs.Cmd_Argv(1));
+  const int ms = abc::ParseInt(gEngfuncs.Cmd_Argv(1)).value_or(0);
   self.ServerBrowser.Query.setTimeoutMs(
       ms > 0 ? static_cast<uint32_t>(ms)
              : services::serverbrowser::kDefaultTimeoutMs);
@@ -272,7 +307,7 @@ void DebugCommands::serverSelectCommand() {
     return;
   }
   GameUiModule &self = *currentModule();
-  const int row = atoi(gEngfuncs.Cmd_Argv(1));
+  const int row = abc::ParseInt(gEngfuncs.Cmd_Argv(1)).value_or(-1);
   self.ServerBrowser.List.selectRow(row);
   const auto *selected =
       self.ServerBrowser.List.selectedEntry(self.ServerBrowser.Query);

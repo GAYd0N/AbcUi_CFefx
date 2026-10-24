@@ -1,5 +1,6 @@
 // services::video::Decoder implementation - see Decoder.h.
 #include "Decoder.h"
+#include "services/media/MemoryInput.h"
 #include <mutex>
 
 #include <windows.h>
@@ -30,71 +31,9 @@ constexpr int kDecodeThreads = 4;
 constexpr int kMaxFramesPerAdvance = 16;
 constexpr double kFrameSlackSeconds = 1.0 / 1000.0;
 
-// Function pointers resolved from Mile.FFmpeg.dll; no import library is
-// linked so the plugin still loads (with video disabled) when the SDK is
-// absent. Same shape as Renderer's STARTUP_FFMPEG_APIS table.
-#define VIDEO_FFMPEG_APIS(X)                                                   \
-  X(avcodec_version)                                                           \
-  X(avformat_version)                                                          \
-  X(avutil_version)                                                            \
-  X(av_strerror)                                                               \
-  X(avformat_alloc_context)                                                    \
-  X(avformat_open_input)                                                       \
-  X(avformat_find_stream_info)                                                 \
-  X(avformat_close_input)                                                      \
-  X(av_find_best_stream)                                                       \
-  X(av_read_frame)                                                             \
-  X(avcodec_alloc_context3)                                                    \
-  X(avcodec_free_context)                                                      \
-  X(avcodec_parameters_to_context)                                             \
-  X(avcodec_find_decoder)                                                      \
-  X(avcodec_open2)                                                             \
-  X(avcodec_send_packet)                                                       \
-  X(avcodec_receive_frame)                                                     \
-  X(avcodec_flush_buffers)                                                     \
-  X(av_packet_alloc)                                                           \
-  X(av_packet_free)                                                            \
-  X(av_packet_unref)                                                           \
-  X(av_frame_alloc)                                                            \
-  X(av_frame_free)                                                             \
-  X(av_frame_unref)                                                            \
-  X(av_seek_frame)                                                             \
-  X(sws_getContext)                                                            \
-  X(sws_freeContext)                                                           \
-  X(sws_scale)
-
-struct FfmpegApi {
-#define VIDEO_DECLARE_API(Name) decltype(&::Name) Name{};
-  VIDEO_FFMPEG_APIS(VIDEO_DECLARE_API)
-#undef VIDEO_DECLARE_API
-};
-
-// Process-lifetime binding of Mile.FFmpeg.dll: one LoadLibrary per process,
-// never unloaded (a menu may open a video again in any HUD cycle, and
-// reloading the FFmpeg runtime per document is the worse trade).
-FfmpegApi &ffmpegApi() {
-  static FfmpegApi Api;
-  static HMODULE Module = nullptr;
-  static std::once_flag Once;
-  std::call_once(Once, [] {
-    Module = LoadLibraryA("Mile.FFmpeg.dll");
-    if (Module) {
-#define VIDEO_LOAD_API(Name)                                                   \
-  Api.Name =                                                                   \
-      reinterpret_cast<decltype(Api.Name)>(GetProcAddress(Module, #Name));     \
-  if (!Api.Name) {                                                             \
-    FreeLibrary(Module);                                                       \
-    Module = nullptr;                                                          \
-    Api = {};                                                                  \
-    break;                                                                     \
-  }
-      do {
-        VIDEO_FFMPEG_APIS(VIDEO_LOAD_API)
-      } while (false);
-#undef VIDEO_LOAD_API
-    }
-  });
-  return Api;
+using FfmpegApi = media::FfmpegApi;
+const FfmpegApi &ffmpegApi() {
+  return media::ffmpeg();
 }
 
 double rationalSeconds(int64_t value, AVRational base) {
@@ -114,6 +53,8 @@ int64_t secondsToTimestamp(double seconds, AVRational base) {
 
 struct Decoder::State {
   AVFormatContext *Format = nullptr;
+  AVIOContext *Io = nullptr;
+  media::MemoryInput Input;
   AVCodecContext *Codec = nullptr;
   AVFrame *Frame = nullptr;
   AVPacket *Packet = nullptr;
@@ -269,7 +210,7 @@ Decoder::~Decoder() {
 }
 
 bool Decoder::available() {
-  FfmpegApi &api = ffmpegApi();
+  const FfmpegApi &api = ffmpegApi();
   if (!api.avcodec_version)
     return false;
   return AV_VERSION_MAJOR(api.avcodec_version()) == LIBAVCODEC_VERSION_MAJOR &&
@@ -302,6 +243,8 @@ void Decoder::close() {
     state.Api.avformat_close_input(&state.Format);
     state.Format = nullptr;
   }
+  media::MemoryInput::destroy(state.Api, state.Io);
+  state.Input = {};
   state.StreamIndex = -1;
   state.Output.clear();
   state.View = {};
@@ -310,9 +253,10 @@ void Decoder::close() {
   state.resetPipeline();
 }
 
-bool Decoder::open(const char *path, int outputWidth, int outputHeight) {
+bool Decoder::open(std::shared_ptr<const framework::PackageEntry> source,
+                   int outputWidth, int outputHeight) {
   close();
-  if (!path || !*path)
+  if (!source || !source->data || !source->size)
     return false;
   State &state = *Data;
   state.Api = ffmpegApi();
@@ -326,8 +270,18 @@ bool Decoder::open(const char *path, int outputWidth, int outputHeight) {
   state.OutputWidth = std::clamp(outputWidth, 1, kMaxOutputEdge);
   state.OutputHeight = std::clamp(outputHeight, 1, kMaxOutputEdge);
 
+  state.Input.entry = std::move(source);
+  state.Io = state.Input.create(state.Api);
+  state.Format = state.Api.avformat_alloc_context();
+  if (!state.Io || !state.Format)
+    return state.fail("cannot allocate video memory reader");
+  if (!media::MemoryInput::configure(state.Format, state.Api,
+                                     "mov,matroska,webm,avi,ivf,mpeg,mpegts"))
+    return state.fail("cannot configure video memory reader");
+  state.Format->pb = state.Io;
+  state.Format->flags |= AVFMT_FLAG_CUSTOM_IO;
   int result =
-      state.Api.avformat_open_input(&state.Format, path, nullptr, nullptr);
+      state.Api.avformat_open_input(&state.Format, nullptr, nullptr, nullptr);
   if (result < 0)
     return state.fail("cannot open video", result);
   result = state.Api.avformat_find_stream_info(state.Format, nullptr);

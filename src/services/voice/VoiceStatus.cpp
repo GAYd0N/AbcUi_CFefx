@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <format>
 
 namespace services {
 namespace voice {
@@ -107,9 +108,8 @@ void VoiceStatus::updateServerState(bool force) {
       static_cast<int>(abc::CVAR_GET_FLOAT("voice_modenable"));
   if (force || ServerModEnable_ != cvarModEnable) {
     ServerModEnable_ = cvarModEnable;
-    char command[64];
-    std::snprintf(command, sizeof(command), "VModEnable %d", ServerModEnable_);
-    gEngfuncs.pfnServerCmd(command);
+    const std::string command = std::format("VModEnable {}", ServerModEnable_);
+    gEngfuncs.pfnServerCmd(command.c_str());
   }
   unsigned long banMask = 0;
   for (int i = 1; i <= kMaxPlayers; ++i) {
@@ -123,9 +123,8 @@ void VoiceStatus::updateServerState(bool force) {
   // tick keeps re-sending (a lost unreliable packet heals within a second).
   if (!force && banMask == AckedBanMask_)
     return;
-  char command[48];
-  std::snprintf(command, sizeof(command), "vban %lx", banMask);
-  gEngfuncs.pfnServerCmdUnreliable(command);
+  const std::string command = std::format("vban {:x}", banMask);
+  gEngfuncs.pfnServerCmdUnreliable(command.c_str());
   LastSyncTime_ = gEngfuncs.GetClientTime();
 }
 

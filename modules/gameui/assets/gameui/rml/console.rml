@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/console.rcss"/>
 </head>
 <!-- T16 replacement console (menuconsole overlay): the bounded engine
@@ -13,9 +13,9 @@
 <body id="menuconsole">
 	<div id="console-box">
 		<div id="console-header">
-			<span id="console-title">#Console_Title</span>
+			<span id="console-title">#abcui.gameui/Console_Title</span>
 			<span id="console-count"></span>
-			<button id="console-close" data-action="console-close" data-label="#Console_Close">#Console_Close</button>
+			<button id="console-close" data-action="console-close" data-label="#abcui.gameui/Console_Close">#abcui.gameui/Console_Close</button>
 		</div>
 		<div id="console-history"></div>
 		<!-- Selection is painted over the rows by the page: translucent
@@ -26,8 +26,8 @@
 			<p id="console-confirm-lead"></p>
 			<div id="console-confirm-text"></div>
 			<div id="console-confirm-actions">
-				<button id="console-confirm-yes" data-action="console-confirm-yes" data-label="#Console_ConfirmYes">#Console_ConfirmYes</button>
-				<button id="console-confirm-no" data-action="console-confirm-no" data-label="#Console_ConfirmNo">#Console_ConfirmNo</button>
+				<button id="console-confirm-yes" data-action="console-confirm-yes" data-label="#abcui.gameui/Console_ConfirmYes">#abcui.gameui/Console_ConfirmYes</button>
+				<button id="console-confirm-no" data-action="console-confirm-no" data-label="#abcui.gameui/Console_ConfirmNo">#abcui.gameui/Console_ConfirmNo</button>
 			</div>
 		</div>
 		<div id="console-input-row">
@@ -36,7 +36,7 @@
 		</div>
 		<!-- Output context menu: shown at the pointer by the page. -->
 		<div id="console-context-menu">
-			<div id="console-context-copy" class="console-context-item" data-action="console-context-copy">#Console_Copy</div>
+			<div id="console-context-copy" class="console-context-item" data-action="console-context-copy">#abcui.gameui/Console_Copy</div>
 		</div>
 	</div>
 </body>

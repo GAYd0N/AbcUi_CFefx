@@ -1,6 +1,6 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
 	<link type="text/rcss" href="../rcss/chat.rcss"/>
 </head>
 <!-- Chat (issue 13): the player log grows upward from the message-mode input
@@ -12,7 +12,7 @@
 <body id="chat">
 	<div id="chat-log"></div>
 	<div id="chat-input-row">
-		<span id="chat-prompt">#Chat_Say</span>
+		<span id="chat-prompt">#abcui.chat/Chat_Say</span>
 		<input id="chat-input" type="text" maxlength="127"/>
 		<!-- Input-method badge (CN/JP/KR...), empty while no IME is active. -->
 		<span id="chat-ime"></span>

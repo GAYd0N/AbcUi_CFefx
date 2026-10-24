@@ -1,6 +1,7 @@
 // framework::modmanager implementation - see ModuleManager.h.
 #include "ModuleManager.h"
 
+#include <algorithm>
 #include <map>
 #include <set>
 #include <string>
@@ -18,6 +19,8 @@
 #include "ModuleDocuments.h"
 #include "ModuleManifest.h"
 #include "ModuleVfs.h"
+#include "ModuleResources.h"
+#include "../framework/PanelManager.h"
 
 namespace framework {
 namespace modmanager {
@@ -27,7 +30,9 @@ constexpr const char *kEntrySymbol = "AbcUiModule_Main";
 
 struct LoadedModule {
   ModuleManifest manifest;
-  std::unique_ptr<MemoryDll> library;
+  std::shared_ptr<MemoryDll> library;
+  module_resources::OwnerHandle owner;
+  bool initialized = false;
   AbcUiModuleDescriptor descriptor{};
 };
 
@@ -36,20 +41,37 @@ std::vector<LoadedModule> &loaded() {
   return instance;
 }
 
-std::vector<AbcUiPanelDesc> &pendingPanels() {
-  static std::vector<AbcUiPanelDesc> instance;
+size_t loadedCount() {
+  return static_cast<size_t>(
+      std::count_if(loaded().begin(), loaded().end(), [](const auto &module) {
+        return module_resources::enabled(module.owner);
+      }));
+}
+
+struct PanelRegistration {
+  AbcUiPanelDesc desc;
+  module_resources::Registration lifetime;
+};
+
+std::vector<PanelRegistration> &pendingPanels() {
+  static std::vector<PanelRegistration> instance;
   return instance;
 }
 
-int s_loadDepth = 0; // >0 while a descriptor onLoad may register panels
-
-template <typename Fn> void guarded(const char *id, const char *what, Fn &&fn) {
-  try {
-    fn();
-  } catch (...) {
-    abc::ConsoleError("[AbcUi] module \"%s\": exception escaped %s\n", id,
-                      what);
-  }
+void retire(LoadedModule &module, bool failedInit = false) {
+  module_resources::stop(module.owner);
+  module.owner->initializing = false;
+  if (failedInit && module.descriptor.onShutdown)
+    module_resources::attempt(module.owner, "failed-init shutdown",
+                              module.descriptor.onShutdown);
+  if (module.descriptor.onUnload)
+    module_resources::attempt(module.owner, "onUnload",
+                              module.descriptor.onUnload);
+  module_resources::release(module.owner);
+  module.descriptor = {};
+  module.owner->imagePin.reset();
+  module.library.reset();
+  ModuleVfs::unmount(module.manifest.id.c_str());
 }
 
 struct Candidate {
@@ -60,60 +82,63 @@ struct Candidate {
 
 bool loadModule(Candidate &candidate) {
   const std::string &id = candidate.manifest.id;
-  if (!ModuleVfs::mount(id.c_str(), std::move(candidate.image))) {
+  LoadedModule module;
+  module.manifest = candidate.manifest;
+  module.owner = std::make_shared<module_resources::Owner>(id);
+  module.owner->dependencies = candidate.manifest.dependencies;
+  module.owner->initializing = true;
+  if (!ModuleVfs::mount(id.c_str(), std::move(candidate.image),
+                        candidate.manifest.dependencies)) {
     abc::ConsoleWarn("[AbcUi] module \"%s\": package mount refused\n",
                      id.c_str());
     return false;
   }
+  if (module.manifest.resourcesOnly) {
+    loaded().push_back(std::move(module));
+    return true;
+  }
 
   PackageEntry entryDll;
   std::string error;
+  module.library = std::make_shared<MemoryDll>();
   if (!ModuleVfs::openPath(id.c_str(), candidate.manifest.entry.c_str(),
-                           entryDll, &error)) {
-    abc::ConsoleWarn("[AbcUi] module \"%s\": entry DLL unreadable (%s)\n",
-                     id.c_str(), error.c_str());
-    ModuleVfs::unmount(id.c_str());
-    return false;
-  }
-
-  auto library = std::make_unique<MemoryDll>();
-  if (!library->load(entryDll.data, entryDll.size, &error)) {
+                           entryDll, &error) ||
+      !module.library->load(entryDll.data, entryDll.size, &error)) {
     abc::ConsoleWarn("[AbcUi] module \"%s\": image load failed (%s)\n",
                      id.c_str(), error.c_str());
-    ModuleVfs::unmount(id.c_str());
+    retire(module);
     return false;
   }
-
-  const auto entry = reinterpret_cast<int (*)(uint32_t, const AbcUiModuleApi *,
-                                              AbcUiModuleDescriptor *)>(
-      library->getExport(kEntrySymbol));
-  if (!entry) {
-    abc::ConsoleWarn("[AbcUi] module \"%s\": no %s export\n", id.c_str(),
-                     kEntrySymbol);
-    ModuleVfs::unmount(id.c_str());
-    return false;
-  }
-
+  module.owner->imagePin = module.library;
+  const auto entry = reinterpret_cast<AbcUiModuleEntry>(
+      module.library->getExport(kEntrySymbol));
   AbcUiModuleDescriptor descriptor{};
-  if (!entry(ABCUI_ABI_VERSION, ApiTable::get(), &descriptor) ||
+  descriptor.structSize = sizeof(descriptor);
+  int accepted = 0;
+  const bool returned =
+      entry && module_resources::attempt(module.owner, "AbcUiModule_Main", [&] {
+        accepted = entry(ABCUI_ABI_VERSION, ApiTable::get(), &descriptor);
+      });
+  if (!returned || !accepted || module.owner->initializationFailed ||
       descriptor.structSize < sizeof(AbcUiModuleDescriptor) || !descriptor.id ||
       std::string(descriptor.id) != id) {
     abc::ConsoleWarn("[AbcUi] module \"%s\": entry refused or mismatched\n",
                      id.c_str());
-    ModuleVfs::unmount(id.c_str());
+    retire(module);
     return false;
   }
-
-  ++s_loadDepth;
-  guarded(id.c_str(), "onLoad", descriptor.onLoad);
-  --s_loadDepth;
-
+  module.descriptor = descriptor;
+  module.owner->loading = true;
+  const bool loadSucceeded =
+      !descriptor.onLoad ||
+      module_resources::attempt(module.owner, "onLoad", descriptor.onLoad);
+  module.owner->loading = false;
+  if (!loadSucceeded || module.owner->initializationFailed) {
+    retire(module);
+    return false;
+  }
   abc::ConsolePrint("[AbcUi] module \"%s\" loaded (%s)\n", id.c_str(),
                     candidate.manifest.version.c_str());
-  LoadedModule module;
-  module.manifest = candidate.manifest;
-  module.library = std::move(library);
-  module.descriptor = descriptor;
   loaded().push_back(std::move(module));
   return true;
 }
@@ -153,7 +178,7 @@ LoadedModulesAdapter s_adapter;
 size_t boot() {
   static bool booted = false;
   if (booted)
-    return loaded().size();
+    return loadedCount();
   booted = true;
 
   const std::string directory = abc::ModPath("abc/abcui/modules");
@@ -163,8 +188,11 @@ size_t boot() {
   if (handle == INVALID_HANDLE_VALUE)
     return 0; // no module directory: zero modules is a valid setup
 
-  // Sorted by id: duplicate ids and the resolution order are deterministic.
+  // Reject every duplicate id before loading anything. Enumeration order
+  // must never choose which package provides an id.
   std::map<std::string, Candidate> candidates;
+  std::set<std::string> discoveredIds;
+  std::set<std::string> duplicateIds;
   std::string error;
   do {
     if (find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
@@ -190,6 +218,15 @@ size_t boot() {
                        find.cFileName, error.c_str());
       continue;
     }
+    const std::string id = candidate.manifest.id;
+    if (!discoveredIds.insert(id).second) {
+      duplicateIds.insert(id);
+      candidates.erase(id);
+      abc::ConsoleWarn("[AbcUi] module id \"%s\" is duplicated; "
+                       "all packages with this id skipped\n",
+                       id.c_str());
+      continue;
+    }
     if (candidate.manifest.abi != ABCUI_ABI_VERSION) {
       abc::ConsoleWarn("[AbcUi] module \"%s\" skipped: abi %d, expected %d\n",
                        candidate.manifest.id.c_str(), candidate.manifest.abi,
@@ -202,21 +239,25 @@ size_t boot() {
                        candidate.manifest.minAbcUi.c_str());
       continue;
     }
-    const std::string id = candidate.manifest.id;
-    if (!candidates.emplace(id, std::move(candidate)).second) {
-      abc::ConsoleWarn(
-          "[AbcUi] module id \"%s\" is duplicated; first package wins\n",
-          id.c_str());
-    }
+    candidates.emplace(id, std::move(candidate));
   } while (FindNextFileA(handle, &find));
   FindClose(handle);
+
+  // A conflict is symmetric even when only one manifest declares it.
+  std::map<std::string, std::set<std::string>> conflicts;
+  for (const auto &[id, candidate] : candidates) {
+    for (const std::string &other : candidate.manifest.conflicts) {
+      conflicts[id].insert(other);
+      conflicts[other].insert(id);
+    }
+  }
 
   // Deterministic resolution: repeatedly load every module whose
   // dependencies are satisfied (id order), fail the ones whose dependencies
   // are missing/failed or whose conflicts are loaded. Whatever remains was
   // part of a dependency cycle.
   std::set<std::string> loadedIds;
-  std::set<std::string> failedIds;
+  std::set<std::string> failedIds = duplicateIds;
   bool progress = true;
   while (progress) {
     progress = false;
@@ -226,7 +267,7 @@ size_t boot() {
       const ModuleManifest &manifest = candidate.manifest;
 
       bool blocked = false;
-      for (const std::string &conflict : manifest.conflicts) {
+      for (const std::string &conflict : conflicts[id]) {
         if (loadedIds.count(conflict)) {
           abc::ConsoleWarn(
               "[AbcUi] module \"%s\" skipped: conflicts with \"%s\"\n",
@@ -267,8 +308,8 @@ size_t boot() {
       progress = true;
     }
   }
-  for (const auto &[id, candidate] : candidates) {
-    (void)candidate;
+  for (const auto &entry : candidates) {
+    const std::string &id = entry.first;
     if (!loadedIds.count(id) && !failedIds.count(id))
       abc::ConsoleWarn("[AbcUi] module \"%s\" skipped: dependency cycle\n",
                        id.c_str());
@@ -277,88 +318,118 @@ size_t boot() {
   if (loadedIds.empty())
     abc::ConsolePrint("[AbcUi] no ui modules loaded\n");
   else
-    abc::ConsolePrint("[AbcUi] %zu ui module(s) loaded\n", loaded().size());
-  return loaded().size();
+    abc::ConsolePrint("[AbcUi] %zu ui module(s) loaded\n", loadedCount());
+  return loadedCount();
 }
 
 void initAll() {
   for (LoadedModule &module : loaded()) {
-    if (module.descriptor.onInit)
-      guarded(module.manifest.id.c_str(), "onInit", module.descriptor.onInit);
+    if (module.owner->initializationFailed && module.library) {
+      retire(module);
+      continue;
+    }
+    if (!module_resources::enabled(module.owner) || module.initialized)
+      continue;
+    bool dependencyFailed = false;
+    for (const std::string &dependency : module.manifest.dependencies) {
+      const auto parent = std::find_if(loaded().begin(), loaded().end(),
+                                       [&](const LoadedModule &other) {
+                                         return other.manifest.id == dependency;
+                                       });
+      if (parent == loaded().end() || !parent->initialized ||
+          !module_resources::enabled(parent->owner)) {
+        dependencyFailed = true;
+        break;
+      }
+    }
+    if (dependencyFailed) {
+      abc::ConsoleWarn(
+          "[AbcUi] module \"%s\": dependency initialization failed\n",
+          module.manifest.id.c_str());
+      retire(module);
+      continue;
+    }
+    const bool initialized =
+        !module.descriptor.onInit ||
+        module_resources::attempt(module.owner, "onInit",
+                                  module.descriptor.onInit);
+    if (!initialized || module.owner->initializationFailed) {
+      retire(module, true);
+      continue;
+    }
+    module.initialized = true;
+    module.owner->initializing = false;
   }
 }
 
 void contextReadyAll(Rml::Context *context) {
-  // Registered pages first: a module's onContextReady may already show one.
   module_documents::contextReady(context);
-  for (LoadedModule &module : loaded()) {
-    if (module.descriptor.onContextReady)
-      guarded(module.manifest.id.c_str(), "onContextReady",
-              [&] { module.descriptor.onContextReady(); });
-  }
+  for (LoadedModule &module : loaded())
+    module_resources::invoke(module.owner, "onContextReady",
+                             module.descriptor.onContextReady);
 }
 
 void frameAll(double frameTime) {
-  // A degraded page's recovery click is honored before the modules project.
   module_documents::pump();
-  for (LoadedModule &module : loaded()) {
-    if (module.descriptor.onFrame)
-      guarded(module.manifest.id.c_str(), "onFrame",
-              [&] { module.descriptor.onFrame(frameTime); });
-  }
+  for (LoadedModule &module : loaded())
+    module_resources::invoke(module.owner, "onFrame", module.descriptor.onFrame,
+                             frameTime);
 }
 
 void vidInitAll() {
-  for (LoadedModule &module : loaded()) {
-    if (module.descriptor.onVidInit)
-      guarded(module.manifest.id.c_str(), "onVidInit",
-              module.descriptor.onVidInit);
-  }
+  for (LoadedModule &module : loaded())
+    module_resources::invoke(module.owner, "onVidInit",
+                             module.descriptor.onVidInit);
 }
 
 void shutdownAll() {
-  // Pages are framework-owned: close them first, while the Rml context is
-  // alive and the modules are fully alive (onClose fires here, not after the
-  // module's own teardown).
   module_documents::shutdown();
   for (auto it = loaded().rbegin(); it != loaded().rend(); ++it) {
-    if (it->descriptor.onShutdown)
-      guarded(it->manifest.id.c_str(), "onShutdown", it->descriptor.onShutdown);
+    module_resources::invoke(it->owner, "onShutdown",
+                             it->descriptor.onShutdown);
+    module_resources::releaseContext(it->owner);
   }
 }
 
 void unloadAll() {
-  // Close pages before the modules tear themselves down (onClose is a module
-  // callback); the descriptor strings and callback pointers point into the
-  // module images, so the registry must also forget them before any image
-  // goes away.
   module_documents::shutdown();
-  for (auto it = loaded().rbegin(); it != loaded().rend(); ++it) {
-    if (it->descriptor.onUnload)
-      guarded(it->manifest.id.c_str(), "onUnload", it->descriptor.onUnload);
-  }
-  module_documents::unload();
+  // Quiesce everyone before an unload callback can trigger another module.
+  for (auto &module : loaded())
+    module_resources::stop(module.owner);
   for (auto it = loaded().rbegin(); it != loaded().rend(); ++it)
-    it->library->unload();
+    retire(*it);
+  module_documents::unload();
   loaded().clear();
   ModuleVfs::unmountAll();
 }
 
 bool acceptPanel(const AbcUiPanelDesc &desc) {
-  if (s_loadDepth <= 0) {
+  const auto owner = module_resources::current();
+  if (!owner || !owner->loading || !module_resources::accepting()) {
     abc::ConsoleWarn(
         "[AbcUi] panel \"%s\" registration outside onLoad refused\n",
         desc.name);
     return false;
   }
-  for (const AbcUiPanelDesc &accepted : pendingPanels()) {
-    if (std::string(accepted.name) == desc.name) {
+  if (!desc.documentPath || !std::string_view(desc.documentPath)
+                                 .starts_with("mod://" + owner->id + "/"))
+    return false;
+  for (const auto &accepted : pendingPanels()) {
+    if (std::string(accepted.desc.name) == desc.name) {
       abc::ConsoleWarn("[AbcUi] panel \"%s\" registered twice, refused\n",
                        desc.name);
       return false;
     }
   }
-  pendingPanels().push_back(desc);
+  PanelRegistration registration{desc};
+  const std::string name = desc.name;
+  registration.lifetime.track([name] {
+    std::erase_if(pendingPanels(), [&](const auto &entry) {
+      return std::string(entry.desc.name) == name;
+    });
+    PanelManager::remove(name.c_str());
+  });
+  pendingPanels().push_back(std::move(registration));
   return true;
 }
 
@@ -369,8 +440,11 @@ std::vector<std::unique_ptr<HudPanel>> takePanels() {
   // in the module image, which outlives every HUD cycle).
   std::vector<std::unique_ptr<HudPanel>> panels;
   panels.reserve(pendingPanels().size());
-  for (const AbcUiPanelDesc &desc : pendingPanels())
-    panels.push_back(std::make_unique<ModulePanel>(desc));
+  for (const auto &entry : pendingPanels()) {
+    if (module_resources::enabled(entry.lifetime.owner()))
+      panels.push_back(
+          std::make_unique<ModulePanel>(entry.desc, entry.lifetime.owner()));
+  }
   return panels;
 }
 

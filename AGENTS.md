@@ -91,7 +91,7 @@ implemented rules the transition must keep:
   + `assets/` + a CMake `add_library(... MODULE)` target. Migrated so far:
   flashlight, textmenu, vote, motd, weaponchoose, killfeed, textfeed, sidetext,
   health, ammo, hudeffects, crosshair, damage, itemhighlight, playerboard,
-  radar, scoreboard and chat; `abcui.gameui` has every replacement menu
+  radar, scoreboard, spectator and chat; `abcui.gameui` has every replacement menu
   page (the shell, the console, the server browser, the connection
   surfaces, the vote creation, player-list, command-menu, inventory,
   create-game and settings pages, plus the display-mode confirmation and the

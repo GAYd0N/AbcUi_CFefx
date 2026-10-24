@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <format>
 #include <string>
 
 namespace {
@@ -95,11 +96,10 @@ void setHealth(int health) {
       dangerCvar ? Api->console->cvarValue(dangerCvar, 45.0f) : 45.0f;
   if (dangerValue > 0.0f && health < static_cast<int>(dangerValue)) {
     const float target = 1.0f - static_cast<float>(health) / dangerValue;
-    char opacity[32];
-    std::snprintf(opacity, sizeof(opacity), "%g", static_cast<double>(target));
+    const std::string opacity = std::format("{:g}", target);
     setElementProperty("danger", "display", "block");
     setElementProperty("danger", "transition", "opacity 0.2s linear-in");
-    setElementProperty("danger", "opacity", opacity);
+    setElementProperty("danger", "opacity", opacity.c_str());
   } else {
     setElementProperty("danger", "display", "none");
     setElementProperty("danger", "opacity", "0");
@@ -189,7 +189,7 @@ void panelOnData(void *, double frameTime) {
   }
   OldWaterStatus = waterlevel;
 
-  char alpha[32];
+  std::string alpha;
   switch (NowWaterType) {
   case WaterType::None:
     // Old SetWater(NONE): all three hidden outright.
@@ -202,9 +202,9 @@ void panelOnData(void *, double frameTime) {
     setElementProperty("left-water", "display", "none");
     setElementProperty("right-water", "display", "none");
     const double ratio = (ClientTimeNow - OutWaterStart) / kFadeTime;
-    std::snprintf(alpha, sizeof(alpha), "%g", std::min(1.0, ratio));
+    alpha = std::format("{:g}", std::min(1.0, ratio));
     setElementProperty("under-water", "display", "block");
-    setElementProperty("under-water", "opacity", alpha);
+    setElementProperty("under-water", "opacity", alpha.c_str());
     break;
   }
   case WaterType::OutWater: {
@@ -220,14 +220,14 @@ void panelOnData(void *, double frameTime) {
     const double elapsed = ClientTimeNow - OutWaterStart;
     const double splashAlpha = std::max(0.0, 1.0 - elapsed / kWaterKeepTime);
     const double underAlpha = std::max(0.0, 1.0 - elapsed / kFadeTime);
-    std::snprintf(alpha, sizeof(alpha), "%g", splashAlpha);
+    alpha = std::format("{:g}", splashAlpha);
     setElementProperty("left-water", "display", "block");
-    setElementProperty("left-water", "opacity", alpha);
+    setElementProperty("left-water", "opacity", alpha.c_str());
     setElementProperty("right-water", "display", "block");
-    setElementProperty("right-water", "opacity", alpha);
-    std::snprintf(alpha, sizeof(alpha), "%g", underAlpha);
+    setElementProperty("right-water", "opacity", alpha.c_str());
+    alpha = std::format("{:g}", underAlpha);
     setElementProperty("under-water", "display", "block");
-    setElementProperty("under-water", "opacity", alpha);
+    setElementProperty("under-water", "opacity", alpha.c_str());
     break;
   }
   }
@@ -267,10 +267,11 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->console || !api->data)
@@ -283,7 +284,7 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.hudeffects";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = &onModuleInit;
   out->onContextReady = nullptr;

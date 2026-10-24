@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/commandmenu.rcss"/>
 </head>
 <!-- In-game command menu: the RmlUi replacement for +commandmenu.
@@ -13,7 +13,7 @@
 <body id="menucommandmenu">
 	<div id="cm-shell">
 		<div id="cm-head">
-			<span id="cm-title">#CommandMenu_Title</span>
+			<span id="cm-title">#abcui.gameui/CommandMenu_Title</span>
 		</div>
 		<div id="cm-columns"></div>
 	</div>

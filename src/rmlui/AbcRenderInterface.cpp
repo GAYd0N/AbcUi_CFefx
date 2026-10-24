@@ -116,7 +116,7 @@ AbcRenderInterface::CompileGeometry(Rml::Span<const Rml::Vertex> vertices,
   if (vertices.empty() || indices.empty())
     return {};
 
-  auto geometry = new CompiledGeometry();
+  auto geometry = std::make_unique<CompiledGeometry>();
   // One-time bake (05 §8): colours un-premultiplied, indices widened -
   // RenderGeometry never repeats this work.
   geometry->Textured.resize(vertices.size());
@@ -133,7 +133,10 @@ AbcRenderInterface::CompileGeometry(Rml::Span<const Rml::Vertex> vertices,
   geometry->Indices.reserve(indices.size());
   for (const int index : indices)
     geometry->Indices.push_back(static_cast<uint32_t>(index));
-  return reinterpret_cast<Rml::CompiledGeometryHandle>(geometry);
+  const auto handle =
+      reinterpret_cast<Rml::CompiledGeometryHandle>(geometry.get());
+  Geometries.emplace(handle, std::move(geometry));
+  return handle;
 }
 
 void AbcRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry,
@@ -343,8 +346,8 @@ void AbcRenderInterface::registerExternalTexture(const Rml::String &uriPrefix,
   // a file/font texture still carries the same id (possible after a
   // frame-buffer regen recycles the GL texture name), releasing that record
   // would delete a texture the external owner now controls.
-  for (auto &[handle, record] : Textures) {
-    (void)handle;
+  for (auto &entry : Textures) {
+    TextureRecord &record = entry.second;
     if (record.Owned && record.Id == static_cast<int>(texture))
       record.Owned = false;
   }
@@ -363,13 +366,12 @@ void AbcRenderInterface::unregisterExternalTexture(
 }
 
 void AbcRenderInterface::ReleaseGeometry(Rml::CompiledGeometryHandle geometry) {
-  delete reinterpret_cast<CompiledGeometry *>(geometry);
+  Geometries.erase(geometry);
 }
 
 Rml::TextureHandle AbcRenderInterface::LoadTexture(Rml::Vector2i &dimensions,
                                                    const Rml::String &source) {
-  // engine:// lets package documents reference shared framework art by its
-  // absolute engine path; the rest of the chain below speaks plain paths.
+  // Explicit native game content, never shared framework UI resources.
   if (source.rfind("engine://", 0) == 0)
     return loadFileTexture(dimensions, source.substr(9));
   if (source.rfind("preview://", 0) == 0) {
@@ -380,7 +382,7 @@ Rml::TextureHandle AbcRenderInterface::LoadTexture(Rml::Vector2i &dimensions,
     if (!File)
       return 0;
     const auto Size = abc::g_pFileSystem->Size(File);
-    std::vector<unsigned char> Bytes;
+    std::vector<std::byte> Bytes;
     if (Size > 0 && Size <= framework::ResourceLimits::MaxFileBytes) {
       Bytes.resize(Size);
       if (abc::g_pFileSystem->Read(Bytes.data(), Size, File) !=
@@ -450,34 +452,17 @@ Rml::TextureHandle AbcRenderInterface::LoadTexture(Rml::Vector2i &dimensions,
     }
     return handle;
   }
-  if (source.rfind("tex://", 0) == 0) {
-    // Mod-relative file, straight alpha: the non-additive twin of texadd://.
-    // The scheme keeps Rml from joining the document directory, so markup
-    // composed in code (the additive glyph stacks) resolves from anywhere.
-    return loadFileTexture(dimensions, source.substr(6));
-  }
   if (source.rfind("mod://", 0) == 0) {
     // Module package image: resolve through the module VFS, decode from the
     // (zero-copy) entry view.
     return loadModuleTexture(dimensions, source, false);
   }
   if (source.rfind("modadd://", 0) == 0) {
-    // Additive twin of mod:// - the package-internal flavor of texadd://.
+    // Additive package-image twin of mod://.
     return loadModuleTexture(dimensions, "mod://" + source.substr(9), true);
   }
-  if (source.rfind("texadd://", 0) == 0) {
-    // Mod-relative file loaded additive (old kRenderTransAdd TGA panels -
-    // the pain indicator arc). Shares the FreeImage path below.
-    const Rml::TextureHandle handle =
-        loadFileTexture(dimensions, source.substr(9));
-    if (handle)
-      AdditiveTextures.insert(handle);
-    return handle;
-  }
-
-  // `source` is the RML-referenced path (Rml joins the document directory);
-  // resolve against the mod dir like every other abcui asset.
-  return loadFileTexture(dimensions, source);
+  // No implicit engine-path lookup and no legacy loose-resource schemes.
+  return 0;
 }
 
 Rml::TextureHandle
@@ -509,7 +494,7 @@ AbcRenderInterface::loadModuleTexture(Rml::Vector2i &dimensions,
     return 0;
   framework::ImageLoader::DecodedImage image;
   if (!framework::ImageLoader::loadFromMemory(
-          static_cast<const unsigned char *>(entry.data), entry.size, image))
+          {static_cast<const std::byte *>(entry.data), entry.size}, image))
     return 0;
   const int textureId =
       uploadSurfaceTexture(image.Pixels.data(), image.Width, image.Height);

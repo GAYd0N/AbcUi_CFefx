@@ -17,10 +17,14 @@
 //   - own the media clock: the caller feeds it the frame delta, the decoder
 //     answers whether the frame on screen must be refreshed.
 // It never uploads textures, never knows about Rml documents and never reads
-// the engine filesystem (paths are resolved by the caller).
+// the engine filesystem (package views are acquired by the caller).
 
 #include <memory>
 #include <string>
+
+namespace framework {
+struct PackageEntry;
+}
 
 namespace video {
 
@@ -39,11 +43,12 @@ public:
   Decoder(const Decoder &) = delete;
   Decoder &operator=(const Decoder &) = delete;
 
-  // Opens `path` (a filesystem path) and prepares an RGBA output of exactly
+  // Pins an immutable package entry and prepares an RGBA output of exactly
   // `outputWidth` x `outputHeight` (clamped to sane bounds). Re-opening
-  // replaces the previous file. Returns false and leaves error() set on
+  // replaces the previous view. Returns false and leaves error() set on
   // failure; the caller decides whether that is fatal for the document.
-  bool open(const char *path, int outputWidth, int outputHeight);
+  bool open(std::shared_ptr<const framework::PackageEntry> source,
+            int outputWidth, int outputHeight);
   void close();
   bool isOpen() const;
 

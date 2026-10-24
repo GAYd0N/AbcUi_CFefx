@@ -34,7 +34,7 @@ bool validDimensions(FIBITMAP *Bitmap) {
 // FreeImage reads through a FreeImageIO callback table; these adapters run
 // that interface over a plain memory span so buffers decode like files.
 struct MemoryStream {
-  const unsigned char *Data = nullptr;
+  const std::byte *Data = nullptr;
   std::size_t Size = 0;
   std::size_t Cursor = 0;
 };
@@ -219,7 +219,7 @@ bool loadFromFile(const char *path, DecodedImage &out) {
   out = DecodedImage();
   if (!path || !*path)
     return false;
-  std::vector<unsigned char> bytes;
+  std::vector<std::byte> bytes;
   if (!ResourceFile::read(path, bytes, ResourceLimits::MaxFileBytes))
     return false;
 
@@ -236,18 +236,18 @@ bool loadFromFile(const char *path, DecodedImage &out) {
   return loadStream(io, &stream, out, {}, FreeImage_GetFIFFromFilename(path));
 }
 
-bool loadFromMemory(const unsigned char *Data, std::size_t Size,
-                    DecodedImage &Output, const PaletteTransform &Transform) {
+bool loadFromMemory(std::span<const std::byte> Data, DecodedImage &Output,
+                    const PaletteTransform &Transform) {
   Output = DecodedImage();
-  if (!Data || Size == 0 || Size > ResourceLimits::MaxFileBytes)
+  if (Data.empty() || Data.size() > ResourceLimits::MaxFileBytes)
     return false;
   FreeImageIO io = {};
   io.read_proc = streamRead;
   io.seek_proc = streamSeek;
   io.tell_proc = streamTell;
   MemoryStream stream;
-  stream.Data = Data;
-  stream.Size = Size;
+  stream.Data = Data.data();
+  stream.Size = Data.size();
   return loadStream(io, &stream, Output, Transform);
 }
 

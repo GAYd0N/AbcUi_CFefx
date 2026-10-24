@@ -49,7 +49,7 @@
 	opacity: var(--abc-hud-flashlight-opacity);
 }
 
-/* The percentage is additive glyph ink (framework::glyphs): the ink and the
+/* The percentage is additive glyph ink (module-generated textures): the ink and the
    text fallback both follow the readout brightness. */
 #flashlight #message .glyph-ink {
 	opacity: var(--abc-hud-flashlight-opacity);

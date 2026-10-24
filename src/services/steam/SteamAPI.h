@@ -19,8 +19,9 @@
 // Every call is safe when Steam is absent (dedicated/uninitialized): values
 // degrade (0 / empty / false), nothing crashes.
 
-#include <string>
+#include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace steamapi {
 
@@ -54,5 +55,30 @@ struct AvatarRgba {
   int height = 0;
 };
 bool avatar(SteamId64 id, AvatarRgba &out);
+
+// Steam animated avatars (APNG). The equipped-profile surface is optional
+// (the flat SteamAPI_ISteamFriends_* exports are probed dynamically): an old
+// Steam runtime reports Unavailable and the caller keeps the static avatar.
+struct AvatarAnimation {
+  const unsigned char *bytes = nullptr;
+  std::size_t size = 0;
+};
+
+enum class AvatarAnimationState {
+  Unavailable, // no profile-item/HTTP surface on this runtime
+  None,        // profile answered: this user has no animated avatar
+  Pending,     // probe or download in flight; ask again later
+  Ready,       // bytes holds a complete APNG
+};
+
+// Poll one avatar's animated state. Does at most one throttled step per call
+// (request the equipped items, query the image URL, or poll the download), so
+// the HUD thread never blocks on Steam or the network. The returned bytes stay
+// valid until shutdown() or disconnect(); the avatar cache copies them.
+AvatarAnimationState animatedAvatar(SteamId64 id, AvatarAnimation &out);
+
+// Cancels an in-flight animation download (the scoreboard closed). Safe for
+// ids that are not downloading.
+void abandonAnimatedAvatar(SteamId64 id);
 
 } // namespace steamapi

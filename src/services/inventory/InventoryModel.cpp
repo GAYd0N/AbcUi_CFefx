@@ -30,15 +30,13 @@ void InventoryModel::add(const netmsg::InvItemData &data) {
 }
 
 void InventoryModel::remove(int id, int force) {
-  const auto removed = std::remove_if(
-      Items_.begin(), Items_.end(), [id, force](const Item &item) {
-        // Native MsgFunc_InvRemove: (id == 0 || id == item id) &&
-        // (item+0x06 == 0 || force != 0).
-        return (id == 0 || id == item.id) && (!item.removeLocked || force != 0);
-      });
-  if (removed == Items_.end())
+  const auto removed = std::erase_if(Items_, [id, force](const Item &item) {
+    // Native MsgFunc_InvRemove: (id == 0 || id == item id) &&
+    // (item+0x06 == 0 || force != 0).
+    return (id == 0 || id == item.id) && (!item.removeLocked || force != 0);
+  });
+  if (removed == 0)
     return;
-  Items_.erase(removed, Items_.end());
   if (Selected_ != 0 && !selected())
     Selected_ = 0;
   Revision_++;

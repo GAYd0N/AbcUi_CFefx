@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "id": "captions",
+  "label": "#abcui.gameui/Settings_PageCaptions",
+  "description": "#abcui.gameui/Settings_CaptionsHint",
+  "order": 31,
+  "components": [],
+  "sections": [
+    {
+      "id": "captions",
+      "label": "#abcui.gameui/Settings_SecSubtitles",
+      "components": []
+    }
+  ],
+  "items": [
+    {
+      "cvar": "cap_subtitle_prefix",
+      "label": "#abcui.gameui/Settings_cap_subtitle_prefix",
+      "section": "captions",
+      "kind": "bool",
+      "default": 0.0,
+      "requires": "cap_enabled",
+      "requiresEnabled": true
+    },
+    {
+      "cvar": "cap_subtitle_waitplay",
+      "label": "#abcui.gameui/Settings_cap_subtitle_waitplay",
+      "section": "captions",
+      "kind": "bool",
+      "default": 0.0,
+      "requires": "cap_enabled",
+      "requiresEnabled": true
+    },
+    {
+      "cvar": "cap_subtitle_antispam",
+      "label": "#abcui.gameui/Settings_cap_subtitle_antispam",
+      "section": "captions",
+      "kind": "bool",
+      "default": 1.0,
+      "requires": "cap_enabled",
+      "requiresEnabled": true
+    },
+    {
+      "cvar": "cap_subtitle_fadein",
+      "label": "#abcui.gameui/Settings_cap_subtitle_fadein",
+      "section": "captions",
+      "kind": "float",
+      "default": 0.3,
+      "requires": "cap_enabled",
+      "requiresEnabled": true
+    },
+    {
+      "cvar": "cap_subtitle_fadeout",
+      "label": "#abcui.gameui/Settings_cap_subtitle_fadeout",
+      "section": "captions",
+      "kind": "float",
+      "default": 0.3,
+      "requires": "cap_enabled",
+      "requiresEnabled": true
+    },
+    {
+      "cvar": "cap_subtitle_holdtime",
+      "label": "#abcui.gameui/Settings_cap_subtitle_holdtime",
+      "section": "captions",
+      "kind": "float",
+      "default": 10.0,
+      "requires": "cap_enabled",
+      "requiresEnabled": true
+    },
+    {
+      "cvar": "cap_subtitle_htimescale",
+      "label": "#abcui.gameui/Settings_cap_subtitle_htimescale",
+      "section": "captions",
+      "kind": "float",
+      "default": 1.0,
+      "requires": "cap_enabled",
+      "requiresEnabled": true
+    },
+    {
+      "cvar": "cap_subtitle_stimescale",
+      "label": "#abcui.gameui/Settings_cap_subtitle_stimescale",
+      "section": "captions",
+      "kind": "float",
+      "default": 1.0,
+      "requires": "cap_enabled",
+      "requiresEnabled": true
+    },
+    {
+      "cvar": "cap_subtitle_extraholdtime",
+      "label": "#abcui.gameui/Settings_cap_subtitle_extraholdtime",
+      "section": "captions",
+      "kind": "float",
+      "default": 0.0,
+      "requires": "cap_enabled",
+      "requiresEnabled": true
+    }
+  ]
+}

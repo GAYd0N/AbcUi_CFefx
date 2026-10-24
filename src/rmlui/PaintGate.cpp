@@ -9,9 +9,13 @@
 #include <abc/GameData.h>
 #include <abc/Plugin.h>
 
+#include <abcui/events.h>
+
+#include "../modsys/EventBus.h"
 #include "../services/GameUiBridge.h"
 
 #include <Windows.h>
+#include <cstring>
 
 namespace rmlui {
 
@@ -51,12 +55,46 @@ void clearNativeInput(vgui::VPANEL panel, uint32_t &cleared) {
     clearNativeInput(Panel->GetChild(panel, i), cleared);
 }
 
+bool childNamed(vgui::VPANEL parent, int children, const char *name) {
+  for (int i = 0; i < children; ++i) {
+    const char *child = Panel->GetName(Panel->GetChild(parent, i));
+    if (child && std::strcmp(child, name) == 0)
+      return true;
+  }
+  return false;
+}
+
+// The client viewport's observer bottom bar. It is not in the gHUD chain and
+// has no gamedata symbol; its three labels keep the constructor names across
+// client builds (SpectatorPanel::Initialize), so the child names are the
+// stable identity. Checked per traversal: the panel is recreated on a client
+// VidInit, and a cached VPANEL would then be stale.
+bool nativeSpectatorPanel(vgui::VPANEL panel) {
+  if (!Panel || !panel)
+    return false;
+  const int children = Panel->GetChildCount(panel);
+  if (children != 5)
+    return false;
+  return childNamed(panel, children, "Health: 100") &&
+         childNamed(panel, children, "Armor: 100") &&
+         childNamed(panel, children, "Spectator Bottom");
+}
+
 // The selective paint filter. No IsVisible/IsPopup reads (the original's own
 // decision logic stays untouched for everything allowed); the module string
 // is the whole rule and must match the install-reported identities exactly
 // (T02 §6: "GameUI" / "ServerBrowser"; never "GAMEUIDLL").
 void __fastcall H_PaintTraverse(void *pthis, int dummy, vgui::VPANEL vguiPanel,
                                 bool forceRepaint, bool allowForce) {
+  // The observer overlay is a client VGUI child, not a GameUI module panel:
+  // it yields to the same per-element claim as the gHUD list (the module
+  // returns zero while its replacement document is unavailable).
+  if (nativeSpectatorPanel(vguiPanel)) {
+    const AbcUiNativeHudEvent event{ABCUI_NATIVE_HUD_SPECTATOR};
+    if (framework::eventBus().publishVeto(ABCUI_CHANNEL_HUD_NATIVE_DRAW,
+                                          event))
+      return;
+  }
   const char *module = Panel ? Panel->GetModuleName(vguiPanel) : nullptr;
   if (services::nativeUiBridge().gatePaintAttempt(module)) {
     uint32_t cleared = 0;
@@ -185,7 +223,7 @@ void installPaintGate() {
   Installed = true;
   services::nativeUiBridge().arm();
   abc::ConsolePrint("[AbcUi] paint gate: installed (IPanel gamedata slots; "
-                    "native UI suppression armed)\n");
+                    "suppression requires module takeover)\n");
 }
 
 void uninstallPaintGate() {

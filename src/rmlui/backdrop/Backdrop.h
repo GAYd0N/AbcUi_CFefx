@@ -89,7 +89,5 @@ private:
 Backdrop &menuBackdrop();
 
 // Default background movie (shipped with the AbcEnchance assets).
-constexpr const char *kDefaultVideoSource =
-    "abc/abcui/gameui/scence/video/trainstation.mp4";
 
 } // namespace menubackdrop

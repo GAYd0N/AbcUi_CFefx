@@ -433,11 +433,4 @@ bool DefinitionParser::parsePage(const std::string &Text,
   }
 }
 
-MenuDefinition DefinitionParser::fallbackMenu() {
-  MenuDefinition Result;
-  Result.Main = {{"main-quit", "#MainMenu_Quit", "quit"}};
-  Result.Pause = {{"pause-resume", "#MainMenu_Resume", "resume"},
-                  {"pause-quit", "#MainMenu_Quit", "quit"}};
-  return Result;
-}
 } // namespace services::uiconfig

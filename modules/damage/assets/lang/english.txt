@@ -1,0 +1,14 @@
+abcui.damage/DMGTiles_Poison = Poison
+abcui.damage/DMGTiles_Acid = Acid
+abcui.damage/DMGTiles_Freeze = Freeze
+abcui.damage/DMGTiles_Drown = Drown
+abcui.damage/DMGTiles_Burn = Burn
+abcui.damage/DMGTiles_Gas = Gas
+abcui.damage/DMGTiles_Radiation = Radiation
+abcui.damage/DMGTiles_Shock = Shock
+abcui.damage/DMGTiles_Energybeam = Beam
+abcui.damage/DMGTiles_Sonic = Sonic
+abcui.damage/PopNumber_O = {0}
+abcui.damage/PopNumber_K = {0}K
+abcui.damage/PopNumber_M = {0}M
+abcui.damage/PopNumber_B = {0}B

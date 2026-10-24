@@ -1,0 +1,14 @@
+<rml>
+<head>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/ime.rcss"/>
+</head>
+<!-- IME overlay: the composition header and the candidate page, drawn by
+     rmlui::ime at the caret. The composing string itself stays inline in the
+     focused editor (RmlUi underlines it); this panel carries what the engine
+     has no renderer for. Rows are built by the module (escaped server/IME
+     text), never by the document. -->
+<body id="ime">
+	<div id="ime-panel"></div>
+</body>
+</rml>

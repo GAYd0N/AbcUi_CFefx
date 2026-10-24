@@ -1,0 +1,14 @@
+{
+  "id": "abcui.mediaplayer",
+  "name": "Media Player",
+  "description": "RmlUi replacement for the client's Sven Co-op Media Player window: engine mp3 transport, playlist, volume and progress (issue 11).",
+  "author": "DrAbc",
+  "version": "1.0.0",
+  "abi": 2,
+  "minAbcUi": "0.9.0",
+  "entry": "entry/abcui_mediaplayer.dll",
+  "dependencies": [
+    "abcui.base"
+  ],
+  "conflicts": []
+}

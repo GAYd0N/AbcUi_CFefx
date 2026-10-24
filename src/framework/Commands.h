@@ -1,29 +1,27 @@
 #pragma once
 
-// framework::commands - the chained command bus (batch C). The old
-// src/core/events/command.cpp hooked slot1..10, missionbriefing, invnext,
-// invprev, +/-showscores, votemenu and +attack with HOOK_COMMAND wrappers;
-// here every hooked command is one abc::CChainedCommand instance and panels
-// subscribe its Event() with the bool-consume callback shape. Instances are
-// plugin-lifetime (fixed slot table in abc/Events.h) and must be created at
-// HUD_Init - registerAll() from PanelManager::registerPanelCvars.
-//
-// TextMenu created slot1..10 locally in batch A; batch C moves them here so
-// WeaponChoose/Scoreboard subscribe the same instances instead of double-
-// hooking the commands (a second HOOK_COMMAND on one name would shadow).
+// Process-owned engine command bridges, installed on explicit module request.
+// Module subscriptions and callback ownership live in EventBus. Bridges remain
+// inert pass-throughs after their handlers are revoked, so other plugins may
+// safely retain a bridge thunk as their predecessor.
 
-#include <abc/Events.h>
+#include <abcui/module_api.h>
 
 namespace commands {
 
-// Creates every chained command instance (idempotent; HUD_Init time only).
-void registerAll();
+// Main-thread, module-owned subscription to any existing callback-backed
+// engine command. No name whitelist, fixed slot count or init-only restriction.
+// Returns zero on refusal. Revoke through events->unsubscribe.
+AbcUiSubscription subscribe(const char *name, int priority, AbcUiEventVeto sink,
+                            void *userdata);
 
-// The instance for a hooked command ("slot3", "+showscores", ...); nullptr
-// when the name is not on the bus (typo guard).
-abc::CChainedCommand *get(const char *name);
-// Convenience: the slotN chain for a zero-based slot index.
-abc::CChainedCommand *slotCommand(int index);
+// Moves an already-subscribed bridge to the head of the engine's command
+// chain and remembers the displaced handler as its upstream link. Returns 1
+// when the bridge is at the head, 0 when there is no bridge/engine callback
+// or the bridge is currently dispatching. The outermost link publishes once;
+// when no sink consumed the command it forwards to the displaced handler.
+// Main thread only.
+int32_t ensureFirst(const char *name);
 
 } // namespace commands
 

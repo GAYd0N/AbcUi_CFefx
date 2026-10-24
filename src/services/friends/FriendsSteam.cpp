@@ -20,6 +20,7 @@
 #include "../steam/RuntimeAccess.h"
 
 #include <cstdio>
+#include <format>
 
 namespace services::friends {
 
@@ -54,10 +55,8 @@ std::string normalizeAddress(const char *text) {
 std::string addressFromGameInfo(uint32 ip, uint16 port) {
   if (ip == 0 || port == 0)
     return {};
-  char text[32];
-  std::snprintf(text, sizeof(text), "%u.%u.%u.%u:%u", (ip >> 24) & 0xFF,
-                (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF, port);
-  return text;
+  return std::format("{}.{}.{}.{}:{}", (ip >> 24) & 0xFF, (ip >> 16) & 0xFF,
+                     (ip >> 8) & 0xFF, ip & 0xFF, port);
 }
 
 } // namespace

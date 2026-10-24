@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <format>
 #include <string>
 
 namespace {
@@ -120,11 +121,9 @@ void applyVital(const char *labelId, const char *barId, const char *iconId,
   // additive sprite. The danger rule retints both.
   if (AbcUiElement *bar = Api->ui->querySelector(doc, barId)) {
     const float pct = std::clamp(value / 100.0f, 0.0f, 1.0f);
-    char width[32];
-    std::snprintf(width, sizeof(width), "%gdp",
-                  static_cast<double>(pct * kBarWidth));
+    const std::string width = std::format("{:g}dp", pct * kBarWidth);
     Api->ui->elementSetProperty(bar, "background-color", color.c_str());
-    Api->ui->elementSetProperty(bar, "width", width);
+    Api->ui->elementSetProperty(bar, "width", width.c_str());
   }
   if (AbcUiElement *icon = Api->ui->querySelector(doc, iconId))
     Api->ui->elementSetProperty(icon, "image-color", color.c_str());
@@ -201,7 +200,15 @@ void panelReset(void *) {
 
 // ---- lifecycle ----
 
+int onNativeHudDraw(void *, const void *payload) {
+  const auto *event = static_cast<const AbcUiNativeHudEvent *>(payload);
+  return panelDocument() && (event->element == ABCUI_NATIVE_HUD_HEALTH ||
+                             event->element == ABCUI_NATIVE_HUD_BATTERY);
+}
+
 void onModuleLoad() {
+  Api->events->subscribeVeto(ABCUI_CHANNEL_HUD_NATIVE_DRAW, 0, &onNativeHudDraw,
+                             nullptr);
   Panel.structSize = sizeof(Panel);
   Panel.name = kPanelName;
   Panel.documentPath = kDocumentPath;
@@ -235,10 +242,11 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->console || !api->data)
@@ -250,7 +258,7 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.health";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = &onModuleInit;
   out->onContextReady = nullptr;

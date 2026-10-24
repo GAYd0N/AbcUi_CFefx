@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
 </head>
 <!-- The menu home (UI overhaul WS4). The blurred backdrop is inserted by
@@ -17,7 +17,7 @@
 <body id="mainmenu">
 	<div id="menu-header">
 		<div id="menu-brand">Sven Co-op</div>
-		<div id="title">#MainMenu_Title</div>
+		<div id="title">#abcui.gameui/MainMenu_Title</div>
 	</div>
 
 	<div id="menu-nav">
@@ -49,7 +49,7 @@
 	</div>
 
 	<div id="friends-panel" class="abc-panel">
-		<div id="friends-title" class="abc-sectitle">#MainMenu_Friends</div>
+		<div id="friends-title" class="abc-sectitle">#abcui.gameui/MainMenu_Friends</div>
 		<div id="friends-list"></div>
 	</div>
 
@@ -57,7 +57,7 @@
 	     page positions it at the click point and hides it again on any click
 	     that does not land on it. -->
 	<div id="friend-menu">
-		<div id="friend-menu-join" class="friend-menu-entry" data-action="friend-join">#MainMenu_FriendJoin</div>
+		<div id="friend-menu-join" class="friend-menu-entry" data-action="friend-join">#abcui.gameui/MainMenu_FriendJoin</div>
 	</div>
 
 	<div id="menu-footer">

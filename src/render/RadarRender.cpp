@@ -40,33 +40,12 @@ bool Active = false;
 bool Started = false;
 float Zoom = 2.5f;
 
-// Square/round mask texture ids (old m_iRadarMaskId/m_iRadarRoundMaskId),
-// uploaded through the VGUI surface channel; MaskSelect is the live slot the
-// render interface reads at draw time (D-19: shape toggles need no reload).
-int MaskSquare = 0;
-int MaskRound = 0;
-int MaskSelect = -1;
+// The module uploads and selects its own mask texture.
+int MaskSelect = 0;
 
 // The map URI generation: bumped whenever the registered handle changes
 // (registration time + frame-buffer regeneration).
 int MapGeneration = 0;
-
-void loadMaskTextures() {
-  if (MaskSquare || MaskRound || !vgui2ext::available())
-    return;
-  const auto upload = [](const char *path) -> int {
-    ImageLoader::DecodedImage image;
-    if (!ImageLoader::loadFromFile(path, image))
-      return 0;
-    const int id = vgui2ext::createTexture();
-    if (!id)
-      return 0;
-    vgui2ext::uploadTexture(id, image.Pixels.data(), image.Width, image.Height);
-    return id;
-  };
-  MaskSquare = upload("abc/abcui/hud/img/radar/radar_mask.png");
-  MaskRound = upload("abc/abcui/hud/img/radar/radar_roundmask.png");
-}
 
 void createFbo() {
   IMetaRenderer *renderer = abc::MetaRenderer();
@@ -243,7 +222,6 @@ void startProducer() {
   Started = true;
   if (IMetaRenderer *renderer = abc::MetaRenderer())
     renderer->RegisterRenderCallbacks(&Callbacks);
-  loadMaskTextures();
   createFbo();
   registerExternal();
 }
@@ -255,8 +233,13 @@ void setActive(bool active) {
   Active = active;
 }
 
-void setMaskRound(bool round) {
-  MaskSelect = round ? MaskRound : MaskSquare;
+void setMask(int textureId) {
+  MaskSelect = textureId;
+}
+
+void forgetMask(int textureId) {
+  if (MaskSelect == textureId)
+    MaskSelect = 0;
 }
 
 void setZoom(float zoom) {

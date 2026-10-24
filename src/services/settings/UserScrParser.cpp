@@ -83,7 +83,7 @@ bool SettingsModel::parseUserScr(const char *text, UserScrTable &out) {
     }
   }
 
-  enum State {
+  enum class State {
     SeekDescription,  // before the DESCRIPTION token
     SeekOpenBrace,    // after DESCRIPTION, waiting for the block '{'
     EntryCvar,        // next quoted token is the entry cvar
@@ -94,7 +94,7 @@ bool SettingsModel::parseUserScr(const char *text, UserScrTable &out) {
     DefaultBlockOpen, // waiting for the default block '{'
     DefaultBlock,     // inside { default }
   };
-  State state = SeekDescription;
+  State state = State::SeekDescription;
   std::string token;
   bool quoted = false;
   std::string cvar, prompt, type, defaultValue;
@@ -166,17 +166,17 @@ bool SettingsModel::parseUserScr(const char *text, UserScrTable &out) {
   while (scrToken(p, token, quoted)) {
     if (token == "{") {
       switch (state) {
-      case SeekOpenBrace:
-        state = EntryCvar;
+      case State::SeekOpenBrace:
+        state = State::EntryCvar;
         break;
-      case EntryBlockOpen:
-        state = EntryPrompt;
+      case State::EntryBlockOpen:
+        state = State::EntryPrompt;
         break;
-      case TypeBlockOpen:
-        state = TypeBlock;
+      case State::TypeBlockOpen:
+        state = State::TypeBlock;
         break;
-      case DefaultBlockOpen:
-        state = DefaultBlock;
+      case State::DefaultBlockOpen:
+        state = State::DefaultBlock;
         break;
       default:
         break; // no nested blocks in the grammar; ignore extras
@@ -185,57 +185,57 @@ bool SettingsModel::parseUserScr(const char *text, UserScrTable &out) {
     }
     if (token == "}") {
       switch (state) {
-      case TypeBlock:
+      case State::TypeBlock:
         if (type == "NUMBER") {
           numberMin = numberParts.size() >= 1 ? numberParts[0] : 0.0f;
           numberMax = numberParts.size() >= 2 ? numberParts[1] : 0.0f;
         }
-        state = DefaultBlockOpen;
+        state = State::DefaultBlockOpen;
         break;
-      case DefaultBlock:
+      case State::DefaultBlock:
         storeRow();
         resetEntry();
-        state = EntryCvar;
+        state = State::EntryCvar;
         break;
-      case EntryCvar:
-      case EntryBlockOpen:
-      case TypeBlockOpen:
-      case DefaultBlockOpen:
+      case State::EntryCvar:
+      case State::EntryBlockOpen:
+      case State::TypeBlockOpen:
+      case State::DefaultBlockOpen:
         // A block closed early: drop the partial entry, resync to
         // the description block (entries may follow).
         resetEntry();
-        state = EntryCvar;
+        state = State::EntryCvar;
         break;
       default:
         break;
       }
       continue;
     }
-    if (state == SeekDescription) {
+    if (state == State::SeekDescription) {
       if (token == "DESCRIPTION")
-        state = SeekOpenBrace;
+        state = State::SeekOpenBrace;
       continue;
     }
-    if (state == SeekOpenBrace)
+    if (state == State::SeekOpenBrace)
       continue; // the description token ("INFO_OPTIONS")
     switch (state) {
-    case EntryCvar:
+    case State::EntryCvar:
       if (quoted) {
         cvar = token;
-        state = EntryBlockOpen;
+        state = State::EntryBlockOpen;
       }
       break;
-    case EntryBlockOpen:
+    case State::EntryBlockOpen:
       break; // tolerate stray tokens before the block brace
-    case EntryPrompt:
+    case State::EntryPrompt:
       if (quoted) {
         prompt = token;
-        state = TypeBlockOpen;
+        state = State::TypeBlockOpen;
       }
       break;
-    case TypeBlockOpen:
+    case State::TypeBlockOpen:
       break;
-    case TypeBlock:
+    case State::TypeBlock:
       if (type.empty()) {
         type = token;
       } else if (type == "LIST") {
@@ -259,7 +259,7 @@ bool SettingsModel::parseUserScr(const char *text, UserScrTable &out) {
           numberParts.push_back(number);
       }
       break;
-    case DefaultBlock:
+    case State::DefaultBlock:
       if (quoted && defaultValue.empty())
         defaultValue = token;
       break;

@@ -30,10 +30,10 @@
 
 #pragma comment(lib, "dbghelp.lib")
 
-#define ABC_UI_STACK_FRAMES 16
+constexpr unsigned int kStackFrames = 16;
 
-int debugAssertReportHook(int reportType, char *message, int *returnValue) {
-  (void)reportType;
+int debugAssertReportHook([[maybe_unused]] int reportType, char *message,
+                          int *returnValue) {
   abc::ConsolePrint("[AbcUi][crt] %s\n", message ? message : "(no message)");
 
   // The same lines to a file: this assert class fail-fasts after the hook
@@ -46,9 +46,8 @@ int debugAssertReportHook(int reportType, char *message, int *returnValue) {
   if (trace)
     fprintf(trace, "=== %s", message ? message : "(no message)");
 
-  void *frames[ABC_UI_STACK_FRAMES] = {};
-  const WORD count =
-      RtlCaptureStackBackTrace(1, ABC_UI_STACK_FRAMES, frames, nullptr);
+  void *frames[kStackFrames] = {};
+  const WORD count = RtlCaptureStackBackTrace(1, kStackFrames, frames, nullptr);
   static bool symbolsReady = []() {
     return SymInitialize(GetCurrentProcess(), nullptr, TRUE);
   }();

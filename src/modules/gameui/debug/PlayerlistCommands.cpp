@@ -6,6 +6,7 @@
 #include "modules/gameui/GameUiModule.h"
 #include "DebugCommands.h"
 #include <abc/Console.h>
+#include <abc/Parse.h>
 #include <abc/Plugin.h>
 #include <cstdlib>
 namespace gameui {
@@ -42,7 +43,7 @@ void DebugCommands::playerListSelectCommand() {
     return;
   }
   GameUiModule &self = *currentModule();
-  const int index = atoi(gEngfuncs.Cmd_Argv(1));
+  const int index = abc::ParseInt(gEngfuncs.Cmd_Argv(1)).value_or(-1);
   self.PlayerList.refresh();
   for (const auto &entry : self.PlayerList.roster()) {
     if (entry.index != index)

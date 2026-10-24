@@ -1,0 +1,14 @@
+abcui.damage/DMGTiles_Poison = intoxicación
+abcui.damage/DMGTiles_Acid = erosión ácida
+abcui.damage/DMGTiles_Freeze = congelación
+abcui.damage/DMGTiles_Drown = asfixia
+abcui.damage/DMGTiles_Burn = Quemaduras
+abcui.damage/DMGTiles_Gas = Envenenamiento
+abcui.damage/DMGTiles_Radiation = Radiación
+abcui.damage/DMGTiles_Shock = Choque eléctrico
+abcui.damage/DMGTiles_Energybeam = Láser
+abcui.damage/DMGTiles_Sonic = Ruido
+abcui.damage/PopNumber_O = {0}
+abcui.damage/PopNumber_K = {0} mil
+abcui.damage/PopNumber_M = {0} millones
+abcui.damage/PopNumber_B = {0} 100 millones

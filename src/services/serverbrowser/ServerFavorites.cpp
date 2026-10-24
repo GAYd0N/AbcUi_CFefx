@@ -3,14 +3,13 @@
 #include "ServerFavorites.h"
 
 #include <cstdio>
+#include <format>
 
 namespace services::serverbrowser {
 
 std::string formatServerIp(uint32_t ip) {
-  char buffer[24];
-  std::snprintf(buffer, sizeof(buffer), "%u.%u.%u.%u", ip >> 24,
-                (ip >> 16) & 0xff, (ip >> 8) & 0xff, ip & 0xff);
-  return buffer;
+  return std::format("{}.{}.{}.{}", ip >> 24, (ip >> 16) & 0xff,
+                     (ip >> 8) & 0xff, ip & 0xff);
 }
 
 std::string buildConnectAddress(const ServerEntry &entry) {

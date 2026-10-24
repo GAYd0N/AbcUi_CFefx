@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <span>
+
 // framework::ImageLoader - FreeImage-backed multi-format image decoding
 // (PNG/JPG/TGA/BMP/... and everything else the pinned FreeImage_clone reads).
 // Feeds every AbcUi texture source that starts as an encoded image file or
@@ -68,8 +71,7 @@ bool loadFromFile(const char *path, DecodedImage &out);
 
 // Same contract for an in-memory buffer (data already pulled through another
 // channel). Format detection runs on the leading bytes.
-bool loadFromMemory(const unsigned char *Data, std::size_t Size,
-                    DecodedImage &Output,
+bool loadFromMemory(std::span<const std::byte> Data, DecodedImage &Output,
                     const PaletteTransform &Transform = {});
 
 // Bilinear resize to exactly Width x Height (FreeImage's default filter, the

@@ -29,24 +29,7 @@ void show() {
   if (!Context)
     return;
   close();
-  Document = Context->LoadDocumentFromMemory(R"(
-<rml><head><style>
-body { position:absolute; left:20px; top:40px; width:1000px; height:560px;
- background-color:#0d1114; color:#ffffff; font-family:Verdana; font-size:16px;
- padding:12px; z-index:2000; }
-video { display:inline-block; width:660px; height:360px; margin:6px; overflow:hidden; position:relative;
- border:1px #3a4148; background-color:#000000; }
-video#small { width:300px; height:180px; }
-div { display:block; }
-.row { display:flex; align-items:flex-start; }
-</style></head><body id="video-test">
-<div>Video element: abc/abcui/gameui/scence/video/trainstation.mp4 (loop, cover)</div>
-<div class="row">
-<video id="main" src="abc/abcui/gameui/scence/video/trainstation.mp4" fit="cover" loop="true"/>
-<video id="small" src="abc/abcui/gameui/scence/video/viewport.mp4" fit="contain" loop="true"/>
-</div>
-<div>abc_ui_video_test hide | status | set id attribute value | src id path</div>
-</body></rml>)");
+  Document = Context->LoadDocument("mod://abcui.gameui/debug/videotest.rml");
   if (Document)
     Document->Show();
 }

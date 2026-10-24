@@ -2,6 +2,9 @@
 // definition and its engine facts). See ApiTable.h for how it joins the
 // module table.
 #include "ApiTable.h"
+#include "ModuleVfs.h"
+#include "ModuleResources.h"
+#include "ApiSnapshot.h"
 
 #include <algorithm>
 #include <cstring>
@@ -65,10 +68,7 @@ int32_t apiEntryAt(int32_t section, int32_t index, AbcUiMenuConfigEntry *out) {
   copyText(entry.Condition, full.condition, sizeof(full.condition));
 
   // The caller's declared size wins: never write past an older header.
-  const uint32_t declared = out->structSize == 0
-                                ? static_cast<uint32_t>(sizeof(full))
-                                : out->structSize;
-  std::memcpy(out, &full, std::min<size_t>(declared, sizeof(full)));
+  abi::copySnapshot(out, full);
   return 1;
 }
 
@@ -90,10 +90,7 @@ int32_t apiPlayerCard(AbcUiPlayerCard *out) {
   copyText(modelPath, full.modelPath, sizeof(full.modelPath));
   copyText(modelLabel, full.modelLabel, sizeof(full.modelLabel));
 
-  const uint32_t declared = out->structSize == 0
-                                ? static_cast<uint32_t>(sizeof(full))
-                                : out->structSize;
-  std::memcpy(out, &full, std::min<size_t>(declared, sizeof(full)));
+  abi::copySnapshot(out, full);
   return 1;
 }
 
@@ -107,8 +104,27 @@ int32_t apiBuildNote(char *out, uint32_t outSize) {
   return static_cast<int32_t>(note.size());
 }
 
+int32_t apiSetResourceRoot(const char *uri) {
+  const auto owner = module_resources::current();
+  if (!uri || !owner || !owner->initializing || !module_resources::accepting())
+    return ABCUI_ERROR_FORBIDDEN;
+  std::string root;
+  if (!ModuleVfs::resolve({}, std::string(uri) + "/_", root) ||
+      !root.starts_with("mod://" + owner->id + "/"))
+    return ABCUI_ERROR_INVALID;
+  root.resize(root.size() - 2);
+  static module_resources::Registration lifetime;
+  if (lifetime.tracked())
+    return ABCUI_ERROR_FORBIDDEN;
+  lifetime = module_resources::Registration{};
+  services::uiconfig::setResourceRoot(std::move(root));
+  lifetime.track([] { services::uiconfig::setResourceRoot({}); });
+  return ABCUI_OK;
+}
+
 const AbcUiMenuConfigApi kMenuConfigApi = {
     sizeof(AbcUiMenuConfigApi),
+    apiSetResourceRoot,
     apiTitle,
     apiEntryCount,
     apiEntryAt,

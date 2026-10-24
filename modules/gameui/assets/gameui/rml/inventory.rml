@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/inventory.rcss"/>
 </head>
 <!-- Inventory window: the RmlUi replacement for the client's VGUI
@@ -25,37 +25,37 @@
 		<div id="inv-window-bg"></div>
 		<div id="inv-header">
 			<div id="inv-eyebrow">Sven Co-op</div>
-			<div id="inv-title">#Invmenu_Topcaption</div>
+			<div id="inv-title">#abcui.gameui/Invmenu_Topcaption</div>
 			<button id="inv-close" data-action="inv-close">×</button>
 		</div>
 
 		<div id="inv-list-panel">
 			<div id="inv-list-head">
-				<span id="inv-list-label">#Invmenu_ListHead</span>
+				<span id="inv-list-label">#abcui.gameui/Invmenu_ListHead</span>
 				<span id="inv-count">0</span>
 			</div>
 			<div id="inv-list-wrap">
 				<div id="inv-list" tab-index="auto"></div>
 				<div id="inv-empty">
-					<div id="inv-empty-title">#Invmenu_NoInventory</div>
-					<div id="inv-empty-hint">#Invmenu_EmptyHint</div>
+					<div id="inv-empty-title">#abcui.gameui/Invmenu_NoInventory</div>
+					<div id="inv-empty-hint">#abcui.gameui/Invmenu_EmptyHint</div>
 				</div>
 			</div>
 		</div>
 
 		<div id="inv-detail-panel">
-			<div id="inv-detail-head">#Invmenu_Details</div>
+			<div id="inv-detail-head">#abcui.gameui/Invmenu_Details</div>
 			<div id="inv-detail-body">
-				<div id="inv-name">#Invmenu_NoItemSelected</div>
+				<div id="inv-name">#abcui.gameui/Invmenu_NoItemSelected</div>
 				<div id="inv-detail-rule"></div>
-				<div id="inv-desc">#Invmenu_NoItemSelected</div>
+				<div id="inv-desc">#abcui.gameui/Invmenu_NoItemSelected</div>
 			</div>
 			<div id="inv-tags">
-				<span id="inv-tag-usable" class="inv-tag">#Invmenu_Usable</span>
+				<span id="inv-tag-usable" class="inv-tag">#abcui.gameui/Invmenu_Usable</span>
 				<span id="inv-tag-droppable"
-					class="inv-tag">#Invmenu_Droppable</span>
+					class="inv-tag">#abcui.gameui/Invmenu_Droppable</span>
 			</div>
-			<div id="inv-select-hint">#Invmenu_SelectHint</div>
+			<div id="inv-select-hint">#abcui.gameui/Invmenu_SelectHint</div>
 		</div>
 
 		<div id="inv-footer-rule"></div>
@@ -65,11 +65,11 @@
 		     the right, where the primary action is easiest to reach. -->
 		<div id="inv-actions">
 			<button id="inv-dropall" class="inv-ghost-danger"
-				data-action="inv-dropall">#Invmenu_DropAll</button>
+				data-action="inv-dropall">#abcui.gameui/Invmenu_DropAll</button>
 			<button id="inv-drop" class="inv-secondary"
-				data-action="inv-drop">#Invmenu_Drop</button>
+				data-action="inv-drop">#abcui.gameui/Invmenu_Drop</button>
 			<button id="inv-activate" class="inv-primary"
-				data-action="inv-activate">#Invmenu_Activate</button>
+				data-action="inv-activate">#abcui.gameui/Invmenu_Activate</button>
 		</div>
 	</div>
 </body>

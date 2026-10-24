@@ -77,13 +77,9 @@ public:
   // The context exists; re-fired after every shutdown cycle (map change /
   // reconnect), because module documents die with each context and must be
   // rebuilt.
-  virtual void onContextReady(Rml::Context *context) {
-    (void)context;
-  }
+  virtual void onContextReady([[maybe_unused]] Rml::Context *context) {}
   // HUD_Frame, after the panel data pump, before Context::Update.
-  virtual void onFrame(double frameTime) {
-    (void)frameTime;
-  }
+  virtual void onFrame([[maybe_unused]] double frameTime) {}
   // HUD_VidInit, after the context resize and the panel resets.
   virtual void onVidInit() {}
   // While the context is still alive: release everything the module owns

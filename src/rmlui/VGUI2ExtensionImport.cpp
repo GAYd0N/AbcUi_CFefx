@@ -112,26 +112,23 @@ public:
   int GetAltitude() const override {
     return 0;
   }
-  void Initialize(CreateInterfaceFn *factories, int count) override {
-    (void)factories;
-    (void)count;
+  void Initialize([[maybe_unused]] CreateInterfaceFn *factories,
+                  [[maybe_unused]] int count) override {
     // T08 step 1: the earliest proven install point (T02 §5: ~1.3s
     // before the first native paint). The gate arms itself only after
     // the IPanel hooks are verified in place; an unsupportable binary
     // stops here (SysError) instead of running with the old UI.
     rmlui::installPaintGate();
   }
-  void Start(struct cl_enginefuncs_s *engineFuncs,
-             int interfaceVersion) override {
-    (void)engineFuncs;
-    (void)interfaceVersion;
-  }
+  void Start([[maybe_unused]] struct cl_enginefuncs_s *engineFuncs,
+             [[maybe_unused]] int interfaceVersion) override {}
   void Shutdown() override {
     // Deliberately empty: at BaseUI::Shutdown vgui2 is already gone
     // (hook-contract §9). The IPanel hooks come down in the GameUI
     // Shutdown notification instead.
   }
-  void Key_Event(int &down, int &keynum, const char *&pszCurrentBinding,
+  void Key_Event(int &down, int &keynum,
+                 [[maybe_unused]] const char *&pszCurrentBinding,
                  VGUI2Extension_CallbackContext *CallbackContext) override {
     // This is the seam through which the engine asks the UI layer whether it
     // consumed a key (CBaseUI::Key_Event). It is how the native chat entry
@@ -146,7 +143,6 @@ public:
     // pair cleanly) are left to the engine: no SUPERCEDE, no synthetic
     // release. rmlui::routeKey de-duplicates the two seams that can deliver
     // one physical edge, so the editor never sees a doubled keystroke.
-    (void)pszCurrentBinding;
     services::nativeUiBridge().noteBaseUiKeyEvent();
     if (CallbackContext->IsPost)
       return;
@@ -164,9 +160,8 @@ public:
   // committed text twice. Observation-only otherwise - the Result is never
   // written, the original surface keeps its own copy of every event.
   void CallEngineSurfaceAppProc(
-      void *&pevent, void *&userData,
+      void *&pevent, [[maybe_unused]] void *&userData,
       VGUI2Extension_CallbackContext *CallbackContext) override {
-    (void)userData;
     if (!CallbackContext->IsPost) {
       // Physical ESC release tracking (one close route per press);
       // T16: the ESC-down path closes the no-map console (see the
@@ -181,18 +176,15 @@ public:
       rmlui::onSurfaceMenuKey(pevent);
     }
   }
-  void CallEngineSurfaceWndProc(
-      void *&hwnd, unsigned int &msg, unsigned int &wparam, long &lparam,
-      VGUI2Extension_CallbackContext *CallbackContext) override {
-    (void)CallbackContext;
+  void CallEngineSurfaceWndProc(void *&hwnd, unsigned int &msg,
+                                unsigned int &wparam, long &lparam,
+                                [[maybe_unused]] VGUI2Extension_CallbackContext
+                                    *CallbackContext) override {
     rmlui::onSurfaceWndProc(hwnd, msg, wparam, lparam);
   }
-  void Paint(int &x, int &y, int &right, int &bottom,
+  void Paint([[maybe_unused]] int &x, [[maybe_unused]] int &y,
+             [[maybe_unused]] int &right, [[maybe_unused]] int &bottom,
              VGUI2Extension_CallbackContext *CallbackContext) override {
-    (void)x;
-    (void)y;
-    (void)right;
-    (void)bottom;
     if (CallbackContext->IsPost)
       rmlui::maintainUiMouse();
   }
@@ -242,11 +234,10 @@ hook_t *PasswordPromptHook = nullptr;
 // password.
 using ShowServerPasswordFn = void(__fastcall *)(void *, int, const char *, int);
 
-void __fastcall Hook_ShowServerPasswordDialog(void *pthis, int dummy,
+void __fastcall Hook_ShowServerPasswordDialog([[maybe_unused]] void *pthis,
+                                              [[maybe_unused]] int dummy,
                                               const char *serverName,
                                               int flag) {
-  (void)pthis;
-  (void)dummy;
   services::LoadingFeedEvent event;
   event.kind = services::LoadingFeedKind::kPasswordPrompt;
   event.text = serverName ? serverName : "";

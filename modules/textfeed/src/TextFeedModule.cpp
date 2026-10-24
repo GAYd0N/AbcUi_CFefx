@@ -85,12 +85,15 @@ void updateHidden(NoticeState &state) {
 
 // ---- event sinks ----
 
-void onNotice(void *, const void *payload) {
+int onNotice(void *, const void *payload) {
   const auto *event = static_cast<const AbcUiNoticeEvent *>(payload);
-  if (event->target == Notify.target)
-    showMessage(Notify, event->text);
-  else if (event->target == Center.target)
-    showMessage(Center, event->text);
+  NoticeState *state = event->target == Notify.target   ? &Notify
+                       : event->target == Center.target ? &Center
+                                                        : nullptr;
+  if (!state || !Api->ui->panelDocument(state->Panel.name))
+    return 0;
+  showMessage(*state, event->text);
+  return 1;
 }
 
 void onHideToken(void *, const void *payload) {
@@ -147,7 +150,8 @@ void onModuleLoad() {
   Notify.hideAll = (state.hideBits & ABCUI_HIDEBIT_ALL) != 0;
   Center.hideAll = Notify.hideAll;
 
-  Api->events->subscribe(ABCUI_CHANNEL_TEXTFEED_NOTICE, 0, &onNotice, nullptr);
+  Api->events->subscribeVeto(ABCUI_CHANNEL_TEXTFEED_NOTICE, 0, &onNotice,
+                             nullptr);
   Api->events->subscribe(ABCUI_CHANNEL_HUD_HIDE_TOKEN, 0, &onHideToken,
                          nullptr);
 }
@@ -165,10 +169,11 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->console || !api->data)
@@ -180,7 +185,7 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.textfeed";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = nullptr;
   out->onContextReady = nullptr;

@@ -648,7 +648,7 @@ void animateScore(double now) {
 
 // ------------------------------------------------------- panel callbacks ----
 
-void onDocumentReady(void *) {
+void ABCUI_CALL onDocumentReady(void *) {
   AbcUiDocument *doc = panelDocument();
   if (!doc)
     return;
@@ -663,7 +663,7 @@ void onDocumentReady(void *) {
   reset();
 }
 
-void onData(void *, double frameTime) {
+void ABCUI_CALL onData(void *, double frameTime) {
   ClientTimeNow += frameTime;
 
   if (!hudActive()) {
@@ -693,9 +693,9 @@ void onData(void *, double frameTime) {
     refreshMarks(LandedMarks);
 }
 
-void onReset(void *) { reset(); }
+void ABCUI_CALL onReset(void *) { reset(); }
 
-void onPopNum(void *, const void *payload) {
+void ABCUI_CALL onPopNum(void *, const void *payload) {
   if (!payload)
     return;
   const auto *event = static_cast<const AbcUiPopNumEvent *>(payload);
@@ -704,14 +704,14 @@ void onPopNum(void *, const void *payload) {
 
 // -------------------------------------------------------------- cvars ------
 
-void clampMaxDamage(void *) {
+void ABCUI_CALL clampMaxDamage(void *) {
   if (!MaxDamage)
     return;
   if (Api->console->cvarValue(MaxDamage, 10.0f) < 10.0f)
     Api->console->setCvarValue(MaxDamage, 10.0f);
 }
 
-void clampVolume(void *) {
+void ABCUI_CALL clampVolume(void *) {
   if (!Volume)
     return;
   const float value = Api->console->cvarValue(Volume, 0.25f);
@@ -721,7 +721,7 @@ void clampVolume(void *) {
     Api->console->setCvarValue(Volume, 1.0f);
 }
 
-void clampKillTime(void *) {
+void ABCUI_CALL clampKillTime(void *) {
   if (!KillTime)
     return;
   if (Api->console->cvarValue(KillTime, 8.0f) < 0.0f)
@@ -774,14 +774,14 @@ void debugDump(const char *label) {
                     "hidden) - the injection ran but nothing draws\n");
 }
 
-void debugStatus(void *) { debugDump("status"); }
+void ABCUI_CALL debugStatus(void *) { debugDump("status"); }
 
-void debugHit(void *) {
+void ABCUI_CALL debugHit(void *) {
   onDamage(static_cast<int>(damageStep()));
   debugDump("hit");
 }
 
-void debugTier(void *) {
+void ABCUI_CALL debugTier(void *) {
   // The old "tier 9" argument: clear the accumulator, then queue exactly nine
   // stars; the marks fill one by one as those stars land.
   reset();
@@ -789,14 +789,14 @@ void debugTier(void *) {
   debugDump("tier");
 }
 
-void debugScore(void *) {
+void ABCUI_CALL debugScore(void *) {
   // One full accumulator: ten stars queue up and the pop (NanoDamege1) shows
   // immediately, before the stars finish.
   onDamage(static_cast<int>(damageStep() * 10));
   debugDump("score");
 }
 
-void debugDamage(void *) {
+void ABCUI_CALL debugDamage(void *) {
   // The old "hit <value>" argument, driven by a cvar because commands carry no
   // argv. The whole star queue plays and the pop shows immediately once the
   // damage reaches a full hud_cfefx_max (8000 at the default max shows
@@ -815,14 +815,14 @@ void debugDamage(void *) {
   debugDump("damage");
 }
 
-void debugSound(void *) {
+void ABCUI_CALL debugSound(void *) {
   playScoreSound();
   Api->core->print("[AbcUi] cfefx: sound requested at volume %.2f "
                    "(abc/cfefx/UI_SPECIALKILL2.wav)\n",
                    cvarFloat(Volume, 0.25f));
 }
 
-void debugReset(void *) {
+void ABCUI_CALL debugReset(void *) {
   reset();
   debugDump("reset");
 }
@@ -847,7 +847,7 @@ void registerDebugCommands() {
 
 // ----------------------------------------------------------- lifecycle -----
 
-void onModuleLoad() {
+void ABCUI_CALL onModuleLoad() {
   PanelDesc.structSize = sizeof(PanelDesc);
   PanelDesc.name = kPanelName;
   PanelDesc.documentPath = kDocumentPath;
@@ -865,7 +865,7 @@ void onModuleLoad() {
   Api->events->subscribe(ABCUI_CHANNEL_NETMSG_POP_NUM, 0, &onPopNum, nullptr);
 }
 
-void onModuleInit() {
+void ABCUI_CALL onModuleInit() {
   // Old ctor defaults (persisted contract - never rename).
   Enabled = Api->console->registerCvar(kEnabledCvar, "1", ABCUI_CVAR_VALUE);
   MaxDamage = Api->console->registerCvarWatch(kMaxDamageCvar, "1000",
@@ -882,7 +882,7 @@ void onModuleInit() {
 #endif
 }
 
-void onModuleShutdown() {
+void ABCUI_CALL onModuleShutdown() {
   // The documents die with the context; every element handle must go.
   ScoreMark = nullptr;
   ScoreEffect = nullptr;
@@ -905,14 +905,15 @@ void onModuleShutdown() {
   LandedMarks = 0;
 }
 
-void onModuleUnload() { Api = nullptr; }
+void ABCUI_CALL onModuleUnload() { Api = nullptr; }
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->console || !api->data)
@@ -925,7 +926,7 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.cfefx";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = &onModuleInit;
   out->onContextReady = nullptr;

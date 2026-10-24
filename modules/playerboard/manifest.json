@@ -3,10 +3,12 @@
   "name": "Player Board",
   "description": "Overhead teammate name/health/armor tiles (moved from the built-in HUD).",
   "author": "DrAbc",
-  "version": "1.0.0",
-  "abi": 1,
-  "minAbcUi": "0.8.0",
+  "version": "2.0.0",
+  "abi": 2,
+  "minAbcUi": "0.9.0",
   "entry": "entry/abcui_playerboard.dll",
-  "dependencies": [],
+  "dependencies": [
+    "abcui.base"
+  ],
   "conflicts": []
 }

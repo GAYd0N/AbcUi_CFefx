@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <new>
 #include <string>
 
@@ -24,6 +25,62 @@
 #include <Windows.h>
 
 namespace rmlui {
+
+void AbcSystemInterface::JoinPath(Rml::String &out, const Rml::String &base,
+                                  const Rml::String &path) {
+  if (!framework::ModuleVfs::isModuleUri(base)) {
+    Rml::SystemInterface::JoinPath(out, base, path);
+    return;
+  }
+  // Specialized texture URIs are already absolute. Their underlying package
+  // paths are checked by their loaders, not rewritten as document relatives.
+  if (path.starts_with("modadd://")) {
+    std::string canonical;
+    if (framework::ModuleVfs::resolve(base, "mod://" + path.substr(9),
+                                      canonical))
+      out = "modadd://" + canonical.substr(6);
+    else
+      out = "invalid://resource";
+    return;
+  }
+  if (path.starts_with("spricon://mod://") ||
+      path.starts_with("spralpha://mod://")) {
+    const auto start = path.find("mod://");
+    const auto crop = path.rfind('/');
+    std::string canonical;
+    if (crop > start && framework::ModuleVfs::resolve(
+                            base, path.substr(start, crop - start), canonical))
+      out = path.substr(0, start) + canonical + path.substr(crop);
+    else
+      out = "invalid://resource";
+    return;
+  }
+  if (path.starts_with("moduletex://")) {
+    const auto sourceSlash = base.find('/', 6);
+    const auto targetSlash = path.find('/', 12);
+    const auto requester = base.substr(6, sourceSlash - 6);
+    if (targetSlash != path.npos &&
+        framework::ModuleVfs::canRead(
+            requester, "mod://" + path.substr(12, targetSlash - 12) + "/_"))
+      out = path;
+    else
+      out = "invalid://resource";
+    return;
+  }
+  if (path.find("://") != path.npos &&
+      !framework::ModuleVfs::isModuleUri(path)) {
+    out = path;
+    return;
+  }
+  std::string uri;
+  const auto slash = base.find('/', 6);
+  const auto id = base.substr(6, slash - 6);
+  if (framework::ModuleVfs::resolve(base, path, uri) &&
+      framework::ModuleVfs::canRead(id, uri))
+    out = std::move(uri);
+  else
+    out = "invalid://resource";
+}
 
 double AbcSystemInterface::GetElapsedTime() {
   static LARGE_INTEGER frequency = {};
@@ -150,9 +207,8 @@ ResourceHandle *handleFor(Rml::FileHandle handle) {
 } // namespace
 
 Rml::FileHandle AbcFileInterface::Open(const Rml::String &path) {
-  // engine://<engine path> lets a package document reference a framework
-  // shared asset (the base stylesheet, shared lang tables) by its absolute
-  // engine path, which relative mod:// links cannot reach.
+  // Explicit native game content is separate from package UI resources.
+  const bool engineSource = path.starts_with("engine://");
   Rml::String resolved = path;
   if (resolved.rfind("engine://", 0) == 0)
     resolved = resolved.substr(9);
@@ -165,14 +221,15 @@ Rml::FileHandle AbcFileInterface::Open(const Rml::String &path) {
     framework::PackageEntry entry;
     if (!framework::ModuleVfs::open(resolved.c_str(), entry, nullptr))
       return 0;
-    auto *resource = new (std::nothrow) ResourceHandle{};
+    std::unique_ptr<ResourceHandle> resource(new (std::nothrow)
+                                                 ResourceHandle{});
     if (!resource)
       return 0;
     resource->ModuleData = static_cast<const unsigned char *>(entry.data);
     resource->ModuleSize = entry.size;
     resource->ModulePos = 0;
     resource->ModuleEntry = std::move(entry);
-    return reinterpret_cast<Rml::FileHandle>(resource);
+    return reinterpret_cast<Rml::FileHandle>(resource.release());
   }
 
   // Rml documents and their resources follow the engine mount order, which
@@ -185,38 +242,42 @@ Rml::FileHandle AbcFileInterface::Open(const Rml::String &path) {
     FILE *local = nullptr;
     if (fopen_s(&local, resolved.c_str(), "rb") != 0 || !local)
       return 0;
-    auto *resource = new (std::nothrow) ResourceHandle{nullptr, local};
+    std::unique_ptr<ResourceHandle> resource(
+        new (std::nothrow) ResourceHandle{nullptr, local});
     if (!resource) {
       fclose(local);
       return 0;
     }
-    return reinterpret_cast<Rml::FileHandle>(resource);
+    return reinterpret_cast<Rml::FileHandle>(resource.release());
   }
 
+  if (!engineSource || resolved.starts_with("abc/abcui/"))
+    return 0;
   std::string normalized;
   if (!abc::g_pFileSystem ||
-      !framework::ResourceFile::normalize(resolved, normalized))
+      !framework::ResourceFile::normalize(resolved, normalized) ||
+      normalized.starts_with("abc/abcui/"))
     return 0;
   FileHandle_t file = abc::g_pFileSystem->Open(normalized.c_str(), "rb");
   if (!file)
     return 0;
-  auto *resource = new (std::nothrow) ResourceHandle{file, nullptr};
+  std::unique_ptr<ResourceHandle> resource(new (std::nothrow)
+                                               ResourceHandle{file, nullptr});
   if (!resource) {
     abc::g_pFileSystem->Close(file);
     return 0;
   }
-  return reinterpret_cast<Rml::FileHandle>(resource);
+  return reinterpret_cast<Rml::FileHandle>(resource.release());
 }
 
 void AbcFileInterface::Close(Rml::FileHandle file) {
-  ResourceHandle *resource = handleFor(file);
+  std::unique_ptr<ResourceHandle> resource(handleFor(file));
   if (!resource)
     return;
   if (resource->LocalFile)
     fclose(resource->LocalFile);
   else if (abc::g_pFileSystem && resource->EngineFile)
     abc::g_pFileSystem->Close(resource->EngineFile);
-  delete resource;
 }
 
 size_t AbcFileInterface::Read(void *buffer, size_t size, Rml::FileHandle file) {

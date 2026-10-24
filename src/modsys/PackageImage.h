@@ -20,8 +20,8 @@ class PackageImage {
 public:
   // Maps `path` (UTF-8) and parses its central directory. Null with `error`
   // set when the file cannot be opened, mapped or parsed.
-  static std::unique_ptr<PackageImage> open(const char *path,
-                                            std::string *error);
+  [[nodiscard]] static std::unique_ptr<PackageImage> open(const char *path,
+                                                          std::string *error);
   ~PackageImage();
 
   PackageImage(const PackageImage &) = delete;

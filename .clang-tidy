@@ -5,6 +5,10 @@ Checks: >
   -*,
   modernize-use-nullptr,
   modernize-use-using,
+  modernize-use-override,
+  modernize-use-emplace,
+  modernize-use-default-member-init,
+  readability-container-contains,
   performance-*
 WarningsAsErrors: ''
 FormatStyle: file

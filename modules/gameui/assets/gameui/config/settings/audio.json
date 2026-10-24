@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "id": "audio",
+  "label": "#abcui.gameui/Settings_SecAudio",
+  "order": 30,
+  "components": [],
+  "sections": [
+    {
+      "id": "audio",
+      "label": "#abcui.gameui/Settings_SecAudio",
+      "components": []
+    }
+  ],
+  "items": [
+    {
+      "cvar": "volume",
+      "label": "#abcui.gameui/Settings_SfxVolume",
+      "section": "audio",
+      "kind": "float",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 0.7
+    },
+    {
+      "cvar": "suitvolume",
+      "label": "#abcui.gameui/Settings_SuitVolume",
+      "section": "audio",
+      "kind": "float",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 0.25
+    },
+    {
+      "cvar": "mp3volume",
+      "label": "#abcui.gameui/Settings_Mp3Volume",
+      "section": "audio",
+      "kind": "float",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 0.8
+    },
+    {
+      "cvar": "hisound",
+      "label": "#abcui.gameui/Settings_Hisound",
+      "section": "audio",
+      "kind": "bool",
+      "default": 1.0
+    }
+  ]
+}

@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
-#include <sstream>
 
 namespace modelpreview {
 namespace {
@@ -20,15 +19,26 @@ template <class T> bool number(std::string_view Text, T &Output, T Min, T Max) {
   return true;
 }
 
+bool isSpace(char c) {
+  return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
 template <class T, size_t N>
 bool vector(std::string_view Text, std::array<T, N> &Output, T Min, T Max) {
-  std::istringstream Stream{std::string(Text)};
   std::array<T, N> Values{};
-  std::string Token;
-  for (T &Value : Values)
-    if (!(Stream >> Token) || !number(Token, Value, Min, Max))
+  std::size_t at = 0;
+  for (T &Value : Values) {
+    while (at < Text.size() && isSpace(Text[at]))
+      ++at;
+    const std::size_t begin = at;
+    while (at < Text.size() && !isSpace(Text[at]))
+      ++at;
+    if (begin == at || !number(Text.substr(begin, at - begin), Value, Min, Max))
       return false;
-  if (Stream >> Token)
+  }
+  while (at < Text.size() && isSpace(Text[at]))
+    ++at;
+  if (at != Text.size())
     return false;
   Output = Values;
   return true;

@@ -3,10 +3,12 @@
   "name": "GameUI",
   "description": "The replacement game-menu pages: the shell, console, server browser, connection surfaces, vote creation, player list, command menu, inventory, create-game, settings and display-mode confirmation pages.",
   "author": "DrAbc",
-  "version": "1.0.0",
-  "abi": 1,
-  "minAbcUi": "0.8.0",
+  "version": "2.0.0",
+  "abi": 2,
+  "minAbcUi": "0.9.0",
   "entry": "entry/abcui_gameui.dll",
-  "dependencies": [],
+  "dependencies": [
+    "abcui.base"
+  ],
   "conflicts": []
 }

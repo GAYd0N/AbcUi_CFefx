@@ -1,0 +1,3 @@
+abcui.vote/Vote_DefaultMessage = Se inició una votación
+abcui.vote/Vote_DefaultYes = Sí
+abcui.vote/Vote_DefaultNo = No

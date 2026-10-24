@@ -1,0 +1,24 @@
+<rml>
+<head>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="../rcss/spectator.rcss"/>
+</head>
+<body id="spectator">
+	<!-- Rebuild of the native SpectatorPanel bottom bar: mode, target name,
+	     health and armor. The health/armor cells hide when the observer has
+	     no target; the mode cell then fills the bar. -->
+	<div id="spectator-bar">
+		<div id="spec-health" class="spec-cell spec-vital">
+			<span id="spec-health-label" class="spec-label">Health</span>
+			<span id="spec-health-value" class="spec-value">0</span>
+		</div>
+		<div id="spec-armor" class="spec-cell spec-vital">
+			<span id="spec-armor-label" class="spec-label">Armor</span>
+			<span id="spec-armor-value" class="spec-value">0</span>
+		</div>
+		<div id="spec-mode" class="spec-cell">
+			<span id="spec-mode-value" class="spec-value">Spectator</span>
+		</div>
+	</div>
+</body>
+</rml>

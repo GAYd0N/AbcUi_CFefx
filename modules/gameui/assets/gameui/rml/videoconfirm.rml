@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
 	<link type="text/rcss" href="../rcss/videoconfirm.rcss"/>
 </head>
@@ -11,14 +11,14 @@
      abcui.gameui settings page module. -->
 <body id="videoconfirm">
 	<div id="videoconfirm-box">
-		<h1 id="videoconfirm-title">#VideoConfirm_Title</h1>
-		<p id="videoconfirm-lead">#VideoConfirm_Lead</p>
-		<div class="videoconfirm-line"><span class="videoconfirm-key">#VideoConfirm_ActualLabel</span><span id="videoconfirm-actual"></span></div>
-		<div class="videoconfirm-line"><span class="videoconfirm-key">#VideoConfirm_RequestedLabel</span><span id="videoconfirm-requested"></span></div>
+		<h1 id="videoconfirm-title">#abcui.gameui/VideoConfirm_Title</h1>
+		<p id="videoconfirm-lead">#abcui.gameui/VideoConfirm_Lead</p>
+		<div class="videoconfirm-line"><span class="videoconfirm-key">#abcui.gameui/VideoConfirm_ActualLabel</span><span id="videoconfirm-actual"></span></div>
+		<div class="videoconfirm-line"><span class="videoconfirm-key">#abcui.gameui/VideoConfirm_RequestedLabel</span><span id="videoconfirm-requested"></span></div>
 		<p id="videoconfirm-timeout"></p>
 		<div id="videoconfirm-actions">
-			<button id="videoconfirm-keep" data-action="video-keep" data-label="#VideoConfirm_Keep">#VideoConfirm_Keep</button>
-			<button id="videoconfirm-revert" data-action="video-revert" data-label="#VideoConfirm_Revert" autofocus="autofocus">#VideoConfirm_Revert</button>
+			<button id="videoconfirm-keep" data-action="video-keep" data-label="#abcui.gameui/VideoConfirm_Keep">#abcui.gameui/VideoConfirm_Keep</button>
+			<button id="videoconfirm-revert" data-action="video-revert" data-label="#abcui.gameui/VideoConfirm_Revert" autofocus="autofocus">#abcui.gameui/VideoConfirm_Revert</button>
 		</div>
 	</div>
 </body>

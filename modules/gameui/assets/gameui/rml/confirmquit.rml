@@ -1,7 +1,7 @@
 <rml>
 <head>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/base.rcss"/>
-	<link type="text/rcss" href="engine://abc/abcui/rcss/theme.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/base.rcss"/>
+	<link type="text/rcss" href="mod://abcui.base/rcss/theme.rcss"/>
 	<link type="text/rcss" href="../rcss/mainmenu.rcss"/>
 </head>
 <!-- Quit confirmation overlay (original QueryBox parity): confirming is the
@@ -9,11 +9,11 @@
      sits on the cancel entry so a stray Enter cannot end the game. -->
 <body id="menuconfirm">
 	<div id="panel" class="settings-layer">
-		<h1 id="confirm-title">#MainMenu_QuitConfirmTitle</h1>
-		<p id="confirm-body">#MainMenu_QuitConfirmBody</p>
+		<h1 id="confirm-title">#abcui.gameui/MainMenu_QuitConfirmTitle</h1>
+		<p id="confirm-body">#abcui.gameui/MainMenu_QuitConfirmBody</p>
 		<div id="confirm-actions">
-			<button id="confirm-yes" data-action="quit-yes" data-label="#MainMenu_QuitYes">#MainMenu_QuitYes</button>
-			<button id="confirm-no" data-action="quit-no" data-label="#MainMenu_QuitNo" autofocus="autofocus">#MainMenu_QuitNo</button>
+			<button id="confirm-yes" data-action="quit-yes" data-label="#abcui.gameui/MainMenu_QuitYes">#abcui.gameui/MainMenu_QuitYes</button>
+			<button id="confirm-no" data-action="quit-no" data-label="#abcui.gameui/MainMenu_QuitNo" autofocus="autofocus">#abcui.gameui/MainMenu_QuitNo</button>
 		</div>
 	</div>
 </body>

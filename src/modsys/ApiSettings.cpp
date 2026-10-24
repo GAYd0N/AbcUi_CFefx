@@ -2,6 +2,7 @@
 // models, transactions, page tree and spray maker). See ApiTable.h for how it
 // joins the module table.
 #include "ApiTable.h"
+#include "ApiSnapshot.h"
 
 #include <algorithm>
 #include <cstring>
@@ -36,11 +37,6 @@ void copyText(const std::string &text, char *out, uint32_t outSize) {
 
 void copyText(const char *text, char *out, uint32_t outSize) {
   copyText(std::string(text ? text : ""), out, outSize);
-}
-
-// The caller's declared size wins: never write past an older header.
-size_t declaredBytes(uint32_t declared, size_t full) {
-  return (declared == 0 || declared > full) ? full : declared;
 }
 
 void bump() {
@@ -174,7 +170,7 @@ int32_t apiRowAt(int32_t index, AbcUiSettingRow *out) {
   AbcUiSettingRow full{};
   if (!fillRow(view, full))
     return 0;
-  std::memcpy(out, &full, declaredBytes(out->structSize, sizeof(full)));
+  abi::copySnapshot(out, full);
   return 1;
 }
 
@@ -188,7 +184,7 @@ int32_t apiRowFind(const char *cvar, AbcUiSettingRow *out) {
   AbcUiSettingRow full{};
   if (!fillRow(*view, full))
     return 0;
-  std::memcpy(out, &full, declaredBytes(out->structSize, sizeof(full)));
+  abi::copySnapshot(out, full);
   return 1;
 }
 
@@ -366,7 +362,7 @@ void apiApply(AbcUiSettingsApply *out) {
   }
   bump();
   if (out)
-    std::memcpy(out, &tally, declaredBytes(out->structSize, sizeof(tally)));
+    abi::copySnapshot(out, tally);
 }
 
 int32_t apiApplyOne(const char *cvar) {
@@ -407,7 +403,7 @@ int32_t apiPageAt(int32_t index, AbcUiSettingsPage *out) {
   copyText(page->Id, full.id, sizeof(full.id));
   copyText(page->Label, full.label, sizeof(full.label));
   copyText(page->Description, full.description, sizeof(full.description));
-  std::memcpy(out, &full, declaredBytes(out->structSize, sizeof(full)));
+  abi::copySnapshot(out, full);
   return 1;
 }
 
@@ -433,7 +429,7 @@ int32_t apiSectionAt(int32_t page, int32_t index, AbcUiSettingsSection *out) {
   copyText(section.Id, full.id, sizeof(full.id));
   copyText(section.Label, full.label, sizeof(full.label));
   copyText(section.Layout, full.layout, sizeof(full.layout));
-  std::memcpy(out, &full, declaredBytes(out->structSize, sizeof(full)));
+  abi::copySnapshot(out, full);
   return 1;
 }
 
@@ -488,7 +484,7 @@ int32_t apiBindRowAt(int32_t index, AbcUiBindAction *out) {
   full.keyCount = static_cast<int32_t>(view->draftKeyNames.size());
   copyText(view->action->Label, full.label, sizeof(full.label));
   copyText(view->action->Command, full.command, sizeof(full.command));
-  std::memcpy(out, &full, declaredBytes(out->structSize, sizeof(full)));
+  abi::copySnapshot(out, full);
   return 1;
 }
 
@@ -652,7 +648,7 @@ int32_t apiVideoFacts(AbcUiVideoFacts *out) {
       break;
     }
   }
-  std::memcpy(out, &full, declaredBytes(out->structSize, sizeof(full)));
+  abi::copySnapshot(out, full);
   return 1;
 }
 
@@ -741,7 +737,7 @@ int32_t apiVoiceFacts(AbcUiVoiceFacts *out) {
   full.micVolume = model->micVolume();
   full.micVolumeDraft = model->micVolumeDraft();
   full.speakingLevel = model->speakingLevel();
-  std::memcpy(out, &full, declaredBytes(out->structSize, sizeof(full)));
+  abi::copySnapshot(out, full);
   return 1;
 }
 

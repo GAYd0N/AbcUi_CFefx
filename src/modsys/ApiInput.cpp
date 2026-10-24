@@ -1,8 +1,14 @@
 // framework input section - the sdk view of the UI input router. See
 // ApiTable.h for how it joins the module table.
 #include "ApiTable.h"
+#include "ApiSnapshot.h"
+#include "rmlui/RmlUiModule.h"
+#include <RmlUi/Core/Context.h>
+#include <RmlUi/Core/ElementDocument.h>
+#include "ModuleResources.h"
 
 #include <map>
+#include <memory>
 #include <new>
 #include <string>
 
@@ -21,44 +27,50 @@ namespace {
 class ModuleOwner final : public uiinput::Owner {
 public:
   explicit ModuleOwner(const AbcUiInputCallbacks &callbacks)
-      : Callbacks(callbacks) {}
+      : Callbacks(callbacks), Owner(module_resources::current()) {}
 
   const AbcUiInputCallbacks &callbacks() const {
     return Callbacks;
   }
 
   bool claimsKey(int down, int keynum) override {
-    return Callbacks.claimsKey &&
-           Callbacks.claimsKey(Callbacks.userdata, down ? 1 : 0, keynum) != 0;
+    return module_resources::invoke(Owner, "input key claim",
+                                    Callbacks.claimsKey, Callbacks.userdata,
+                                    down ? 1 : 0, keynum) != 0;
   }
   bool claimsWheel() override {
-    return Callbacks.claimsWheel &&
-           Callbacks.claimsWheel(Callbacks.userdata) != 0;
+    return module_resources::invoke(Owner, "input wheel claim",
+                                    Callbacks.claimsWheel,
+                                    Callbacks.userdata) != 0;
   }
   bool blocksGameplay() const override {
-    return Callbacks.blocksGameplay &&
-           Callbacks.blocksGameplay(Callbacks.userdata) != 0;
+    return module_resources::invoke(Owner, "input gameplay claim",
+                                    Callbacks.blocksGameplay,
+                                    Callbacks.userdata) != 0;
   }
   void onClaimedKeyDown(int keynum) override {
-    if (Callbacks.onClaimedKeyDown)
-      Callbacks.onClaimedKeyDown(Callbacks.userdata, keynum);
+    module_resources::invoke(Owner, "input key", Callbacks.onClaimedKeyDown,
+                             Callbacks.userdata, keynum);
   }
   bool onClaimedWheelPulse(int keynum) override {
-    return Callbacks.onClaimedWheelPulse &&
-           Callbacks.onClaimedWheelPulse(Callbacks.userdata, keynum) != 0;
+    return module_resources::invoke(Owner, "input wheel",
+                                    Callbacks.onClaimedWheelPulse,
+                                    Callbacks.userdata, keynum) != 0;
   }
   void onOwnershipLost() override {
-    if (Callbacks.onOwnershipLost)
-      Callbacks.onOwnershipLost(Callbacks.userdata);
+    module_resources::invoke(Owner, "input ownership lost",
+                             Callbacks.onOwnershipLost, Callbacks.userdata);
   }
 
 private:
   AbcUiInputCallbacks Callbacks{};
+  module_resources::OwnerHandle Owner;
 };
 
 struct TokenRecord {
-  ModuleOwner *owner = nullptr;
+  std::unique_ptr<ModuleOwner> owner;
   uiinput::Token token;
+  module_resources::Registration lifetime;
 };
 
 std::map<AbcUiInputToken, TokenRecord> &tokens() {
@@ -68,18 +80,26 @@ std::map<AbcUiInputToken, TokenRecord> &tokens() {
 
 AbcUiInputToken NextToken = 1;
 
+void apiReleaseToken(AbcUiInputToken token);
+
 AbcUiInputToken apiTakeToken(const AbcUiInputCallbacks *callbacks) {
-  if (!callbacks || callbacks->structSize < sizeof(AbcUiInputCallbacks))
+  if (!module_resources::accepting() ||
+      !module_resources::contextRegistrationsOpen() || !callbacks ||
+      rmlui::uiRouter().tearingDown() ||
+      callbacks->structSize < sizeof(AbcUiInputCallbacks))
     return 0;
-  auto *owner = new (std::nothrow) ModuleOwner(*callbacks);
+  std::unique_ptr<ModuleOwner> owner(new (std::nothrow)
+                                         ModuleOwner(*callbacks));
   if (!owner)
     return 0;
   const AbcUiInputToken id = NextToken++;
   TokenRecord record;
-  record.owner = owner;
-  record.token =
-      rmlui::uiRouter().acquire(owner, uiinput::OwnerTier::kInteractiveHud);
+  record.owner = std::move(owner);
+  record.token = rmlui::uiRouter().acquire(record.owner.get(),
+                                           uiinput::OwnerTier::kInteractiveHud);
   tokens()[id] = std::move(record);
+  tokens()[id].lifetime.track([id] { apiReleaseToken(id); },
+                              module_resources::Lifetime::Context);
   return id;
 }
 
@@ -87,9 +107,8 @@ void apiReleaseToken(AbcUiInputToken token) {
   const auto itor = tokens().find(token);
   if (itor == tokens().end())
     return;
-  itor->second.token.release();
-  delete itor->second.owner;
-  tokens().erase(itor);
+  auto closing = tokens().extract(itor);
+  closing.mapped().token.release();
 }
 
 int32_t apiTokenHeld(AbcUiInputToken token) {
@@ -124,10 +143,26 @@ int32_t apiImeLanguageTag(char *out, uint32_t outSize) {
   return static_cast<int32_t>(tag.size());
 }
 
+int32_t apiImeState(AbcUiImeState *out) {
+  if (!out)
+    return ABCUI_ERROR_INVALID;
+  AbcUiImeState state{};
+  state.structSize = sizeof(state);
+  auto *context = rmlui::context();
+  auto *focus = context ? context->GetFocusElement() : nullptr;
+  auto *document = focus ? focus->GetOwnerDocument() : nullptr;
+  const auto owner = module_resources::current();
+  if (owner && document && document->IsVisible() &&
+      document->GetSourceURL().starts_with("mod://" + owner->id + "/"))
+    rmlui::ime::snapshot(state);
+  abi::copySnapshot(out, state);
+  return ABCUI_OK;
+}
+
 const AbcUiInputApi kInputApi = {
-    sizeof(AbcUiInputApi), apiTakeToken, apiReleaseToken,
-    apiTokenHeld,          apiExclusive, apiTextComposing,
-    apiCancelComposition,  apiMenuUp,    apiImeLanguageTag,
+    sizeof(AbcUiInputApi), apiTakeToken,     apiReleaseToken,      apiTokenHeld,
+    apiExclusive,          apiTextComposing, apiCancelComposition, apiMenuUp,
+    apiImeLanguageTag,     apiImeState,
 };
 
 } // namespace

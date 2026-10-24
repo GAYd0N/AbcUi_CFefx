@@ -20,10 +20,8 @@
 #include <cstdarg>
 #include <cstdio>
 
-void _SpewInfo(SpewType_t type, const tchar *pFile, int line) {
-  (void)type;
-  (void)pFile;
-  (void)line;
+void _SpewInfo([[maybe_unused]] SpewType_t type,
+               [[maybe_unused]] const tchar *pFile, [[maybe_unused]] int line) {
 }
 
 SpewRetval_t _SpewMessage(const tchar *pMsg, ...) {
@@ -36,19 +34,15 @@ SpewRetval_t _SpewMessage(const tchar *pMsg, ...) {
   return SPEW_CONTINUE;
 }
 
-SpewRetval_t _DSpewMessage(const tchar *pGroupName, int level,
-                           const tchar *pMsg, ...) {
-  (void)pGroupName;
-  (void)level;
-  (void)pMsg;
+SpewRetval_t _DSpewMessage([[maybe_unused]] const tchar *pGroupName,
+                           [[maybe_unused]] int level,
+                           [[maybe_unused]] const tchar *pMsg, ...) {
   return SPEW_CONTINUE;
 }
 
-SpewRetval_t ColorSpewMessage(SpewType_t type, const Color *pColor,
-                              const tchar *pMsg, ...) {
-  (void)type;
-  (void)pColor;
-  (void)pMsg;
+SpewRetval_t ColorSpewMessage([[maybe_unused]] SpewType_t type,
+                              [[maybe_unused]] const Color *pColor,
+                              [[maybe_unused]] const tchar *pMsg, ...) {
   return SPEW_CONTINUE;
 }
 
@@ -60,10 +54,9 @@ bool ShouldUseNewAssertDialog() {
   return false;
 }
 
-bool DoNewAssertDialog(const tchar *pFile, int line, const tchar *pExpression) {
-  (void)pFile;
-  (void)line;
-  (void)pExpression;
+bool DoNewAssertDialog([[maybe_unused]] const tchar *pFile,
+                       [[maybe_unused]] int line,
+                       [[maybe_unused]] const tchar *pExpression) {
   return false;
 }
 

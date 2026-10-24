@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <string_view>
 
 #include <Windows.h>
 
@@ -15,6 +16,10 @@ constexpr size_t kMaxImportModules = 64;
 void fail(std::string *error, const char *message) {
   if (error)
     *error = message;
+}
+
+bool within(size_t offset, size_t bytes, size_t size) {
+  return offset <= size && bytes <= size - offset;
 }
 
 const IMAGE_SECTION_HEADER *sectionTable(const IMAGE_NT_HEADERS32 *nt) {
@@ -40,12 +45,14 @@ bool protectSections(uint8_t *image, const IMAGE_NT_HEADERS32 *nt,
   const IMAGE_SECTION_HEADER *sections = sectionTable(nt);
   for (WORD i = 0; i < nt->FileHeader.NumberOfSections; ++i) {
     const IMAGE_SECTION_HEADER &section = sections[i];
-    if (section.Misc.VirtualSize == 0)
+    const size_t bytes =
+        (std::max)(section.Misc.VirtualSize, section.SizeOfRawData);
+    if (bytes == 0)
       continue;
     DWORD oldProtect = 0;
-    if (!VirtualProtect(
-            image + section.VirtualAddress, section.Misc.VirtualSize,
-            sectionProtection(section.Characteristics), &oldProtect)) {
+    if (!VirtualProtect(image + section.VirtualAddress, bytes,
+                        sectionProtection(section.Characteristics),
+                        &oldProtect)) {
       fail(error, "image section protection failed");
       return false;
     }
@@ -163,8 +170,9 @@ bool MemoryDll::load(const void *data, size_t size, std::string *error) {
   }
   const auto *dos = static_cast<const IMAGE_DOS_HEADER *>(data);
   const auto *source = static_cast<const uint8_t *>(data);
-  if (dos->e_magic != IMAGE_DOS_SIGNATURE ||
-      static_cast<size_t>(dos->e_lfanew) + sizeof(IMAGE_NT_HEADERS32) > size) {
+  if (dos->e_magic != IMAGE_DOS_SIGNATURE || dos->e_lfanew < 0 ||
+      !within(static_cast<size_t>(dos->e_lfanew), sizeof(IMAGE_NT_HEADERS32),
+              size)) {
     fail(error, "image is not a PE executable");
     return false;
   }
@@ -180,8 +188,9 @@ bool MemoryDll::load(const void *data, size_t size, std::string *error) {
     fail(error, "image is not a Win32 DLL");
     return false;
   }
-  if (nt->OptionalHeader.NumberOfRvaAndSizes <
-      IMAGE_NUMBEROF_DIRECTORY_ENTRIES) {
+  if (nt->FileHeader.SizeOfOptionalHeader < sizeof(IMAGE_OPTIONAL_HEADER32) ||
+      nt->OptionalHeader.NumberOfRvaAndSizes <
+          IMAGE_NUMBEROF_DIRECTORY_ENTRIES) {
     fail(error, "image data directories are truncated");
     return false;
   }
@@ -206,6 +215,53 @@ bool MemoryDll::load(const void *data, size_t size, std::string *error) {
     return false;
   }
 
+  const size_t sectionOffset = static_cast<size_t>(dos->e_lfanew) +
+                               offsetof(IMAGE_NT_HEADERS32, OptionalHeader) +
+                               nt->FileHeader.SizeOfOptionalHeader;
+  if (!within(sectionOffset,
+              static_cast<size_t>(nt->FileHeader.NumberOfSections) *
+                  sizeof(IMAGE_SECTION_HEADER),
+              sizeOfHeaders)) {
+    fail(error, "image section table is out of bounds");
+    return false;
+  }
+  const IMAGE_SECTION_HEADER *sections = sectionTable(nt);
+  const DWORD entryRva = nt->OptionalHeader.AddressOfEntryPoint;
+  bool entryExecutable = entryRva == 0;
+  for (WORD i = 0; i < nt->FileHeader.NumberOfSections; ++i) {
+    const IMAGE_SECTION_HEADER &section = sections[i];
+    const size_t bytes =
+        (std::max)(section.Misc.VirtualSize, section.SizeOfRawData);
+    if (!within(section.VirtualAddress, bytes,
+                nt->OptionalHeader.SizeOfImage) ||
+        (section.SizeOfRawData != 0 &&
+         !within(section.PointerToRawData, section.SizeOfRawData, size))) {
+      fail(error, "image section data is out of bounds");
+      return false;
+    }
+    if (entryRva >= section.VirtualAddress &&
+        entryRva - section.VirtualAddress < bytes &&
+        (section.Characteristics & IMAGE_SCN_MEM_EXECUTE) != 0)
+      entryExecutable = true;
+  }
+  if (!entryExecutable) {
+    fail(error, "image entry point is outside executable sections");
+    return false;
+  }
+  for (size_t i = 0; i < IMAGE_NUMBEROF_DIRECTORY_ENTRIES; ++i) {
+    // The certificate directory uses a file offset, not an image RVA.
+    if (i == IMAGE_DIRECTORY_ENTRY_SECURITY)
+      continue;
+    const IMAGE_DATA_DIRECTORY &directory = directories[i];
+    if (directory.Size != 0 &&
+        (directory.VirtualAddress == 0 ||
+         !within(directory.VirtualAddress, directory.Size,
+                 nt->OptionalHeader.SizeOfImage))) {
+      fail(error, "image data directory is out of bounds");
+      return false;
+    }
+  }
+
   uint8_t *image = static_cast<uint8_t *>(
       VirtualAlloc(nullptr, nt->OptionalHeader.SizeOfImage,
                    MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
@@ -213,26 +269,18 @@ bool MemoryDll::load(const void *data, size_t size, std::string *error) {
     fail(error, "image allocation failed");
     return false;
   }
-  // Register the image first: every failure below cleans up through
-  // unload() (detach is safe - the entry point has not run yet).
+  // Partial loads release imports and memory without calling module code.
+  // AttachedEntry is armed only after a successful process attach.
   Image = image;
   ImageSize = nt->OptionalHeader.SizeOfImage;
 
   std::memcpy(image, source, (std::min)(sizeOfHeaders, size));
-  const IMAGE_SECTION_HEADER *sections = sectionTable(nt);
   for (WORD i = 0; i < nt->FileHeader.NumberOfSections; ++i) {
     const IMAGE_SECTION_HEADER &section = sections[i];
-    if (section.SizeOfRawData == 0 ||
-        section.VirtualAddress >= nt->OptionalHeader.SizeOfImage)
+    if (section.SizeOfRawData == 0)
       continue;
-    const size_t rawSize =
-        (std::min)(static_cast<size_t>(section.SizeOfRawData), size);
-    const size_t room =
-        (std::min)(rawSize,
-                   static_cast<size_t>(nt->OptionalHeader.SizeOfImage) -
-                       static_cast<size_t>(section.VirtualAddress));
     std::memcpy(image + section.VirtualAddress,
-                source + section.PointerToRawData, room);
+                source + section.PointerToRawData, section.SizeOfRawData);
   }
 
   const ptrdiff_t delta =
@@ -244,18 +292,23 @@ bool MemoryDll::load(const void *data, size_t size, std::string *error) {
     unload();
     return false;
   }
+  if (!FlushInstructionCache(GetCurrentProcess(), image, ImageSize)) {
+    fail(error, "image instruction cache flush failed");
+    unload();
+    return false;
+  }
 
-  const auto entryPoint =
-      reinterpret_cast<BOOL(WINAPI *)(HINSTANCE, DWORD, LPVOID)>(
-          image + nt->OptionalHeader.AddressOfEntryPoint);
-  if (entryPoint) {
-    DisableThreadLibraryCalls(reinterpret_cast<HMODULE>(image));
+  if (entryRva != 0) {
+    const auto entryPoint =
+        reinterpret_cast<BOOL(WINAPI *)(HINSTANCE, DWORD, LPVOID)>(image +
+                                                                   entryRva);
     if (!entryPoint(reinterpret_cast<HINSTANCE>(image), DLL_PROCESS_ATTACH,
                     nullptr)) {
       fail(error, "image DllMain(DLL_PROCESS_ATTACH) refused the load");
       unload();
       return false;
     }
+    AttachedEntry = reinterpret_cast<void *>(entryPoint);
   }
   return true;
 }
@@ -266,16 +319,14 @@ void MemoryDll::unload() {
     return;
   Image = nullptr;
   ImageSize = 0;
+  void *attachedEntry = AttachedEntry;
+  AttachedEntry = nullptr;
 
-  // The PE header is still readable while the image is mapped; run the
-  // detach entry before the imports and the allocation are released.
-  const auto *dos = reinterpret_cast<const IMAGE_DOS_HEADER *>(image);
-  const auto *nt =
-      reinterpret_cast<const IMAGE_NT_HEADERS32 *>(image + dos->e_lfanew);
-  if (nt->OptionalHeader.AddressOfEntryPoint != 0) {
+  // Never run detach for an image whose imports/protection/attach failed.
+  if (attachedEntry) {
     const auto entryPoint =
         reinterpret_cast<BOOL(WINAPI *)(HINSTANCE, DWORD, LPVOID)>(
-            image + nt->OptionalHeader.AddressOfEntryPoint);
+            attachedEntry);
     entryPoint(reinterpret_cast<HINSTANCE>(image), DLL_PROCESS_DETACH, nullptr);
   }
   for (auto it = Imports.rbegin(); it != Imports.rend(); ++it)
@@ -301,7 +352,7 @@ void *MemoryDll::getExport(const char *name) const {
       reinterpret_cast<const DWORD *>(image + exports->AddressOfNames);
   for (DWORD i = 0; i < exports->NumberOfNames; ++i) {
     const char *candidate = reinterpret_cast<const char *>(image + names[i]);
-    if (std::strcmp(candidate, name) != 0)
+    if (std::string_view(candidate) != name)
       continue;
     const auto *ordinals =
         reinterpret_cast<const WORD *>(image + exports->AddressOfNameOrdinals);

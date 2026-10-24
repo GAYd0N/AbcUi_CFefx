@@ -5,7 +5,7 @@
 //
 // RmlUi 6 attaches stylesheets through <link> tags in each document's <head>
 // (no context-level sheet API in 6.3), so Theme's contract here is: every
-// HudPanel document links kBaseSheetPath first, then its own sheet.
+// module document chooses its own stylesheets.
 //
 // Scale model (batch A): the old VGUI proportional system laid panels out in
 // a 480-line design space (GetProportionalScaledValue = value * screenH/480),
@@ -22,9 +22,6 @@ class Context;
 namespace framework {
 
 namespace Theme {
-
-// Shared sheet every panel document links (fonts, colours, hud vars).
-constexpr const char *kBaseSheetPath = "abc/abcui/rcss/base.rcss";
 
 // Context-level density ratio (screenH/480). Call from rmlui init and on
 // every dimension change (HUD_VidInit chain).

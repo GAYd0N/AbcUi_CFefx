@@ -4,6 +4,7 @@
 #include "services/settings/VideoPendingStore.h"
 #include <chrono>
 #include <cstring>
+#include <string_view>
 #include "modules/gameui/engine/VideoBindings.h"
 namespace gameui::engine {
 bool DeferredVideoRestart = false;
@@ -27,7 +28,7 @@ services::settings::VideoModeModel::Seams videoSeams() {
     return count;
   };
   seams.clientCmd = [](const char *command) {
-    if (command && std::strcmp(command, "_restart\n") == 0) {
+    if (command && std::string_view(command) == "_restart\n") {
       DeferredVideoRestart = true; // never shares the flush with its writes
       return true;
     }

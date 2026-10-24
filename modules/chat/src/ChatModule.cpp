@@ -11,12 +11,16 @@
 // capped (hud_saytext_lines, at most six rows) over a 256-line scrollback,
 // the wheel browses older lines while the input line is open, and the block
 // fades out one second after hud_saytext_time elapses.
+#include "saytext/SayText.h"
+
 #include <abcui/events.h>
 #include <abcui/module_api.h>
+#include "../../common/ImeOverlay.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <format>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -24,6 +28,7 @@
 namespace {
 
 const AbcUiModuleApi *Api = nullptr;
+moduleui::ImeOverlay Ime;
 AbcUiPanelDesc Panel = {};
 
 constexpr const char *kPanelName = "chat";
@@ -37,8 +42,10 @@ constexpr size_t kMaxBuffer = 256;
 constexpr int kMaxWindowRows = 6;
 constexpr float kRowHeightDp = 13.0f;
 
-// Persisted contract (never rename): abc_ui_chat is AbcUi's own switch; the
-// hud_saytext_* set belongs to the game client and is only read.
+// Persisted contract (never rename): abc_ui_chat is AbcUi's owner-priority
+// switch (0 = off, 1 = prefer CaptionMod while cap_newchat is set, 2 = take
+// chat even then); the hud_saytext_* set belongs to the game client and is
+// only read.
 constexpr const char *kChatMode = "abc_ui_chat";
 
 AbcUiCvarHandle ChatMode = nullptr;
@@ -49,12 +56,6 @@ AbcUiCvarHandle SayTextBlockMuted = nullptr;
 AbcUiCvarHandle CaptionModChat = nullptr;
 
 enum class Mode { kNone = 0, kSay, kTeam };
-enum class RunKind { kText = 0, kName, kPrefix, kLocation };
-
-struct Run {
-  std::string text;
-  RunKind kind = RunKind::kText;
-};
 
 struct Line {
   AbcUiElement *node = nullptr;
@@ -72,6 +73,8 @@ int HistoryCursor = -1;
 std::string HistoryDraft;
 AbcUiInputToken Token = 0;
 std::string ImeBadge;
+bool StandDownHinted = false;
+bool TakeoverHinted = false;
 
 AbcUiDocument *panelDocument() {
   return Api->ui->panelDocument(kPanelName);
@@ -112,17 +115,78 @@ std::string escapeText(const std::string &text) {
 
 // ---- visibility (abc_ui_chat / hud_saytext / CaptionMod) ----
 
-bool otherOwnerActive() {
+AbcUiCvarHandle captionModChat() {
+  // CaptionMod may register cap_newchat after this module's onInit; retry
+  // until the engine knows it.
+  if (!CaptionModChat)
+    CaptionModChat = Api->console->findCvar("cap_newchat");
+  return CaptionModChat;
+}
+
+bool captionModActive() {
   // CaptionMod ships cap_newchat (default 1) as its chat replacement switch.
-  return CaptionModChat && cvarInt(CaptionModChat, 0) != 0;
+  const AbcUiCvarHandle cvar = captionModChat();
+  return cvar && cvarInt(cvar, 0) != 0;
 }
 
 bool chatEnabled() {
-  return cvarInt(ChatMode, 1) > 0 && !otherOwnerActive();
+  const int mode = cvarInt(ChatMode, 1);
+  if (mode <= 0)
+    return false;
+  if (mode >= 2)
+    return true;
+  return !captionModActive();
 }
 
 bool chatVisible() {
   return chatEnabled() && cvarInt(SayTextEnabled, 1) > 0;
+}
+
+void hintStandDown() {
+  if (StandDownHinted)
+    return;
+  StandDownHinted = true;
+  Api->core->print("chat: CaptionMod owns chat (cap_newchat is set); set "
+                   "cap_newchat 0 or abc_ui_chat 2 to use the AbcUi chat\n");
+}
+
+void hintTakeover() {
+  if (TakeoverHinted)
+    return;
+  TakeoverHinted = true;
+  Api->core->print("chat: taking chat ownership while cap_newchat is set "
+                   "(abc_ui_chat 2)\n");
+}
+
+// Promotes AbcUi's command and SayText hooks above the other chat plugin's
+// links. Both are order-sensitive: CaptionMod replaces the hook head when it
+// loads (or re-hooks on a map cycle), so the election is re-applied until the
+// head is ours. No-op while AbcUi stands down.
+void ensureOwnershipHooks() {
+  if (ABCUI_API_HAS_MEMBER(AbcUiCommandsApi, Api->commands,
+                           ensureFirstCommand)) {
+    Api->commands->ensureFirstCommand("messagemode");
+    Api->commands->ensureFirstCommand("messagemode2");
+  }
+  if (ABCUI_API_HAS_MEMBER(AbcUiDataApi, Api->data, ensureSayTextFirst))
+    Api->data->ensureSayTextFirst();
+}
+
+void maintainChatOwnership() {
+  const int mode = cvarInt(ChatMode, 1);
+  if (mode <= 0)
+    return;
+  const AbcUiCvarHandle caption = captionModChat();
+  if (!caption)
+    return; // no competing chat switch: the natural chain is enough
+  const bool active = cvarInt(caption, 0) != 0;
+  if (active && mode == 1) {
+    hintStandDown();
+    return;
+  }
+  if (active)
+    hintTakeover();
+  ensureOwnershipHooks();
 }
 
 double sayTextTime() {
@@ -132,129 +196,6 @@ double sayTextTime() {
 
 int sayTextLineCount() {
   return std::clamp(cvarInt(SayTextLines, kDefaultSayTextLines), 1, 64);
-}
-
-// ---- SayText parsing (the old ChatMessage helper) ----
-
-void appendRun(std::vector<Run> &runs, RunKind kind, const std::string &text) {
-  if (text.empty())
-    return;
-  if (!runs.empty() && runs.back().kind == kind) {
-    runs.back().text += text;
-    return;
-  }
-  runs.push_back(Run{text, kind});
-}
-
-std::string substituteParams(const std::string &format,
-                             const char *const params[4]) {
-  bool any = false;
-  for (int i = 0; i < 4; i++) {
-    if (params[i] && params[i][0])
-      any = true;
-  }
-  if (!any)
-    return format;
-  std::string out;
-  out.reserve(format.size());
-  int next = 0;
-  for (size_t i = 0; i < format.size(); i++) {
-    const char c = format[i];
-    if (c != '%' || i + 1 >= format.size()) {
-      out += c;
-      continue;
-    }
-    const char spec = format[i + 1];
-    if (spec == '%') {
-      out += '%';
-      i++;
-      continue;
-    }
-    if (spec == 's') {
-      if (i + 2 < format.size() && format[i + 2] >= '1' &&
-          format[i + 2] <= '9') {
-        const int position = format[i + 2] - '1';
-        if (position < 4) {
-          out += params[position] ? params[position] : "";
-          i += 2;
-          continue;
-        }
-        out += c;
-        continue;
-      }
-      if (next < 4)
-        out += params[next] ? params[next++] : (next++, "");
-      i++;
-      continue;
-    }
-    out += c;
-  }
-  return out;
-}
-
-// Splits a leading "(TEAM) " / "*DEAD* " decoration off the first text run.
-void splitPrefix(std::vector<Run> &runs) {
-  static const char *const kPrefixes[] = {"(TEAM) ", "*DEAD* ", "*SPEC* ",
-                                          "*SPECTATOR* "};
-  if (runs.empty() || runs.front().kind != RunKind::kText)
-    return;
-  for (const char *prefix : kPrefixes) {
-    const size_t length = std::strlen(prefix);
-    if (runs.front().text.compare(0, length, prefix) != 0)
-      continue;
-    Run head{prefix, RunKind::kPrefix};
-    runs.front().text.erase(0, length);
-    if (runs.front().text.empty())
-      runs.erase(runs.begin());
-    runs.insert(runs.begin(), std::move(head));
-    return;
-  }
-}
-
-std::vector<Run> buildRuns(const std::string &text, const char *const params[4],
-                           const std::string &senderName) {
-  std::string body = substituteParams(text, params);
-  while (!body.empty() && (body.back() == '\n' || body.back() == '\r'))
-    body.pop_back();
-
-  std::vector<Run> runs;
-  RunKind kind = RunKind::kText;
-  std::string pending;
-  for (size_t i = 0; i < body.size();) {
-    const unsigned char byte = static_cast<unsigned char>(body[i]);
-    if (byte == 0x01 || byte == 0x03 || byte == 0x04) {
-      appendRun(runs, kind, pending);
-      pending.clear();
-      kind = byte == 0x01   ? RunKind::kText
-             : byte == 0x03 ? RunKind::kName
-                            : RunKind::kLocation;
-      i++;
-      continue;
-    }
-    if (byte == 0x02) {
-      // Legacy marker: the sender name sits inside the text.
-      appendRun(runs, kind, pending);
-      pending.clear();
-      i++;
-      const size_t at =
-          senderName.empty() ? std::string::npos : body.find(senderName, i);
-      if (at == std::string::npos)
-        continue;
-      appendRun(runs, RunKind::kText, body.substr(i, at - i));
-      appendRun(runs, RunKind::kName, senderName);
-      i = at + senderName.size();
-      continue;
-    }
-    if (byte < 0x20 || byte == 0x7f) {
-      i++;
-      continue;
-    }
-    pending += static_cast<char>(byte);
-    i++;
-  }
-  appendRun(runs, kind, pending);
-  splitPrefix(runs);
-  return runs;
 }
 
 std::string playerColorCss(int client) {
@@ -271,22 +212,22 @@ std::string playerColorCss(int client) {
 // Prefix/location ink follows the old chat scheme (amber accent).
 constexpr const char *kAccentInk = "rgb(255, 176, 0)";
 
-std::string runsToRml(const std::vector<Run> &runs,
+std::string runsToRml(const std::vector<chatsaytext::Run> &runs,
                       const std::string &nameColor) {
   std::string rml;
   rml.reserve(256);
-  for (const Run &run : runs) {
+  for (const chatsaytext::Run &run : runs) {
     switch (run.kind) {
-    case RunKind::kName:
+    case chatsaytext::RunKind::kName:
       rml += "<span style=\"color: " + nameColor + ";\">" +
              escapeText(run.text) + "</span>";
       break;
-    case RunKind::kPrefix:
-    case RunKind::kLocation:
+    case chatsaytext::RunKind::kPrefix:
+    case chatsaytext::RunKind::kLocation:
       rml += std::string("<span style=\"color: ") + kAccentInk + ";\">" +
              escapeText(run.text) + "</span>";
       break;
-    case RunKind::kText:
+    case chatsaytext::RunKind::kText:
     default:
       rml += escapeText(run.text);
       break;
@@ -357,9 +298,8 @@ void updateFade() {
   if (percent == FadeOpacity)
     return;
   FadeOpacity = percent;
-  char value[8] = {};
-  std::snprintf(value, sizeof(value), "%.2f", percent / 100.0);
-  Api->ui->documentSetProperty(doc, "opacity", value);
+  const std::string value = std::format("{:.2f}", percent / 100.0);
+  Api->ui->documentSetProperty(doc, "opacity", value.c_str());
 }
 
 void updateVisibility() {
@@ -376,13 +316,13 @@ void applyWindowHeight() {
     return;
   WindowRows = rows;
   if (AbcUiElement *log = chatLog()) {
-    char value[16] = {};
-    std::snprintf(value, sizeof(value), "%.0fdp", rows * kRowHeightDp);
-    setProperty(log, "max-height", value);
+    const std::string value = std::format("{:.0f}dp", rows * kRowHeightDp);
+    setProperty(log, "max-height", value.c_str());
   }
 }
 
-void appendNode(const std::vector<Run> &runs, const std::string &nameColor) {
+void appendNode(const std::vector<chatsaytext::Run> &runs,
+                const std::string &nameColor) {
   AbcUiElement *log = chatLog();
   if (!log)
     return;
@@ -436,12 +376,13 @@ void setInputText(const std::string &text) {
 
 void setPrompt(Mode mode) {
   if (AbcUiElement *prompt = query("chat-prompt")) {
-    char out[128];
     const char *token = mode == Mode::kTeam ? "Chat_Team" : "Chat_Say";
-    if (!Api->ui->translate(token, out, sizeof(out)))
-      std::snprintf(out, sizeof(out), "%s",
-                    mode == Mode::kTeam ? "#Chat_Team" : "#Chat_Say");
-    Api->ui->elementSetInnerRML(prompt, escapeText(out).c_str());
+    char translated[128];
+    const std::string text =
+        Api->ui->translate(token, translated, sizeof(translated))
+            ? std::string(translated)
+            : std::format("#{}", token);
+    Api->ui->elementSetInnerRML(prompt, escapeText(text).c_str());
   }
 }
 
@@ -633,12 +574,12 @@ int32_t onSayText(void *, const void *payload) {
   sender.structSize = sizeof(sender);
   const bool known = Api->players->get(event->client, &sender) && sender.valid;
   const std::string senderName = known ? sender.name : std::string();
-  const std::vector<Run> runs =
-      buildRuns(event->text ? event->text : "", event->params, senderName);
+  const std::vector<chatsaytext::Run> runs = chatsaytext::buildRuns(
+      event->text ? event->text : "", event->params, senderName);
 
   // The console mirror the native handler did.
   std::string plain;
-  for (const Run &run : runs)
+  for (const chatsaytext::Run &run : runs)
     plain += run.text;
   if (!plain.empty())
     Api->core->print("%s", plain.c_str());
@@ -694,7 +635,13 @@ void panelOnData(void *, double frameTime) {
 
 // ---- lifecycle ----
 
+void onModuleFrame(double) {
+  Ime.frame();
+  maintainChatOwnership();
+}
+
 void onModuleLoad() {
+  Ime.load(Api, "abcui.chat");
   Panel.structSize = sizeof(Panel);
   Panel.name = kPanelName;
   Panel.documentPath = kDocumentPath;
@@ -721,9 +668,11 @@ void onModuleInit() {
   SayTextLines = Api->console->findCvar("hud_saytext_lines");
   SayTextBlockMuted = Api->console->findCvar("hud_saytext_block_muted");
   CaptionModChat = Api->console->findCvar("cap_newchat");
+  maintainChatOwnership();
 }
 
 void onModuleShutdown() {
+  Ime.reset();
   // The document dies with the context; drop the token and the rows.
   closeInput();
   Lines.clear();
@@ -734,19 +683,22 @@ void onModuleShutdown() {
 }
 
 void onModuleUnload() {
+  Ime.unload();
   Api = nullptr;
 }
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->console || !api->data ||
-      !api->players || !api->input || !api->voice || !api->commands)
+      !api->documents || !api->players || !api->input || !api->voice ||
+      !api->commands)
     return 0;
   if (api->ui->structSize < sizeof(AbcUiUiApi) ||
       api->console->structSize < sizeof(AbcUiConsoleApi) ||
@@ -758,11 +710,11 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.chat";
-  out->version = "1.0.0";
+  out->version = "2.1.0";
   out->onLoad = &onModuleLoad;
   out->onInit = &onModuleInit;
   out->onContextReady = nullptr;
-  out->onFrame = nullptr;
+  out->onFrame = &onModuleFrame;
   out->onVidInit = nullptr;
   out->onShutdown = &onModuleShutdown;
   out->onUnload = &onModuleUnload;

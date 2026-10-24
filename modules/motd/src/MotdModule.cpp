@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <format>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -267,6 +268,8 @@ void onMotd(void *, const void *payload) {
 }
 
 int onVguiMenu(void *, const void *payload) {
+  if (!panelDocument())
+    return 0;
   const auto *event = static_cast<const AbcUiVguiMenuEvent *>(payload);
   // The vanilla mission brief never opens: the missionbriefing command chain
   // feeds this panel instead.
@@ -308,10 +311,9 @@ void panelOnData(void *, double frameTime) {
   if (remaining > 0.0) {
     if (AbcUiElement *progress = Api->ui->querySelector(doc, "progress")) {
       const float ratio = static_cast<float>(remaining / kKeepTime);
-      char width[32];
-      std::snprintf(width, sizeof(width), "%gdp",
-                    122.0 * std::clamp(ratio, 0.0f, 1.0f));
-      Api->ui->elementSetProperty(progress, "width", width);
+      const std::string width =
+          std::format("{:g}dp", 122.0 * std::clamp(ratio, 0.0f, 1.0f));
+      Api->ui->elementSetProperty(progress, "width", width.c_str());
     }
     Fading = false;
     return;
@@ -369,6 +371,8 @@ void onModuleLoad() {
   Api->commands->subscribeCommand(
       "missionbriefing", 0,
       [](void *, const void *) -> int {
+        if (!panelDocument())
+          return 0;
         showMotd();
         return 1;
       },
@@ -398,10 +402,11 @@ void onModuleUnload() {
 
 } // namespace
 
-ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
-                                         const AbcUiModuleApi *api,
-                                         AbcUiModuleDescriptor *out) {
-  if (abiVersion != ABCUI_ABI_VERSION || !api || !out)
+ABCUI_MODULE_EXPORT int ABCUI_CALL
+AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
+                 AbcUiModuleDescriptor *out) {
+  if (abiVersion != ABCUI_ABI_VERSION || !api ||
+      !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
       !api->events || !api->ui || !api->console || !api->data || !api->vfs ||
@@ -418,7 +423,7 @@ ABCUI_MODULE_EXPORT int AbcUiModule_Main(uint32_t abiVersion,
 
   out->structSize = sizeof(AbcUiModuleDescriptor);
   out->id = "abcui.motd";
-  out->version = "1.0.0";
+  out->version = "2.0.0";
   out->onLoad = &onModuleLoad;
   out->onInit = &onModuleInit;
   out->onContextReady = nullptr;

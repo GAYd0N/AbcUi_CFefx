@@ -12,6 +12,8 @@ using namespace engine;
 
 void GameUiModule::onContextReady(Rml::Context *context) {
   Context = context;
+  if (!services::nativeUiBridge().armed())
+    return;
   ServerBrowser.startContext();
   // T12 startup recovery: a persisted unconfirmed-switch record drives
   // the first presentation (confirmation window on the actual mode, or

@@ -1,0 +1,474 @@
+/* mediaplayer.rcss - the in-game Media Player window (issue 11).
+
+   A centred 620x440dp dialog on the shared menu theme: dimmed scrim, title
+   bar, the now-playing readout with a progress bar, the transport and volume
+   rows, a scrollable playlist and the small playlist editor. Every panel is
+   absolutely positioned on the 480dp-tall logical screen and the window is
+   centred with left/top 50% plus negative margins, so 4:3 and 16:9 both
+   centre it. */
+
+body#mp-root {
+	width: 100%;
+	height: 100%;
+}
+
+/* ---- scrim -------------------------------------------------------------- */
+
+#mp-scrim {
+	position: absolute;
+	left: 0dp;
+	top: 0dp;
+	right: 0dp;
+	bottom: 0dp;
+	background-color: #0206098c;
+}
+
+/* ---- frame -------------------------------------------------------------- */
+
+#mp-window {
+	position: absolute;
+	box-sizing: border-box;
+	left: 50%;
+	margin-left: -310dp;
+	top: 50%;
+	margin-top: -220dp;
+	width: 620dp;
+	height: 440dp;
+	background-color: transparent;
+	border: 1dp var(--abc-line);
+	border-top: 2dp var(--abc-accent);
+	border-radius: 2dp;
+}
+
+#mp-window-bg {
+	position: absolute;
+	left: 0dp;
+	top: 0dp;
+	right: 0dp;
+	bottom: 0dp;
+	background-color: #0b1114f7;
+	border-radius: 1dp;
+}
+
+/* ---- header ------------------------------------------------------------- */
+
+#mp-header {
+	position: absolute;
+	box-sizing: border-box;
+	left: 0dp;
+	top: 0dp;
+	width: 620dp;
+	height: 62dp;
+	border-bottom: 1dp var(--abc-line-soft);
+}
+
+#mp-header-text {
+	position: absolute;
+	left: 18dp;
+	top: 12dp;
+	width: 480dp;
+	height: 40dp;
+}
+
+#mp-title {
+	display: block;
+	height: 22dp;
+	line-height: 22dp;
+	font-size: 16dp;
+	color: var(--abc-text-strong);
+}
+
+#mp-subtitle {
+	display: block;
+	height: 16dp;
+	line-height: 16dp;
+	font-size: 10dp;
+	color: var(--abc-text-dim);
+}
+
+#mp-close {
+	position: absolute;
+	left: 574dp;
+	top: 14dp;
+	width: 28dp;
+	height: 28dp;
+	min-width: 28dp;
+	padding: 0dp;
+	line-height: 26dp;
+	font-size: 13dp;
+	text-align: center;
+	background-color: transparent;
+	border: 1dp var(--abc-line);
+	color: var(--abc-text-dim);
+}
+
+#mp-close:hover {
+	border-color: var(--abc-danger);
+	color: var(--abc-danger);
+}
+
+/* ---- now playing -------------------------------------------------------- */
+
+#mp-now {
+	position: absolute;
+	left: 18dp;
+	top: 66dp;
+	width: 584dp;
+	height: 54dp;
+}
+
+#mp-track {
+	display: block;
+	height: 26dp;
+	line-height: 26dp;
+	font-size: 15dp;
+	color: var(--abc-accent);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+#mp-state {
+	display: block;
+	height: 18dp;
+	line-height: 18dp;
+	font-size: 11dp;
+	color: var(--abc-text-dim);
+}
+
+/* ---- progress ----------------------------------------------------------- */
+
+#mp-progress {
+	position: absolute;
+	left: 18dp;
+	top: 124dp;
+	width: 584dp;
+	height: 10dp;
+	background-color: var(--abc-inset);
+	border: 1dp var(--abc-line-soft);
+}
+
+#mp-progress fill {
+	background-color: var(--abc-accent);
+}
+
+#mp-time-row {
+	position: absolute;
+	left: 18dp;
+	top: 136dp;
+	width: 584dp;
+	height: 18dp;
+	font-size: 11dp;
+	color: var(--abc-text-dim);
+}
+
+#mp-elapsed {
+	position: absolute;
+	left: 0dp;
+	top: 0dp;
+	height: 18dp;
+	line-height: 18dp;
+}
+
+#mp-total {
+	position: absolute;
+	right: 0dp;
+	top: 0dp;
+	height: 18dp;
+	line-height: 18dp;
+}
+
+/* ---- transport ---------------------------------------------------------- */
+
+#mp-transport {
+	position: absolute;
+	left: 154dp;
+	top: 160dp;
+	width: 312dp;
+	height: 34dp;
+}
+
+#mp-transport button {
+	position: absolute;
+	top: 0dp;
+	height: 34dp;
+	box-sizing: border-box;
+	font-size: 12dp;
+	text-align: center;
+	background-color: var(--abc-surface-2);
+	border: 1dp var(--abc-line);
+	color: var(--abc-text);
+}
+
+#mp-transport button:hover {
+	background-color: var(--abc-surface-3);
+	border-color: var(--abc-accent-soft);
+}
+
+#mp-transport button:active {
+	background-color: var(--abc-accent);
+	color: var(--abc-accent-ink);
+}
+
+#mp-prev {
+	left: 0dp;
+	width: 56dp;
+}
+
+#mp-toggle {
+	left: 64dp;
+	width: 120dp;
+	background-color: var(--abc-accent-soft);
+	border-color: var(--abc-accent);
+	color: var(--abc-text-strong);
+}
+
+#mp-stop {
+	left: 192dp;
+	width: 56dp;
+}
+
+#mp-next {
+	left: 256dp;
+	width: 56dp;
+}
+
+#mp-toggle-label {
+	display: block;
+	height: 32dp;
+	line-height: 32dp;
+}
+
+/* ---- volume ------------------------------------------------------------- */
+
+#mp-volume-row {
+	position: absolute;
+	left: 18dp;
+	top: 204dp;
+	width: 584dp;
+	height: 24dp;
+}
+
+#mp-volume-label {
+	position: absolute;
+	left: 0dp;
+	top: 0dp;
+	width: 70dp;
+	height: 24dp;
+	line-height: 24dp;
+	font-size: 11dp;
+	color: var(--abc-text-dim);
+}
+
+#mp-volume {
+	position: absolute;
+	left: 76dp;
+	top: 1dp;
+	width: 428dp;
+	height: 22dp;
+}
+
+#mp-volume-value {
+	position: absolute;
+	left: 514dp;
+	top: 0dp;
+	width: 70dp;
+	height: 24dp;
+	line-height: 24dp;
+	font-size: 11dp;
+	color: var(--abc-text);
+	text-align: right;
+}
+
+/* ---- playlist ----------------------------------------------------------- */
+
+#mp-playlist-head {
+	position: absolute;
+	left: 18dp;
+	top: 238dp;
+	width: 584dp;
+	height: 20dp;
+	border-bottom: 1dp var(--abc-line-soft);
+}
+
+#mp-playlist-title {
+	position: absolute;
+	left: 0dp;
+	top: 0dp;
+	height: 20dp;
+	line-height: 20dp;
+	font-size: 11dp;
+	color: var(--abc-text-strong);
+}
+
+#mp-playlist-source {
+	position: absolute;
+	left: 82dp;
+	top: 0dp;
+	height: 20dp;
+	line-height: 20dp;
+	font-size: 10dp;
+	color: var(--abc-text-dim);
+}
+
+#mp-playlist-count {
+	position: absolute;
+	right: 0dp;
+	top: 0dp;
+	height: 20dp;
+	line-height: 20dp;
+	font-size: 10dp;
+	color: var(--abc-accent);
+}
+
+#mp-list {
+	position: absolute;
+	left: 18dp;
+	top: 262dp;
+	width: 584dp;
+	height: 120dp;
+	overflow-y: auto;
+	overflow-x: hidden;
+	background-color: var(--abc-inset);
+	border: 1dp var(--abc-line-soft);
+}
+
+.mp-row {
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	height: 24dp;
+	line-height: 24dp;
+	padding-left: 8dp;
+	padding-right: 8dp;
+	font-size: 11dp;
+	color: var(--abc-text);
+	background-color: transparent;
+}
+
+.mp-row:hover {
+	background-color: var(--abc-surface-3);
+}
+
+.mp-row-selected {
+	background-color: var(--abc-surface-3);
+	border-left: 2dp var(--abc-accent);
+	color: var(--abc-text-strong);
+}
+
+.mp-row-playing {
+	color: var(--abc-accent);
+}
+
+.mp-row-num {
+	display: inline-block;
+	width: 34dp;
+	color: var(--abc-text-dim);
+}
+
+.mp-row-name {
+	display: inline-block;
+	width: 470dp;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mp-row-mark {
+	display: inline-block;
+	width: 24dp;
+	text-align: right;
+	color: var(--abc-accent);
+}
+
+.mp-empty {
+	display: block;
+	padding: 8dp;
+	font-size: 11dp;
+	color: var(--abc-text-dim);
+}
+
+/* ---- editor ------------------------------------------------------------- */
+
+#mp-edit-row {
+	position: absolute;
+	left: 18dp;
+	top: 388dp;
+	width: 584dp;
+	height: 30dp;
+}
+
+#mp-add-path {
+	position: absolute;
+	left: 0dp;
+	top: 0dp;
+	width: 278dp;
+	height: 30dp;
+	box-sizing: border-box;
+	padding-left: 6dp;
+	padding-right: 6dp;
+	font-size: 11dp;
+	background-color: var(--abc-inset);
+	border: 1dp var(--abc-line);
+	color: var(--abc-text);
+}
+
+#mp-add-path:focus {
+	border-color: var(--abc-accent);
+}
+
+#mp-edit-row button {
+	position: absolute;
+	top: 0dp;
+	height: 30dp;
+	box-sizing: border-box;
+	font-size: 11dp;
+	text-align: center;
+	background-color: var(--abc-surface-2);
+	border: 1dp var(--abc-line);
+	color: var(--abc-text);
+}
+
+#mp-edit-row button:hover {
+	background-color: var(--abc-surface-3);
+	border-color: var(--abc-accent-soft);
+}
+
+#mp-add {
+	left: 286dp;
+	width: 54dp;
+}
+
+#mp-remove {
+	left: 348dp;
+	width: 64dp;
+}
+
+#mp-up {
+	left: 420dp;
+	width: 32dp;
+}
+
+#mp-down {
+	left: 460dp;
+	width: 32dp;
+}
+
+#mp-reload {
+	left: 500dp;
+	width: 84dp;
+}
+
+/* ---- hint --------------------------------------------------------------- */
+
+#mp-hint {
+	position: absolute;
+	left: 18dp;
+	top: 422dp;
+	width: 584dp;
+	height: 14dp;
+	line-height: 14dp;
+	font-size: 10dp;
+	color: var(--abc-warn);
+	display: none;
+}

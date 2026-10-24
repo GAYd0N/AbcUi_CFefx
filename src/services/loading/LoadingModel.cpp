@@ -105,11 +105,12 @@ void LoadingModel::loadingFinished(uint32_t generation,
     LevelFinished = true;
 }
 
-void LoadingModel::startProgress(uint32_t generation, const char *progressType,
+void LoadingModel::startProgress(uint32_t generation,
+                                 [[maybe_unused]] const char *progressType,
                                  int steps) {
   if (!live(generation))
     return;
-  (void)progressType; // the type string is not projected; steps carry the truth
+  // The type string is not projected; steps carry the truth.
   Primary.Point = 0;
   Primary.Steps = steps > 0 ? steps : 0;
   Primary.Known = steps > 0;
@@ -133,14 +134,14 @@ void LoadingModel::continueProgress(uint32_t generation, int point,
     Primary.Known = true;
 }
 
-void LoadingModel::stopProgress(uint32_t generation, bool error) {
+void LoadingModel::stopProgress(uint32_t generation,
+                                [[maybe_unused]] bool error) {
   if (!live(generation))
     return;
   // Non-error stop = the phase's progress completed (the level load that
   // follows keeps the page up until LoadingFinished). Error handling is the
   // module's: it dispatches the failed outcome with the engine reason, and
   // the controller owns the text - no second copy here.
-  (void)error;
 }
 
 void LoadingModel::setStatusText(uint32_t generation, const char *text) {

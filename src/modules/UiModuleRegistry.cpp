@@ -4,6 +4,7 @@
 #include <abc/Console.h>
 
 #include <cstring>
+#include <string_view>
 
 namespace modules {
 
@@ -35,7 +36,7 @@ IUiModule *ModuleRegistry::find(const char *name) const {
   if (!name)
     return nullptr;
   for (size_t i = 0; i < Count; ++i) {
-    if (std::strcmp(Modules[i]->name(), name) == 0)
+    if (std::string_view(Modules[i]->name()) == name)
       return Modules[i];
   }
   return nullptr;

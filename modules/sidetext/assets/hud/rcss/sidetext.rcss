@@ -12,7 +12,7 @@
 }
 
 /* Value template ({SCORE}/{SPEED}/{MAXSPEED}) at the small side-readout size;
-   the panel writes it as additive glyph ink (framework::glyphs), so the font
+   the panel writes it as additive glyph ink (module-generated textures), so the font
    below only drives the em sizing and the text fallback. */
 #sidetext #message {
 	font-family: Verdana;
