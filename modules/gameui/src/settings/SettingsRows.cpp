@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <string_view>
+#include <utility>
 
 namespace settingspage {
 
@@ -398,6 +399,20 @@ void renderRow(AbcUiSettingRow &row, bool skipInput) {
           return fileStem(value);
         return value;
       };
+      std::vector<std::pair<std::string, std::string>> choices;
+      std::string shownLabel = stringLabel(shownText);
+      for (int32_t index = 0; index < row.choiceCount; ++index) {
+        char value[ABCUI_SETTINGS_TEXT_MAX]{};
+        char label[ABCUI_SETTINGS_LABEL_MAX]{};
+        if (!Api->settings->choiceAt(cvar.c_str(), index, value, sizeof(value),
+                                     label, sizeof(label)))
+          continue;
+        const std::string text =
+            label[0] ? std::string(label) : stringLabel(value);
+        if (shownText == value)
+          shownLabel = text;
+        choices.emplace_back(value, text);
+      }
       // The live value rides FIRST (the widget auto-picks the first option
       // when it is added, and the deferred change it fires then carries the
       // live value = clean). An empty live value gets an "unset" placeholder
@@ -405,7 +420,7 @@ void renderRow(AbcUiSettingRow &row, bool skipInput) {
       if (shownText.empty())
         addOption("", resolve("#abcui.gameui/Settings_Unset"));
       else
-        addOption(shownText, stringLabel(shownText));
+        addOption(shownText, shownLabel);
       for (int32_t index = 0; index < row.optionCount; ++index) {
         float optionValue = 0.0f;
         char label[ABCUI_SETTINGS_LABEL_MAX];
@@ -415,16 +430,16 @@ void renderRow(AbcUiSettingRow &row, bool skipInput) {
           continue;
         addOption(label, stringLabel(label));
       }
-      for (int32_t index = 0; index < row.choiceCount; ++index) {
-        char value[ABCUI_SETTINGS_TEXT_MAX];
-        char label[ABCUI_SETTINGS_LABEL_MAX];
-        value[0] = '\0';
-        label[0] = '\0';
-        if (!Api->settings->choiceAt(cvar.c_str(), index, value, sizeof(value),
-                                     label, sizeof(label)))
-          continue;
-        addOption(value, label[0] ? std::string(label) : stringLabel(value));
-      }
+      for (const auto &[value, label] : choices)
+        addOption(value, label);
+    }
+    // A different action model can reuse all numeric values while changing
+    // every label. Both columns participate in the rebuild signature.
+    std::vector<std::string> signature;
+    signature.reserve(values.size() * 2);
+    for (std::size_t index = 0; index < values.size(); ++index) {
+      signature.push_back(values[index]);
+      signature.push_back(labels[index]);
     }
     std::vector<std::string> *shown = nullptr;
     for (auto &entry : SelectShown) {
@@ -433,7 +448,7 @@ void renderRow(AbcUiSettingRow &row, bool skipInput) {
       shown = &entry.second;
       break;
     }
-    if (!shown || *shown != values) {
+    if (!shown || *shown != signature) {
       Api->ui->elementSelectRemoveAll(control);
       for (std::size_t index = 0; index < values.size(); ++index) {
         const std::string label = escapeText(labels[index]);
@@ -441,9 +456,9 @@ void renderRow(AbcUiSettingRow &row, bool skipInput) {
                                   values[index].c_str());
       }
       if (shown)
-        *shown = values;
+        *shown = signature;
       else
-        SelectShown.emplace_back(cvar, values);
+        SelectShown.emplace_back(cvar, std::move(signature));
     }
     // Selection through SetSelection (a programmatic value attribute WOULD
     // dispatch change - the stack-overflow trap).

@@ -153,13 +153,20 @@ AbcUiCvarHandle GrenadeIndicator = nullptr;
 AbcUiCvarHandle GrenadeRange = nullptr;
 AbcUiCvarHandle GrenadeTime = nullptr;
 
+// Marker geometry in raw HUD px (the same basis as the other readouts).
+constexpr float kGrenadeIconSize = 24.0f;
+constexpr float kGrenadeArrowSize = 14.0f;
+constexpr float kGrenadeEdgeInset = 3.0f;
+constexpr float kGrenadeIconGap = 4.0f;
+
 struct TrackedGrenade {
   int index = 0;
   float origin[3] = {};
   float expire = 0.0f;
   int32_t messageNum = 0;
   bool noDraw = false;
-  AbcUiElement *marker = nullptr;
+  AbcUiElement *marker = nullptr; // wrapper box (icon + arrow)
+  AbcUiElement *arrow = nullptr;
 };
 std::vector<TrackedGrenade> Tracked;
 double GrenadeTimeNow = 0.0;
@@ -240,6 +247,21 @@ void viewForward(const AbcUiPlayerState &player, float forward[3]) {
   forward[0] = std::cos(pitch) * std::cos(yaw);
   forward[1] = std::cos(pitch) * std::sin(yaw);
   forward[2] = -std::sin(pitch);
+}
+
+// Engine AngleVectors basis with roll 0: the view right/up axes the edge
+// clamp resolves a direction against (also for points behind the eye).
+void viewBasis(const AbcUiPlayerState &player, float right[3], float up[3]) {
+  const float pitch = player.angles[0] * 3.14159265358979323846f / 180.0f;
+  const float yaw = player.angles[1] * 3.14159265358979323846f / 180.0f;
+  const float sp = std::sin(pitch), cp = std::cos(pitch);
+  const float sy = std::sin(yaw), cy = std::cos(yaw);
+  right[0] = sy;
+  right[1] = -cy;
+  right[2] = 0.0f;
+  up[0] = sp * cy;
+  up[1] = sp * sy;
+  up[2] = cp;
 }
 
 bool inFront(const float origin[3], const AbcUiPlayerState &player,
@@ -642,6 +664,18 @@ void onAddEntity(const AbcUiAddEntityEvent &event) {
   Tracked.push_back(tracked);
 }
 
+// Marker box: the old 24x24 grenade icon, plus a direction triangle that
+// only appears while the marker is pinned to the screen edge.
+void setPx(AbcUiElement *element, const char *name, float value) {
+  const std::string text = std::format("{:g}px", value);
+  Api->ui->elementSetProperty(element, name, text.c_str());
+}
+
+void hideGrenadeMarker(TrackedGrenade &tracked) {
+  if (tracked.marker)
+    Api->ui->elementSetProperty(tracked.marker, "display", "none");
+}
+
 void grenadeOnRedraw(void *, double frameTime) {
   GrenadeTimeNow += frameTime;
   AbcUiDocument *doc = panelDocument(kGrenadePanel);
@@ -677,45 +711,132 @@ void grenadeOnRedraw(void *, double frameTime) {
 
   if (player.index == 0)
     return;
-  float forward[3] = {};
-  viewForward(player, forward);
+  float right[3] = {};
+  float up[3] = {};
+  viewBasis(player, right, up);
 
   AbcUiElement *container = Api->ui->querySelector(doc, "markers");
   if (!container)
     return;
 
+  int screenW = 0, screenH = 0;
+  if (!Api->ui->documentSize(doc, &screenW, &screenH) || screenW <= 0 ||
+      screenH <= 0)
+    return;
+  const float width = static_cast<float>(screenW);
+  const float height = static_cast<float>(screenH);
+  const float centerX = width * 0.5f;
+  const float centerY = height * 0.5f;
+  // The icon box stays fully visible; the arrow rides the edge inset.
+  const float iconMargin = kGrenadeIconSize * 0.5f + 2.0f;
+  const float iconMinX = iconMargin, iconMaxX = width - iconMargin;
+  const float iconMinY = iconMargin, iconMaxY = height - iconMargin;
+  const float edgeMinX = kGrenadeEdgeInset + kGrenadeArrowSize * 0.5f;
+  const float edgeMaxX = width - edgeMinX;
+  const float edgeMinY = kGrenadeEdgeInset + kGrenadeArrowSize * 0.5f;
+  const float edgeMaxY = height - edgeMinY;
+  // Icon-center distance from the arrow center (half arrow + gap + half icon).
+  const float reticleOffset =
+      kGrenadeArrowSize * 0.5f + kGrenadeIconGap + kGrenadeIconSize * 0.5f;
+  const float range = cvarFloat(GrenadeRange, 256.0f);
+
   for (TrackedGrenade &tracked : Tracked) {
     if (!tracked.marker) {
       tracked.marker = Api->ui->elementAppendRml(
           container,
-          "<img src=\"mod://abcui.damage/hud/img/grenadeicon.png\"/>",
+          "<img class=\"icon\" "
+          "src=\"mod://abcui.damage/hud/img/grenadeicon.png\"/>"
+          "<img class=\"arrow\" "
+          "src=\"mod://abcui.damage/hud/img/grenadearrow.png\"/>",
           "grenade");
+      tracked.arrow = Api->ui->elementChild(tracked.marker, 1);
     }
     if (!tracked.marker)
       continue;
-    // Front-facing gate (old dot > 0.5) then project.
     const float rel[3] = {tracked.origin[0] - player.origin[0],
                           tracked.origin[1] - player.origin[1],
                           tracked.origin[2] - player.origin[2]};
     const float length =
         std::sqrt(rel[0] * rel[0] + rel[1] * rel[1] + rel[2] * rel[2]);
-    const float dot = length > 0.0f
-                          ? (rel[0] * forward[0] + rel[1] * forward[1] +
-                             rel[2] * forward[2]) /
-                                length
-                          : 0.0f;
-    if (dot > kFrontDotGate && length <= cvarFloat(GrenadeRange, 256.0f)) {
-      float screen[2] = {};
-      Api->ui->project(tracked.origin, screen);
-      // Old 24x24 box centered on the projection.
-      const std::string left = std::format("{:g}px", screen[0] - 12.0f);
-      const std::string top = std::format("{:g}px", screen[1] - 12.0f);
-      Api->ui->elementSetProperty(tracked.marker, "display", "block");
-      Api->ui->elementSetProperty(tracked.marker, "left", left.c_str());
-      Api->ui->elementSetProperty(tracked.marker, "top", top.c_str());
-    } else {
-      Api->ui->elementSetProperty(tracked.marker, "display", "none");
+    if (length > range || length <= 0.0f) {
+      hideGrenadeMarker(tracked);
+      continue;
     }
+
+    // Project first: the engine reads nonzero for a point behind the eye.
+    // Behind or outside the viewport no longer hides the marker - the old
+    // dot>0.5 front gate made a grenade in the same VIS group vanish the
+    // moment it left the view, which left the player without a direction.
+    float projected[2] = {};
+    const bool behind = Api->ui->project(tracked.origin, projected) != 0;
+    const bool onScreen = !behind && projected[0] >= iconMinX &&
+                          projected[0] <= iconMaxX &&
+                          projected[1] >= iconMinY && projected[1] <= iconMaxY;
+
+    float iconX = projected[0];
+    float iconY = projected[1];
+    float dirX = 0.0f, dirY = 0.0f;
+    bool clamped = !onScreen;
+    if (clamped) {
+      if (!behind) {
+        dirX = projected[0] - centerX;
+        dirY = projected[1] - centerY;
+      } else {
+        // View-space basis (engine AngleVectors, roll 0): right/up components
+        // give the direction in every quadrant, including directly behind
+        // the eye where the engine projection mirrors.
+        const float xr =
+            rel[0] * right[0] + rel[1] * right[1] + rel[2] * right[2];
+        const float yu = rel[0] * up[0] + rel[1] * up[1] + rel[2] * up[2];
+        dirX = xr;
+        dirY = -yu;
+      }
+      const float magnitude = std::sqrt(dirX * dirX + dirY * dirY);
+      if (magnitude < 0.0001f) {
+        // Exactly behind/above: point the arrow at the bottom edge.
+        dirX = 0.0f;
+        dirY = 1.0f;
+      } else {
+        dirX /= magnitude;
+        dirY /= magnitude;
+      }
+      // Cast the direction ray from the screen centre to the edge rect.
+      const float tX = dirX > 0.0f   ? (edgeMaxX - centerX) / dirX
+                       : dirX < 0.0f ? (edgeMinX - centerX) / dirX
+                                     : 1.0e30f;
+      const float tY = dirY > 0.0f   ? (edgeMaxY - centerY) / dirY
+                       : dirY < 0.0f ? (edgeMinY - centerY) / dirY
+                                     : 1.0e30f;
+      const float t = (std::min)(tX, tY);
+      const float edgeX = std::clamp(centerX + dirX * t, edgeMinX, edgeMaxX);
+      const float edgeY = std::clamp(centerY + dirY * t, edgeMinY, edgeMaxY);
+      // Keep the icon inside the screen, just inboard of the arrow.
+      iconX = std::clamp(edgeX - dirX * reticleOffset, iconMinX, iconMaxX);
+      iconY = std::clamp(edgeY - dirY * reticleOffset, iconMinY, iconMaxY);
+      if (tracked.arrow) {
+        // Arrow centre relative to the (24x24) marker box's top-left.
+        setPx(tracked.arrow, "left",
+              edgeX - (iconX - kGrenadeIconSize * 0.5f) -
+                  kGrenadeArrowSize * 0.5f);
+        setPx(tracked.arrow, "top",
+              edgeY - (iconY - kGrenadeIconSize * 0.5f) -
+                  kGrenadeArrowSize * 0.5f);
+        const float degrees =
+            std::atan2(dirY, dirX) * 180.0f / 3.14159265358979323846f;
+        const std::string rotation = std::format("rotate({:g}deg)", degrees);
+        Api->ui->elementSetProperty(tracked.arrow, "transform",
+                                    rotation.c_str());
+        Api->ui->elementSetProperty(tracked.arrow, "display", "block");
+      }
+    } else if (tracked.arrow) {
+      Api->ui->elementSetProperty(tracked.arrow, "display", "none");
+    }
+
+    // The marker box is the 24x24 icon box; the old panel centred it on the
+    // projection (left = x - 12).
+    Api->ui->elementSetProperty(tracked.marker, "display", "block");
+    setPx(tracked.marker, "left", iconX - kGrenadeIconSize * 0.5f);
+    setPx(tracked.marker, "top", iconY - kGrenadeIconSize * 0.5f);
   }
 }
 

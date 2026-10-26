@@ -42,10 +42,10 @@ constexpr size_t kMaxBuffer = 256;
 constexpr int kMaxWindowRows = 6;
 constexpr float kRowHeightDp = 13.0f;
 
-// Persisted contract (never rename): abc_ui_chat is AbcUi's owner-priority
-// switch (0 = off, 1 = prefer CaptionMod while cap_newchat is set, 2 = take
-// chat even then); the hud_saytext_* set belongs to the game client and is
-// only read.
+// Persisted contract (never rename): abc_ui_chat is AbcUi's chat switch
+// (0 = off, any other value = on, the default; while on, CaptionMod's chat
+// takeover cap_newchat is forced off and restored when the switch goes back
+// to 0); the hud_saytext_* set belongs to the game client and is only read.
 constexpr const char *kChatMode = "abc_ui_chat";
 
 AbcUiCvarHandle ChatMode = nullptr;
@@ -73,8 +73,11 @@ int HistoryCursor = -1;
 std::string HistoryDraft;
 AbcUiInputToken Token = 0;
 std::string ImeBadge;
-bool StandDownHinted = false;
-bool TakeoverHinted = false;
+bool ForceNoticeHinted = false;
+// cap_newchat's value before this module forced it off; the float is restored
+// when the AbcUi chat is turned off.
+bool CaptionModForcedOff = false;
+float CaptionModSavedValue = 1.0f;
 
 AbcUiDocument *panelDocument() {
   return Api->ui->panelDocument(kPanelName);
@@ -123,70 +126,53 @@ AbcUiCvarHandle captionModChat() {
   return CaptionModChat;
 }
 
-bool captionModActive() {
-  // CaptionMod ships cap_newchat (default 1) as its chat replacement switch.
-  const AbcUiCvarHandle cvar = captionModChat();
-  return cvar && cvarInt(cvar, 0) != 0;
-}
-
 bool chatEnabled() {
-  const int mode = cvarInt(ChatMode, 1);
-  if (mode <= 0)
-    return false;
-  if (mode >= 2)
-    return true;
-  return !captionModActive();
+  return cvarInt(ChatMode, 1) > 0;
 }
 
 bool chatVisible() {
   return chatEnabled() && cvarInt(SayTextEnabled, 1) > 0;
 }
 
-void hintStandDown() {
-  if (StandDownHinted)
+// While AbcUi's chat is enabled (abc_ui_chat nonzero, the default),
+// CaptionMod's takeover must be off: its hooks sit at the head of the usermsg
+// and command chains (it loads after AbcUi) and swallow
+// SayText/TextMsg/messagemode after handling them, so the wires never reach
+// AbcUi's frames. With cap_newchat at 0 CaptionMod declines and forwards
+// everything instead; the user value is remembered once and restored when the
+// AbcUi chat is turned off.
+void forceCaptionModOff(const AbcUiCvarHandle caption) {
+  if (!caption || cvarInt(caption, 0) == 0)
     return;
-  StandDownHinted = true;
-  Api->core->print("chat: CaptionMod owns chat (cap_newchat is set); set "
-                   "cap_newchat 0 or abc_ui_chat 2 to use the AbcUi chat\n");
-}
-
-void hintTakeover() {
-  if (TakeoverHinted)
-    return;
-  TakeoverHinted = true;
-  Api->core->print("chat: taking chat ownership while cap_newchat is set "
-                   "(abc_ui_chat 2)\n");
-}
-
-// Promotes AbcUi's command and SayText hooks above the other chat plugin's
-// links. Both are order-sensitive: CaptionMod replaces the hook head when it
-// loads (or re-hooks on a map cycle), so the election is re-applied until the
-// head is ours. No-op while AbcUi stands down.
-void ensureOwnershipHooks() {
-  if (ABCUI_API_HAS_MEMBER(AbcUiCommandsApi, Api->commands,
-                           ensureFirstCommand)) {
-    Api->commands->ensureFirstCommand("messagemode");
-    Api->commands->ensureFirstCommand("messagemode2");
+  if (!CaptionModForcedOff) {
+    CaptionModSavedValue = cvarFloat(caption, 1.0f);
+    CaptionModForcedOff = true;
+    if (!ForceNoticeHinted) {
+      ForceNoticeHinted = true;
+      Api->core->print("chat: CaptionMod's chat is disabled while the AbcUi "
+                       "chat is on (abc_ui_chat); cap_newchat is restored "
+                       "when it is turned off\n");
+    }
   }
-  if (ABCUI_API_HAS_MEMBER(AbcUiDataApi, Api->data, ensureSayTextFirst))
-    Api->data->ensureSayTextFirst();
+  Api->console->setCvarValue(caption, 0.0f);
+}
+
+void releaseForcedCaptionMod(const AbcUiCvarHandle caption) {
+  if (!CaptionModForcedOff)
+    return;
+  CaptionModForcedOff = false;
+  if (caption)
+    Api->console->setCvarValue(caption, CaptionModSavedValue);
 }
 
 void maintainChatOwnership() {
-  const int mode = cvarInt(ChatMode, 1);
-  if (mode <= 0)
-    return;
   const AbcUiCvarHandle caption = captionModChat();
   if (!caption)
-    return; // no competing chat switch: the natural chain is enough
-  const bool active = cvarInt(caption, 0) != 0;
-  if (active && mode == 1) {
-    hintStandDown();
-    return;
-  }
-  if (active)
-    hintTakeover();
-  ensureOwnershipHooks();
+    return; // CaptionMod is not installed: nothing to arbitrate
+  if (chatEnabled())
+    forceCaptionModOff(caption);
+  else
+    releaseForcedCaptionMod(caption);
 }
 
 double sayTextTime() {
@@ -572,7 +558,11 @@ int32_t onSayText(void *, const void *payload) {
 
   AbcUiPlayerInfo sender{};
   sender.structSize = sizeof(sender);
-  const bool known = Api->players->get(event->client, &sender) && sender.valid;
+  // A non-positive client byte is the server console's own line (`say` typed
+  // into the dedicated-server console arrives as SayText client 0 or
+  // TextMsg/HUD_PRINTTALK): no sender row, no player tint.
+  const bool known = event->client >= 1 && event->client <= 32 &&
+                     Api->players->get(event->client, &sender) && sender.valid;
   const std::string senderName = known ? sender.name : std::string();
   const std::vector<chatsaytext::Run> runs = chatsaytext::buildRuns(
       event->text ? event->text : "", event->params, senderName);

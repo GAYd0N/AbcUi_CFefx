@@ -94,7 +94,7 @@ int32_t apiEntity(int32_t index, AbcUiEntityState *out) {
 }
 
 int32_t apiClientColor(int32_t index, float out[3]) {
-  if (!out || !hooks::GetClientColor)
+  if (!out || index < 1 || index > 32 || !hooks::GetClientColor)
     return 0;
   const float *tint = hooks::GetClientColor(index);
   if (!tint)
@@ -102,6 +102,11 @@ int32_t apiClientColor(int32_t index, float out[3]) {
   out[0] = std::clamp(tint[0], 0.0f, 1.0f);
   out[1] = std::clamp(tint[1], 0.0f, 1.0f);
   out[2] = std::clamp(tint[2], 0.0f, 1.0f);
+  // The client answers (0, 0, 0) for players outside any team colour; a
+  // solid black tint is never a usable text colour on the dark UI, so report
+  // "no colour" and let the caller keep its default.
+  if (out[0] == 0.0f && out[1] == 0.0f && out[2] == 0.0f)
+    return 0;
   return 1;
 }
 

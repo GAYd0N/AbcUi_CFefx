@@ -1,6 +1,9 @@
 // framework::radarrender implementation - see RadarRender.h. Ported from the
 // built-in radar panel's render half (old CRadarPanel::RenderRadar, from
-// ABCEnchance src/hud/vgui/radar.cpp).
+// ABCEnchance src/hud/vgui/radar.cpp). Since issue #24 the GPU half lives in
+// the render backend (IWorldPass); this file keeps the orchestration: cvar
+// save/restore, camera math, zoom, the mask slot and the external-texture
+// registration.
 #include "RadarRender.h"
 
 #include <cstdint>
@@ -18,10 +21,8 @@
 #include "../data/HudState.h"
 #include "../rmlui/AbcRenderInterface.h"
 #include "../rmlui/RmlUiModule.h"
-#include "../rmlui/VGUI2ExtensionImport.h"
-#include "../framework/ImageLoader.h"
-#include "Render.h"
-#include "RenderCommon.h"
+#include "BackendHost.h"
+#include "IRenderBackend.h"
 
 namespace framework {
 namespace radarrender {
@@ -34,70 +35,57 @@ constexpr float kOrthoBase = 4096.0f;
 // Old m_vClearColor (Radar.ClearColor 0 0 0 255).
 constexpr float kClearColor[4] = {0.0f, 0.0f, 0.0f, 1.0f};
 
-FBO_Container_t RadarFbo = {};
-bool FboReady = false;
 bool Active = false;
-bool Started = false;
 float Zoom = 2.5f;
 
 // The module uploads and selects its own mask texture.
 int MaskSelect = 0;
 
-// The map URI generation: bumped whenever the registered handle changes
-// (registration time + frame-buffer regeneration).
+// The backend owns the render target; the framework observes the texture id
+// (it changes on creation / frame-buffer regeneration) and re-registers the
+// external texture + bumps the generation so the module's <img> re-resolves.
+unsigned int RegisteredTexture = 0;
 int MapGeneration = 0;
 
-void createFbo() {
-  IMetaRenderer *renderer = abc::MetaRenderer();
-  if (!renderer)
-    return;
-  if (FboReady)
-    renderer->FreeFBO(&RadarFbo);
-  RadarFbo = {};
-  RadarFbo.iWidth = kFboSize;
-  RadarFbo.iHeight = kFboSize;
-  renderer->GenFrameBuffer(&RadarFbo, "RadarPanelFBO");
-  renderer->FrameBufferColorTexture(&RadarFbo, GL_RGBA8);
-  renderer->FrameBufferDepthTexture(&RadarFbo, GL_DEPTH24_STENCIL8);
-  FboReady = RadarFbo.s_hBackBufferTex != 0;
-  MapGeneration++;
-}
-
-void destroyFbo() {
-  if (!FboReady)
-    return;
-  if (IMetaRenderer *renderer = abc::MetaRenderer())
-    renderer->FreeFBO(&RadarFbo);
-  RadarFbo = {};
-  FboReady = false;
-  // The registered handle died with the FBO; the next generate re-registers
-  // (+ bumps MapGeneration so the <img> re-resolves).
-  if (rmlui::AbcRenderInterface *renderInterface = rmlui::renderInterface())
-    renderInterface->unregisterExternalTexture("radarfbo://");
-}
-
-// Pushes the live registration (FBO colour texture + mask slot) into the
-// render interface; the module's URI refresh picks the handle up.
-void registerExternal() {
+void syncRegistration() {
+  abc::render::IWorldPass *world = abc::render::worldPass();
   rmlui::AbcRenderInterface *renderInterface = rmlui::renderInterface();
-  if (!renderInterface || !FboReady)
+  if (!world || !renderInterface)
     return;
+  const unsigned int texture = world->texture();
+  if (texture == 0) {
+    if (RegisteredTexture != 0) {
+      RegisteredTexture = 0;
+      renderInterface->unregisterExternalTexture("radarfbo://");
+    }
+    return;
+  }
+  if (texture == RegisteredTexture)
+    return;
+  RegisteredTexture = texture;
+  MapGeneration++;
   renderInterface->registerExternalTexture(
-      "radarfbo://", static_cast<Rml::TextureHandle>(RadarFbo.s_hBackBufferTex),
-      RadarFbo.iWidth, RadarFbo.iHeight, &MaskSelect);
+      "radarfbo://", static_cast<Rml::TextureHandle>(texture), kFboSize,
+      kFboSize, &MaskSelect);
 }
 
-// Old CRadarPanel::RenderRadar: render the world from +72u straight down into
-// the radar FBO (world class only, entities/viewmodel/dynamics ducked).
+// Old CRadarPanel::RenderRadar framework half: render the world from +72u
+// straight down into the backend's radar target (world class only,
+// entities/viewmodel/dynamics ducked). Runs from the backend's world beat,
+// inside its frame - the old RadarCallbacks::OnPreRenderView slot.
 void renderRadar() {
-  IMetaRenderer *renderer = abc::MetaRenderer();
-  if (!renderer || !FboReady || !Active)
+  abc::render::IWorldPass *world = abc::render::worldPass();
+  if (!world || !Active)
     return;
   // The suit gate lives with the module's visibility decision (it only calls
   // setActive while the plate is on screen), so the expensive world pass
   // never runs for an invisible plate.
   const cl_entity_t *local = gEngfuncs.GetLocalPlayer();
   if (!local || local->index <= 0)
+    return;
+  world->ensureTarget(kFboSize, kFboSize);
+  syncRegistration();
+  if (world->texture() == 0)
     return;
 
   // Old arySaveCvars duck-typing.
@@ -126,55 +114,25 @@ void renderRadar() {
   if (deferred)
     deferred->value = 0;
 
-  renderer->BeginDebugGroup("CRadarPanel::RenderRadar");
-  renderer->BindFrameBuffer(&RadarFbo);
-  renderer->SetCurrentSceneFBO(&RadarFbo);
-
-  vec3_t origin{};
-  vec3_t angles{};
+  abc::render::IWorldPass::Request request;
+  request.width = kFboSize;
+  request.height = kFboSize;
   for (int i = 0; i < 3; i++)
-    origin[i] = local->curstate.origin[i];
-  origin[2] += kCameraHeight;
+    request.origin[i] = local->curstate.origin[i];
+  request.origin[2] += kCameraHeight;
   for (int i = 0; i < 3; i++)
-    angles[i] = local->curstate.angles[i];
-  angles[0] = 90.0f; // straight down
-  angles[2] = 0.0f;  // no roll
-
-  renderer->PushRefDef();
-  // Multiview on: R_SetupGL then leaves viewport/projection/world matrix to
-  // us (the old code's own trick); the UBO upload below replaces
-  // R_UploadCameraUBO, which self-skips under multiview.
-  renderer->SetMultiviewEnabled(true);
-  const int oldDrawClassify = renderer->GetDrawClassify();
-  renderer->SetDrawClassify(DRAW_CLASSIFY_WORLD | DRAW_CLASSIFY_LIGHTMAP);
-  renderer->SetRefDefViewOrigin(origin);
-  renderer->SetRefDefViewAngles(angles);
-  renderer->UpdateRefDef();
-  renderer->LoadIdentityForProjectionMatrix();
+    request.angles[i] = local->curstate.angles[i];
+  request.angles[0] = 90.0f; // straight down
+  request.angles[2] = 0.0f;  // no roll
   // Old SetupOrthoProjectionMatrix(-worldSize..+worldSize, 2048, -2048) with
   // worldSize = 4096/zoom: the frustum half-extent (the visible span is
   // 2*worldSize - the same span the module's avatar math divides by).
-  const float worldHalf = kOrthoBase / Zoom;
-  renderer->SetupOrthoProjectionMatrix(-worldHalf, worldHalf, -worldHalf,
-                                       worldHalf, kOrthoBase, -kOrthoBase,
-                                       true);
-  renderer->LoadIdentityForWorldMatrix();
-  renderer->SetupPlayerViewWorldMatrix(origin, angles);
-  renderer->SetViewport(0, 0, kFboSize, kFboSize);
-
-  camera_ubo_t cameraUbo = {};
-  renderer->SetupCameraView(&cameraUbo.views[0]);
-  cameraUbo.numViews = 1;
-  renderer->UploadCameraUBOData(&cameraUbo);
-
-  renderer->ClearColorDepthStencil(const_cast<float *>(kClearColor), 1.0f, 0,
-                                   STENCIL_MASK_ALL);
-  renderer->RenderScene();
-
-  renderer->SetDrawClassify(oldDrawClassify);
-  renderer->SetMultiviewEnabled(false);
-  renderer->PopRefDef();
-  renderer->EndDebugGroup();
+  request.orthoHalfExtent = kOrthoBase / Zoom;
+  request.orthoNear = kOrthoBase;
+  request.orthoFar = -kOrthoBase;
+  for (int i = 0; i < 4; i++)
+    request.clearColor[i] = kClearColor[i];
+  world->render(request);
 
   if (drawEntities)
     drawEntities->value = savedEntities;
@@ -190,47 +148,20 @@ void renderRadar() {
     deferred->value = savedDeferred;
 }
 
-// Engine-lifetime render callbacks (old CMetaRendererCallbacks radar half +
-// the ModelViewPanel frame-buffer regeneration seam; the old radar lacked the
-// latter - D-19 closes that latent hole).
-class RadarCallbacks : public IMetaRendererCallbacks {
-public:
-  void OnBeginRendering(int *, int *, int *, int *) override {}
-  void OnRenderFrameStart() override {}
-  void OnBeginRenderingPost(int *, int *, int *, int *) override {}
-  void OnFreeFrameBuffers() override {
-    destroyFbo();
-  }
-  void OnGenerateFrameBuffers() override {
-    createFbo();
-    registerExternal();
-  }
-  void OnPreRenderView() override {
-    renderRadar();
-  }
-  void OnPreRenderViewPost() override {}
-  void OnPostRenderView() override {}
-  void OnPostRenderViewPost() override {}
-  void OnRenderEndFrame() override {}
-};
-
-RadarCallbacks Callbacks;
-
-void startProducer() {
-  if (Started)
-    return;
-  Started = true;
-  if (IMetaRenderer *renderer = abc::MetaRenderer())
-    renderer->RegisterRenderCallbacks(&Callbacks);
-  createFbo();
-  registerExternal();
-}
-
 } // namespace
 
+void onWorldPassBeat() {
+  renderRadar();
+}
+
 void setActive(bool active) {
-  startProducer();
   Active = active;
+  // Ensure the target exists before the first beat (the module may query
+  // ready()/generation() right after presenting the plate).
+  if (abc::render::IWorldPass *world = abc::render::worldPass()) {
+    world->ensureTarget(kFboSize, kFboSize);
+    syncRegistration();
+  }
 }
 
 void setMask(int textureId) {
@@ -247,10 +178,12 @@ void setZoom(float zoom) {
 }
 
 bool ready() {
-  return FboReady;
+  const abc::render::IWorldPass *world = abc::render::worldPass();
+  return world && world->texture() != 0;
 }
 
 int generation() {
+  syncRegistration();
   return MapGeneration;
 }
 

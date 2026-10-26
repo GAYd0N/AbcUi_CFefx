@@ -49,6 +49,7 @@
 // engine registers without FCVAR_ARCHIVE - the original behaves the same).
 
 #include <deque>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -120,6 +121,8 @@ struct SettingRow {
   // them with the file stem, and the write validation accepts a relative
   // path (no traversal) instead of the bare enum-token charset.
   bool FileChoices = false;
+  // Optional text fields (for example a weapon path: empty means no weapon).
+  bool AllowEmpty = false;
 };
 
 // Per-row lifecycle. kClean -> (edit) -> kDirty -> (apply) -> kClean, with
@@ -184,6 +187,8 @@ public:
     // channel (buffered - the model treats the effect as deferred).
     bool (*isKeyDown)(const char *stateName) = nullptr;
     bool (*clientCmd)(const char *command) = nullptr;
+    // Optional composition-owned validation for specialized text cvars.
+    bool (*validateText)(const char *name, const char *value) = nullptr;
   };
 
   SettingsModel(const SettingRow *rows, int count);
@@ -206,6 +211,9 @@ public:
   // The labelled form (file scans): values are stored, labels are shown.
   // Both vectors are sorted together by value.
   void setStringChoices(const char *cvar, std::vector<StringChoice> choices);
+  // Composition-owned dependent option providers. Runs after draft/snapshot
+  // changes and before apply; re-entrant draft corrections do not recurse.
+  void setChoiceRefresh(std::function<void(SettingsModel &)> refresh);
 
   // Re-reads engine truth. Untouched rows adopt the new value silently;
   // rows with a pending user edit keep the draft and flip to kConflict
@@ -322,6 +330,9 @@ private:
 
   Seams Seams_;
   std::vector<RowRuntime> Rows_;
+  std::function<void(SettingsModel &)> ChoiceRefresh_;
+  bool RefreshingChoices_ = false;
+  void refreshChoices();
 };
 
 // kText byte budget: the shipped OptionsSubMultiplayer.res NameEntry

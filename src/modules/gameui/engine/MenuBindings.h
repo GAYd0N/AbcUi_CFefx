@@ -16,6 +16,11 @@ struct PlayerCardFacts {
   std::string PlayerName;
   std::string ModelName; // as the cvar spells it ("HT_Cerberus")
   std::string ModelPath; // resolvable Studio path for the <model> element
+  // The action group that drives the card's pose, the weapon merged onto it
+  // and the group sequence shown (empty path = that entity is not used).
+  std::string ActionModel;
+  std::string WeaponModel;
+  int Sequence = 0;
 };
 PlayerCardFacts playerCardFacts();
 // Current engine level name; empty when no world is loaded. The command-menu

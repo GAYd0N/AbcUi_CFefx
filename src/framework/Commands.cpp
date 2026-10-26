@@ -36,11 +36,11 @@ struct Entry {
   std::string name;
   std::string channel;
   xcommand_t original = nullptr;
-  // The handler that was displaced from the head of the engine chain by
-  // ensureFirst(). The outermost link forwards here when no sink consumed the
-  // command; the nested (older) link always terminates at original.
-  xcommand_t upstream = nullptr;
-  int depth = 0;
+  // abc_ui_mediaplayer diagnostics: how often the bridge ran and what it
+  // did with the command.
+  unsigned dispatches = 0;
+  unsigned consumed = 0;
+  int last = -1; // 1 consumed, 0 chained to the original, -1 never ran
 };
 
 struct Registry {
@@ -71,30 +71,18 @@ void commandThunk() {
   if (it == entries.end())
     return;
   Entry &entry = it->second;
-  // A bridge promoted by ensureFirst() leaves its old link in the chain
-  // below; only the outermost link may publish. The nested link forwards
-  // straight to the chain tail so a chained plugin cannot dispatch twice.
-  ++entry.depth;
-  struct DepthGuard {
-    int &depth;
-    ~DepthGuard() { --depth; }
-  } guard{entry.depth};
-  if (entry.depth > 1) {
-    if (entry.original)
-      entry.original();
+  // Process-owned entries stay valid when a module callback hooks another
+  // command. Snapshot the original before invoking any module code.
+  const xcommand_t original = entry.original;
+  entry.dispatches++;
+  if (framework::eventBus().publishVetoAggregateRaw(entry.channel.c_str(),
+                                                    nullptr)) {
+    entry.consumed++;
+    entry.last = 1;
     return;
   }
-  // Process-owned entries stay valid when a module callback hooks another
-  // command. Snapshot the chain before invoking any module code.
-  const xcommand_t original = entry.original;
-  const xcommand_t upstream = entry.upstream;
-  const bool consumed = framework::eventBus().publishVetoAggregateRaw(
-      entry.channel.c_str(), nullptr);
-  if (consumed)
-    return;
-  if (upstream)
-    upstream();
-  else if (original)
+  entry.last = 0;
+  if (original)
     original();
 }
 
@@ -149,32 +137,27 @@ AbcUiSubscription subscribe(const char *name, int priority, AbcUiEventVeto sink,
       it->second.channel.c_str(), priority, sink, userdata);
 }
 
-int32_t ensureFirst(const char *name) {
-  if (!g_pMetaHookAPI || !g_pMetaHookAPI->FindCmd ||
-      !g_pMetaHookAPI->HookCmd)
-    return 0;
+bool debugBridge(const char *name, unsigned &dispatches, unsigned &consumed,
+                 int &last, bool &engineHeadOurs) {
+  dispatches = 0;
+  consumed = 0;
+  last = -1;
+  engineHeadOurs = false;
+  if (!g_pMetaHookAPI || !g_pMetaHookAPI->FindCmd)
+    return false;
   const auto key = commandKey(name);
   if (key.empty())
-    return 0;
-  auto &entries = registry().entries;
-  const auto it = entries.find(key);
-  if (it == entries.end())
-    return 0;
-  Entry &entry = it->second;
-  // Re-hooking from inside a dispatch would move the frame that is running.
-  if (entry.depth > 0)
-    return 0;
-  const auto *command = g_pMetaHookAPI->FindCmd(entry.name.c_str());
-  if (!command || !command->function)
-    return 0;
-  if (command->function == &commandThunk)
-    return 1;
-  const xcommand_t previous =
-      g_pMetaHookAPI->HookCmd(entry.name.c_str(), &commandThunk);
-  if (!previous || previous == &commandThunk)
-    return 0;
-  entry.upstream = previous;
-  return 1;
+    return false;
+  const auto it = registry().entries.find(key);
+  if (it == registry().entries.end())
+    return false;
+  const Entry &entry = it->second;
+  dispatches = entry.dispatches;
+  consumed = entry.consumed;
+  last = entry.last;
+  if (const auto *command = g_pMetaHookAPI->FindCmd(entry.name.c_str()))
+    engineHeadOurs = command->function == &commandThunk;
+  return true;
 }
 
 namespace {

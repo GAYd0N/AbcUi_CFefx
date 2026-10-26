@@ -5,8 +5,11 @@
 #include <abc/Parse.h>
 
 #include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cmath>
+#include <filesystem>
+#include <ranges>
 
 namespace modelpreview {
 namespace {
@@ -45,10 +48,37 @@ bool vector(std::string_view Text, std::array<T, N> &Output, T Min, T Max) {
 }
 } // namespace
 
-bool Options::isModelPath(std::string_view Path) {
-  return Path.starts_with("models/") && Path.ends_with(".mdl") &&
-         Path.size() < 64 && Path.find("..") == Path.npos &&
-         Path.find_first_of("\\:\r\n\t") == Path.npos;
+namespace {
+// The extension is the only part that needs filesystem semantics: let the
+// standard library split the path, then compare the extension
+// case-insensitively (game content is Windows-authored).
+bool isMdlExtension(std::string_view Text) {
+  if (Text.empty() || Text.size() >= 128)
+    return false;
+  const std::filesystem::path Candidate{std::string(Text)};
+  const std::string Extension = Candidate.extension().string();
+  return std::ranges::equal(
+      Extension, std::string_view{".mdl"}, [](char Left, char Right) {
+        return std::tolower(static_cast<unsigned char>(Left)) == Right;
+      });
+}
+} // namespace
+
+bool Options::isModelPath(std::string_view Text) {
+  if (Text.size() >= 128 || !isMdlExtension(Text))
+    return false;
+  const std::filesystem::path Candidate{std::string(Text)};
+  // Engine model names are game-relative: no root, no parent hop and no
+  // separator other than '/'.
+  if (Candidate.has_root_name() || Candidate.has_root_directory())
+    return false;
+  const bool HasParent =
+      std::ranges::any_of(Candidate, [](const std::filesystem::path &Part) {
+        return Part == "..";
+      });
+  return !HasParent && Text.find_first_of("\\:") == std::string_view::npos &&
+         std::ranges::none_of(
+             Text, [](unsigned char c) { return c < 32 || c == 127; });
 }
 
 namespace {
@@ -56,7 +86,7 @@ namespace {
 std::string spell(std::string_view Name) {
   if (Name.empty())
     return {};
-  if (Name.ends_with(".mdl"))
+  if (isMdlExtension(Name))
     return std::string(Name);
   return "models/player/" + std::string(Name) + "/" + std::string(Name) +
          ".mdl";
@@ -82,11 +112,51 @@ std::string resolveCardModelPath(std::string_view Spelling,
   return Card;
 }
 
+std::string resolveActionModelPath(std::string_view Spelling,
+                                   const ModelExists &Exists) {
+  if (Spelling.empty())
+    Spelling = kActionModelDefault;
+  std::string Resolved;
+  if (isMdlExtension(Spelling) || Spelling.find('/') != std::string_view::npos)
+    Resolved = std::string(Spelling);
+  else
+    Resolved = kActionModelDir + std::string(Spelling) + ".mdl";
+  if (!Options::isModelPath(Resolved))
+    Resolved = std::string(kActionModelDir) + kActionModelDefault + ".mdl";
+  // A group the engine cannot see is not presented: the card degrades to the
+  // displayed model drawing alone instead of an invisible body.
+  if (Exists && !Exists(Resolved))
+    return {};
+  return Resolved;
+}
+
+std::string resolveWeaponModelPath(std::string_view Spelling) {
+  // Exactly one game-relative path, including its directory and extension.
+  // Never infer models/, append .mdl, or try alternative locations.
+  return Spelling.find('/') != std::string_view::npos &&
+                 Options::isModelPath(Spelling)
+             ? std::string(Spelling)
+             : std::string();
+}
+
 bool Options::set(std::string_view Name, std::string_view Value) {
   if (Name == "src") {
     if (!Value.empty() && !isModelPath(Value))
       return false;
     Source = Value;
+    return true;
+  }
+  if (Name == "action-src") {
+    if (!Value.empty() && !isModelPath(Value))
+      return false;
+    ActionSource = Value;
+    return true;
+  }
+  if (Name == "weapon") {
+    const std::string Resolved = resolveWeaponModelPath(Value);
+    if (!Value.empty() && Resolved.empty())
+      return false;
+    WeaponSource = Resolved;
     return true;
   }
   if (Name == "camera-origin")

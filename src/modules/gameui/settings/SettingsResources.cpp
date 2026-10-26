@@ -3,6 +3,8 @@
 #include <abc/Paths.h>
 #include <abc/Console.h>
 #include <abc/Plugin.h>
+#include <studio.h>
+#include "rmlui/modelpreview/Options.h"
 #include "rmlui/VGUI2ExtensionImport.h"
 #include "services/settings/KeyBindModel.h"
 #include <io.h>
@@ -70,7 +72,7 @@ std::vector<std::string> scanMounted(const char *Directory, bool Directories) {
   }
   std::sort(Names.begin(), Names.end());
   Names.erase(std::unique(Names.begin(), Names.end()), Names.end());
-  if (Names.size() > 512)
+  if (!Directories && Names.size() > 512)
     Names.resize(512);
   return Names;
 }
@@ -80,6 +82,113 @@ std::vector<std::string> scanModDirectories(const char *Directory) {
 }
 std::vector<std::string> scanModFileBasenames(const char *Directory) {
   return scanMounted(Directory, false);
+}
+
+namespace {
+std::vector<services::settings::StringChoice> actionModels() {
+  std::vector<services::settings::StringChoice> choices;
+  if (!abc::g_pFileSystem)
+    return choices;
+  FileFindHandle_t handle = FILESYSTEM_INVALID_FIND_HANDLE;
+  const std::string mask = std::string(modelpreview::kActionModelDir) + "*.mdl";
+  const char *name = abc::g_pFileSystem->FindFirst(mask.c_str(), &handle);
+  while (name && choices.size() < 512) {
+    const std::string path = std::string(modelpreview::kActionModelDir) + name;
+    if (!abc::g_pFileSystem->FindIsDirectory(handle) &&
+        modelpreview::Options::isModelPath(path)) {
+      const std::string stem = std::filesystem::path(name).stem().string();
+      choices.push_back({stem, stem});
+    }
+    name = abc::g_pFileSystem->FindNext(handle);
+  }
+  if (handle != FILESYSTEM_INVALID_FIND_HANDLE)
+    abc::g_pFileSystem->FindClose(handle);
+  return choices;
+}
+
+std::vector<services::settings::StringChoice>
+actionSequences(const std::string &path) {
+  std::vector<services::settings::StringChoice> choices;
+  if (!abc::g_pFileSystem || path.empty())
+    return choices;
+  const auto file = abc::g_pFileSystem->Open(path.c_str(), "rb");
+  if (!file)
+    return choices;
+  studiohdr_t header{};
+  const auto size = abc::g_pFileSystem->Size(file);
+  const bool valid =
+      abc::g_pFileSystem->Read(&header, sizeof(header), file) ==
+          sizeof(header) &&
+      header.id == 0x54534449 && header.version == 10 &&
+      header.length >= sizeof(header) &&
+      static_cast<unsigned>(header.length) <= size && header.numseq > 0 &&
+      header.numseq <= 512 && header.seqindex >= sizeof(header) &&
+      static_cast<size_t>(header.seqindex) +
+              static_cast<size_t>(header.numseq) * sizeof(mstudioseqdesc_t) <=
+          static_cast<size_t>(header.length);
+  if (valid) {
+    abc::g_pFileSystem->Seek(file, header.seqindex, FILESYSTEM_SEEK_HEAD);
+    for (int i = 0; i < header.numseq; ++i) {
+      mstudioseqdesc_t sequence{};
+      if (abc::g_pFileSystem->Read(&sequence, sizeof(sequence), file) !=
+          sizeof(sequence)) {
+        choices.clear();
+        break;
+      }
+      std::string label(sequence.label,
+                        strnlen(sequence.label, sizeof(sequence.label)));
+      // Asset labels are untrusted display text, not markup or commands.
+      std::replace_if(
+          label.begin(), label.end(),
+          [](unsigned char c) { return c < 32 || c == 127; }, ' ');
+      const std::string value = std::to_string(i);
+      choices.push_back({value, value + ": " + label});
+    }
+  }
+  abc::g_pFileSystem->Close(file);
+  return choices;
+}
+} // namespace
+
+void configureMenuActionChoices(services::settings::SettingsModel &model) {
+  const auto action = model.find("abc_ui_menu_action_model");
+  const auto sequence = model.find("abc_ui_menu_model_sequence");
+  if (!action || !sequence || !action->row->StateName ||
+      !sequence->row->StateName ||
+      std::string_view(action->row->StateName) != "menu-action-models" ||
+      std::string_view(sequence->row->StateName) != "menu-action-sequences")
+    return;
+  model.setStringChoices("abc_ui_menu_action_model", actionModels());
+  model.setChoiceRefresh([source = std::string(), initialized = false](
+                             services::settings::SettingsModel &rows) mutable {
+    const auto action = rows.find("abc_ui_menu_action_model");
+    const auto sequence = rows.find("abc_ui_menu_model_sequence");
+    if (!action || !sequence || action->missing || sequence->missing)
+      return;
+    const std::string spelling =
+        action->state == services::settings::RowState::kInvalid
+            ? action->engineText
+            : action->draftText;
+    const std::string path = modelpreview::resolveActionModelPath(spelling, {});
+    if (initialized && path == source)
+      return;
+    auto choices = actionSequences(path);
+    const bool known = std::any_of(choices.begin(), choices.end(),
+                                   [&sequence](const auto &choice) {
+                                     return choice.Value == sequence->draftText;
+                                   });
+    rows.setStringChoices("abc_ui_menu_model_sequence", choices);
+    // Repair only pending edits, including switching back to the live model
+    // while a sequence draft still belongs to another model. Opening/cancelling
+    // settings never silently changes the live value or creates a draft.
+    const bool pending = spelling != action->engineText ||
+                         sequence->draftText != sequence->engineText;
+    if (!known && !choices.empty() && pending)
+      rows.setDraftString("abc_ui_menu_model_sequence",
+                          choices.front().Value.c_str());
+    source = path;
+    initialized = true;
+  });
 }
 
 namespace {

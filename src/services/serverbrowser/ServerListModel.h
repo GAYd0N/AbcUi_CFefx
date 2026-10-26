@@ -5,20 +5,10 @@
 // a bounded page window. Pure (no engine, Steam or Rml includes) so the exact
 // production logic links into the offline acceptance test (05 doc tier 1).
 //
-// Evidence (T18a, installed serverbrowser.dll, Ghidra; image base 0x10000000):
-//   - The master-side filter pairs the shipped browser sends are read at
-//     0x10007f50: "gamedir" (the mod dir, lowercased; skipped for appid 1002),
-//     "empty"="1" (hide empty servers), "full"="1" (hide full servers) and
-//     "secure"="1" (secure only). ServerFilter::buildPairs emits exactly those
-//     keys in that order.
-//   - The same page re-checks rows before display, so the filter is also
-//     enforced client-side here (accepts()); a master that ignores a filter
-//     cannot fake the visible list.
-//   - Column set of the shipped list (CBaseGamesPage ctor 0x10001f50):
-//     Password/Bots/Secure icons, Servers, IPAddr, GameDesc, Players, Map,
-//     Latency. This model sorts the four data columns that map to query
-//     snapshot fields (name/map/players/ping); the identity markers ride the
-//     row projection, not the sort.
+// Master-side filters use the Steam SDK keys gamedir, empty, full and secure.
+// Rows are also checked client-side so a master ignoring filters cannot fake
+// the visible list. Name/map/players/ping sort the query snapshot fields;
+// password, bots and secure markers belong to the row projection.
 //
 // Contract pinned for the page (and the tests):
 //   - Stable identity is (ip, queryPort) - keyOf(). Rows are updated in

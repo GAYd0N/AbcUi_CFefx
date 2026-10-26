@@ -2,16 +2,20 @@
 
 // rmlui - RmlUi assembly module. Plan 05 §2/§3.
 //
-// Startup order (LoadClient): abc::MetaRendererInit (caller) -> vgui2ext
-// import -> Rml::Initialise (render/system/file interfaces) -> context ->
-// fonts -> theme assets -> panels -> debugger -> RegisterRenderCallbacks.
+// Startup order (LoadClient): abc::render::boot (caller - the render-backend
+// DI root, issue #24) -> vgui2ext import -> Rml::Initialise (render/system/
+// file interfaces) -> context -> fonts -> theme assets -> panels -> debugger
+// -> backend->installFrameSink.
 //
-// Render timing: IMetaRendererCallbacks::OnRenderEndFrame drives the Rml
-// render pass - fires exactly once per frame (GL_EndRendering ->
-// R_RenderEndFrame), after all built-in post-processing and immediately
-// before the final buffer is blitted to screen. This is the "implementation
-// micro-adjustment" the plan anticipated vs OnPostRenderView: the latter
-// fires per view render (water portals/mirrors would double-draw the UI).
+// Render timing: the backend's frame beat drives the Rml render pass through
+// the IFrameSink this module installs. The Renderer backend fires it from
+// IMetaRendererCallbacks::OnRenderEndFrame - exactly once per frame
+// (GL_EndRendering -> R_RenderEndFrame), after all built-in post-processing
+// and immediately before the final buffer is blitted to screen. This is the
+// "implementation micro-adjustment" the plan anticipated vs OnPostRenderView:
+// the latter fires per view render (water portals/mirrors would double-draw
+// the UI). A RedrawBeat backend (the future GL backend) pumps the same sink
+// from HUD_Redraw instead.
 
 #include <functional>
 

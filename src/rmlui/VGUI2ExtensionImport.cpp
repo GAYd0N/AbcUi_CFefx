@@ -7,6 +7,7 @@
 // headers pull in defines Assert/FloatEqual as function-like macros
 // (tier0/dbg.h), which would break RmlUi's own Debug.h macros if it were
 // parsed afterwards. vgui2 extension code that needs both keeps this order.
+#include "AbcRenderInterface.h"
 #include "InputBridge.h"
 #include "NativeEntryCallbacks.h"
 #include "RmlUiModule.h"
@@ -545,6 +546,10 @@ void uploadTexture(int textureId, const unsigned char *rgba, int width,
                    int height) {
   if (!Surface2 || textureId == 0)
     return;
+  // All surface writers (font atlases, module uploads and dynamic media)
+  // share this hand-off, including uploads made inside an element render.
+  if (auto *renderInterface = rmlui::renderInterface())
+    renderInterface->endFrame();
   // hardwareFilter=1: linear filtering (UI glyphs/images), forceReload=false.
   Surface2->DrawSetTextureRGBA(textureId, rgba, width, height, 1, false);
 }
@@ -552,6 +557,8 @@ void uploadTexture(int textureId, const unsigned char *rgba, int width,
 void deleteTextureById(int textureId) {
   if (!Surface2 || textureId == 0)
     return;
+  if (auto *renderInterface = rmlui::renderInterface())
+    renderInterface->endFrame();
   Surface2->DeleteTextureByID(textureId);
 }
 

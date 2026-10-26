@@ -180,11 +180,15 @@ GameUiModule::GameUiModule()
     return engine::menuBackend().maxClientsFact() > 1;
   };
   shellAccess.playerCard = [](std::string &playerName, std::string &modelPath,
-                              std::string &modelLabel) {
+                              std::string &modelLabel, std::string &actionModel,
+                              std::string &weaponModel, int &sequence) {
     const engine::PlayerCardFacts facts = engine::playerCardFacts();
     playerName = facts.PlayerName;
     modelPath = facts.ModelPath;
     modelLabel = facts.ModelName;
+    actionModel = facts.ActionModel;
+    weaponModel = facts.WeaponModel;
+    sequence = facts.Sequence;
   };
   shellAccess.buildNote = [](std::string &note) {
     note = std::format("Sven Co-op build {}", abc::g_dwEngineBuildnum);
@@ -222,6 +226,38 @@ GameUiModule::GameUiModule()
       module->Inventory->close();
   };
   services::inventory::setAccess(inventoryAccess);
+  // The server-browser SDK needs both its models and flow intents. Keep
+  // this wiring process-scoped, like the other page services; context
+  // recreation resets the session contents, not the session's address.
+  services::serverbrowser::Access serverBrowserAccess;
+  serverBrowserAccess.session = &ServerBrowser;
+  serverBrowserAccess.blacklist = &Blacklist;
+  serverBrowserAccess.setTab = [](int kind) {
+    if (GameUiModule *module = currentModule())
+      module->Server->beginQuery(
+          static_cast<services::serverbrowser::QueryKind>(kind));
+  };
+  serverBrowserAccess.refresh = [] {
+    if (GameUiModule *module = currentModule())
+      module->Server->refreshOrStop();
+  };
+  serverBrowserAccess.stop = [] {
+    if (GameUiModule *module = currentModule())
+      module->Server->stop();
+  };
+  serverBrowserAccess.connect = [] {
+    if (GameUiModule *module = currentModule())
+      module->Server->connectSelected();
+  };
+  serverBrowserAccess.toggleFavorite = [] {
+    if (GameUiModule *module = currentModule())
+      module->Server->toggleSelectedFavorite();
+  };
+  serverBrowserAccess.applyFilters = [] {
+    if (GameUiModule *module = currentModule())
+      module->Server->applyFiltersQuery();
+  };
+  services::serverbrowser::setAccess(serverBrowserAccess);
   // The console page module's close button lowers both truths (the bridge
   // request path and the engine-side console flag) - the seams resolve the
   // module through the registry (the launcher-thunk shape).
@@ -553,6 +589,17 @@ void GameUiModule::onInit() {
   // The character card's model source override; empty follows the player's
   // own `model` cvar (gameui::engine::playerCardFacts).
   abc::CREATE_CVAR("abc_ui_menu_model_path", "", abc::FCVAR_VALUE, nullptr);
+  // The card's action group (the stance model that poses the displayed model
+  // and the weapon), its sequence, and the weapon model merged onto it. A
+  // bare action spelling lives in abc/abcui/models/menu_action/. A weapon
+  // requires its complete game-relative .mdl path, used verbatim; empty
+  // means no weapon.
+  abc::CREATE_CVAR("abc_ui_menu_action_model", "display_male", abc::FCVAR_VALUE,
+                   nullptr);
+  abc::CREATE_CVAR("abc_ui_menu_model_sequence", "0", abc::FCVAR_VALUE,
+                   nullptr);
+  abc::CREATE_CVAR("abc_ui_menu_weapon_model", "models/p_m16.mdl",
+                   abc::FCVAR_VALUE, nullptr);
   std::string ServerScript = readModFile("settings.scr");
   if (ServerScript.empty())
     framework::ModuleVfs::readText(
@@ -631,6 +678,7 @@ void GameUiModule::onInit() {
       SettingsModel.setStringChoices(Row.Cvar, std::move(choices));
     }
   }
+  configureMenuActionChoices(SettingsModel);
 
   // T11 bind sources live in the mod dir (engine-owned data, not abcui
   // assets): the action list, the factory defaults and the label table.

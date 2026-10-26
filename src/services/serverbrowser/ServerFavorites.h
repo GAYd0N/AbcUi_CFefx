@@ -2,27 +2,11 @@
 
 // services::serverbrowser::favorites - the T18b favorites/history seam.
 //
-// The authoritative store is STEAM, not a file of ours (T18 step b.2:
-// "若 a 发现宿主已有权威存储，使用该存储，不建双真值"). Evidence (installed
-// serverbrowser.dll, Ghidra; image base 0x10000000):
-//   - steam_api.dll already exposes ISteamMatchmaking "SteamMatchMaking009";
-//     the shipped browser binds it through the same modern lazy singleton the
-//     T17 adapter uses (SteamInternal_ContextInit at 0x10085024, binding stubs
-//     0x1000c090/0x1000c030/0x1000bce0).
-//   - vtable slots verified at shipped call sites:
-//       +0x00 GetFavoriteGameCount  (0x1000bce0 - empty-favorites check)
-//       +0x04 GetFavoriteGame       (the list fill)
-//       +0x08 AddFavoriteGame       (0x1000e710: appid, ip, connPort,
-//                                    queryPort, flags=1, time)
-//       +0x0c RemoveFavoriteGame    (0x1000bf70: ip, connPort, queryPort,
-//                                    flags=1)
-//   - flags are the SDK's k_unFavoriteFlagFavorite (1) /
-//   k_unFavoriteFlagHistory
-//     (2); the shipped ConnectedToGame handler (0x1000ef00) records every
-//     successful join with flags=2 - history is Steam's own "最近玩过的
-//    服务器" list, and RequestFavoritesServerList / RequestHistoryServerList
-//     (T17-proven slots 0x0c/0x10) read those same records back. One truth,
-//     persisted by Steam itself across restarts (no schema of ours).
+// Steam is the authoritative store; there is no duplicate local store.
+// ServerQuerySteam binds ISteamMatchmaking directly from steam_api.dll.
+// The SDK's k_unFavoriteFlagFavorite / k_unFavoriteFlagHistory select records
+// that RequestFavoritesServerList / RequestHistoryServerList read back.
+// Steam persists both collections across restarts.
 //
 // This header is pure (no engine or Steam includes) so the connect-address
 // grammar and the favorite-state decision table link into the offline test;

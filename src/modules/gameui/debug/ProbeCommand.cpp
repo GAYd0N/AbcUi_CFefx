@@ -16,11 +16,15 @@
 #include <abc/Math.h>
 
 #include "../../../data/HudState.h"
+#include "../../../framework/Commands.h"
 #include "../../../framework/PanelManager.h"
+#include "../../../modsys/ModuleVfs.h"
 #include "../../../framework/HudPanel.h"
 #include "../../../framework/ScoreSeat.h"
 #include "../../../render/RadarRender.h"
+#include "../../../rmlui/ImeOverlay.h"
 #include "../../../rmlui/texture/Avatars.h"
+#include "../../../rmlui/animated/ElementAnimatedImage.h"
 #include "../../../data/NetworkMessages.h"
 #include "../../../data/PlayerResource.h"
 #include "../../../rmlui/texture/SpriteResource.h"
@@ -249,22 +253,23 @@ void probeCommand() {
     }
   }
   abc::ConsolePrint(
-      "[AbcUi] probe: hudstate suit=%d hideFlash=%d tokens=%d spectate=%d\n",
+      "[AbcUi] probe: hudstate suit=%d hideFlash=%d tokens=%d spectate=%d "
+      "mode=%d target=%d\n",
       hudstate::hasSuit() ? 1 : 0,
       hudstate::isHudHidden(hudstate::kHideFlashlight) ? 1 : 0,
-      hudstate::debugHideTokens(), hudstate::isSpectate() ? 1 : 0);
-  // Steam/avatar chain ground truth (P6 avatar round): which backend won,
+      hudstate::debugHideTokens(), hudstate::isSpectate() ? 1 : 0,
+      hudstate::spectateMode(), hudstate::spectateTarget());
+  // Steam/avatar diagnostics: direct runtime availability,
   // the id it serves, and a live fetch on the LOCAL id - that avatar is
   // always resident, so a failure here pins the broken link (connect /
   // handle / image decode) with no second client needed.
   {
-    const steamapi::Backend steamBackend = steamapi::backend();
     const steamapi::SteamId64 local = steamapi::localSteamId();
     steamapi::AvatarRgba av;
     const bool fetched = steamapi::avatar(local, av);
     abc::ConsolePrint(
-        "[AbcUi] probe: steam backend=%d local=%llu fetch=%d %dx%d gen=%d\n",
-        static_cast<int>(steamBackend), static_cast<unsigned long long>(local),
+        "[AbcUi] probe: steam available=%d local=%llu fetch=%d %dx%d gen=%d\n",
+        steamapi::available() ? 1 : 0, static_cast<unsigned long long>(local),
         fetched ? 1 : 0, av.width, av.height, avatars::generation(local));
   }
   // Keydown follows the context focus; print who owns it so a stuck input
@@ -283,7 +288,7 @@ void probeCommand() {
        {"health", "flashlight", "ammobar", "ammostack", "itemstack",
         "weaponstack", "deadmsg", "notice", "notice-center", "sidetext",
         "textmenu", "crosshair", "indicator", "gindicator", "dmgtiles",
-        "effect", "popnum"}) {
+        "effect", "popnum", "spectator"}) {
     if (Rml::ElementDocument *doc = context->GetDocument(name))
       abc::ConsolePrint("[AbcUi] probe: doc %-14s visible=%d display='%s'\n",
                         name, doc->IsVisible() ? 1 : 0,
@@ -672,6 +677,35 @@ void inputEventsCommand() {
       "wndproc-total=%u char=%u key=%u feed-commit=%u drop=%u composing=%d\n",
       appProcTotal, textInput, textEditing, candidates, wndProcTotal, wndChar,
       wndKey, commits, drops, rmlui::textComposing() ? 1 : 0);
+  unsigned imeFeeds = 0, imeBytes = 0, imeEventFeeds = 0;
+  int imeEventCount = -1, imeCount = 0, imeSelected = -1, imeComposition = 0;
+  bool imeAnchor = false;
+  rmlui::ime::imeDebug(imeFeeds, imeBytes, imeEventFeeds, imeEventCount,
+                       imeCount, imeSelected, imeAnchor, imeComposition);
+  abc::ConsolePrint(
+      "[AbcUi] input-events ime feeds=%u last-bytes=%u event-feeds=%u "
+      "event-count=%d count=%d selected=%d anchor=%d comp-bytes=%d (a "
+      "TSF IME keeps last-bytes 0; the page then rides the event payload)\n",
+      imeFeeds, imeBytes, imeEventFeeds, imeEventCount, imeCount, imeSelected,
+      imeAnchor ? 1 : 0, imeComposition);
+  unsigned payloadSeen = 0;
+  unsigned payloadWords[8] = {};
+  rmlui::ime::imePayloadDebug(payloadSeen, payloadWords);
+  abc::ConsolePrint(
+      "[AbcUi] input-events ime-payload seen=%u w3=0x%08x w4=0x%08x "
+      "w5=0x%08x w6=0x%08x w7=0x%08x\n",
+      payloadSeen, payloadWords[3], payloadWords[4], payloadWords[5],
+      payloadWords[6], payloadWords[7]);
+  if (Rml::Context *context = rmlui::context()) {
+    Rml::Element *focus = context->GetFocusElement();
+    Rml::ElementDocument *document =
+        focus ? focus->GetOwnerDocument() : nullptr;
+    abc::ConsolePrint(
+        "[AbcUi] input-events ime-gate focus=%s doc=%s visible=%d\n",
+        focus ? focus->GetAddress().c_str() : "(none)",
+        document ? document->GetSourceURL().c_str() : "(none)",
+        document && document->IsVisible() ? 1 : 0);
+  }
   unsigned wndTypes[256] = {}, appTypes[256] = {};
   rmlui::messageHistogram(wndTypes, appTypes);
   for (int i = 0; i < 256; ++i) {
@@ -836,6 +870,166 @@ void inputRegressionCommand() {
 
 } // namespace
 
+// Scoreboard row ground truth for the acceptance drive: each row's class list
+// plus the name cell's inner RML, computed colour and font.
+void boardRowCommand() {
+  Rml::Context *ctx = rmlui::context();
+  if (!ctx)
+    return;
+  Rml::ElementDocument *doc = ctx->GetDocument("scoreboard");
+  if (!doc) {
+    abc::ConsoleWarn("[AbcUi] board-row: scoreboard document not found\n");
+    return;
+  }
+  Rml::Element *table = doc->GetElementById("table");
+  if (!table) {
+    abc::ConsoleWarn("[AbcUi] board-row: #table not found\n");
+    return;
+  }
+  int printed = 0;
+  for (int i = 0; i < table->GetNumChildren() && printed < 5; ++i) {
+    Rml::Element *row = table->GetChild(i);
+    if (!row)
+      continue;
+    abc::ConsolePrint("[AbcUi] board-row[%d] tag='%s' class='%s'\n", i,
+                      row->GetTagName().c_str(), row->GetClassNames().c_str());
+    Rml::Element *name = nullptr;
+    for (int c = 0; c < row->GetNumChildren() && !name; ++c) {
+      Rml::Element *cell = row->GetChild(c);
+      if (cell && cell->GetClassNames().find("c-name") != std::string::npos)
+        name = cell;
+    }
+    if (name) {
+      const Rml::Property *color = name->GetProperty("color");
+      const Rml::Property *font = name->GetProperty("font-family");
+      abc::ConsolePrint(
+          "[AbcUi] board-row name rml='%.200s' color='%s' font='%s'\n",
+          name->GetInnerRML().c_str(),
+          color ? color->ToString().c_str() : "<none>",
+          font ? font->ToString().c_str() : "<none>");
+    }
+    for (int c = 0; c < row->GetNumChildren(); ++c) {
+      Rml::Element *cell = row->GetChild(c);
+      if (!cell || cell->GetClassNames().find("c-avatar") == std::string::npos)
+        continue;
+      // cell > avatar-frame > (animimg|img)
+      Rml::Element *image = cell->GetFirstChild();
+      image = image ? image->GetFirstChild() : nullptr;
+      if (!image)
+        continue;
+      if (auto *animated =
+              rmlui_dynamic_cast<rmlui::animated::ElementAnimatedImage *>(
+                  image)) {
+        abc::ConsolePrint(
+            "[AbcUi] board-row avatar animimg src='%.160s' frames=%d "
+            "visible=%d\n",
+            image->GetAttribute<Rml::String>("src", "").c_str(),
+            animated->frameCount(), image->IsVisible() ? 1 : 0);
+      } else {
+        abc::ConsolePrint("[AbcUi] board-row avatar img src='%.160s'\n",
+                          image->GetAttribute<Rml::String>("src", "").c_str());
+      }
+    }
+    ++printed;
+  }
+}
+
+// MediaPlayer acceptance (issue 11): did typing the chained command open the
+// module window? The bridge counters say whether the hook installed, ran and
+// consumed; the document lines say whether the replacement page is loaded
+// and visible. Decision tree: bridge=0 -> subscribe found no engine command;
+// head=0 -> the engine entry no longer points at the bridge; dispatches=0 ->
+// the command never reached the bridge; last=0 -> a sink declined (usually
+// the document is not loaded); last=1 with doc visible=0 -> the module's
+// show path.
+void mediaPlayerCommand() {
+  unsigned dispatches = 0, consumed = 0;
+  int last = -1;
+  bool headOurs = false;
+  const bool bridge = commands::debugBridge("MediaPlayer", dispatches, consumed,
+                                            last, headOurs);
+  abc::ConsolePrint(
+      "[AbcUi] mediaplayer bridge=%d engine-head-ours=%d dispatches=%u "
+      "consumed=%u last=%d\n",
+      bridge ? 1 : 0, headOurs ? 1 : 0, dispatches, consumed, last);
+  // A mounted package is a module that passed validation and entry; an
+  // absent id means the module never loaded (boot warnings name the reason).
+  const auto mounted = framework::ModuleVfs::mountedIds();
+  bool moduleMounted = false;
+  std::string ids;
+  for (const auto &id : mounted) {
+    if (id == "abcui.mediaplayer")
+      moduleMounted = true;
+    if (!ids.empty())
+      ids += " ";
+    ids += id;
+  }
+  abc::ConsolePrint("[AbcUi] mediaplayer module-mounted=%d\n",
+                    moduleMounted ? 1 : 0);
+  abc::ConsolePrint("[AbcUi] mediaplayer mounted=%zu:%s\n", ids.size(),
+                    ids.c_str());
+  Rml::Context *context = rmlui::context();
+  int found = 0;
+  for (int i = 0; context && i < context->GetNumDocuments(); ++i) {
+    Rml::ElementDocument *doc = context->GetDocument(i);
+    if (!doc || doc->GetSourceURL().find("mediaplayer") == Rml::String::npos)
+      continue;
+    ++found;
+    abc::ConsolePrint(
+        "[AbcUi] mediaplayer doc[%d] visible=%d display='%s' src='%.80s'\n", i,
+        doc->IsVisible() ? 1 : 0,
+        doc->GetProperty("display")->ToString().c_str(),
+        doc->GetSourceURL().c_str());
+  }
+  if (!found)
+    abc::ConsoleWarn("[AbcUi] mediaplayer: no mediaplayer document loaded\n");
+}
+
+// Chat log ground truth: document visibility/opacity, the log element's row
+// count and the last rows' RML.
+void chatStateCommand() {
+  Rml::Context *ctx = rmlui::context();
+  if (!ctx)
+    return;
+  Rml::ElementDocument *doc = ctx->GetDocument("chat");
+  if (!doc) {
+    abc::ConsoleWarn("[AbcUi] chat-state: chat document not found\n");
+    return;
+  }
+  for (int i = 0; i < ctx->GetNumDocuments(); ++i) {
+    Rml::ElementDocument *scan = ctx->GetDocument(i);
+    if (scan && scan->GetId() == "chat")
+      abc::ConsolePrint("[AbcUi] chat-state doc[%d] '%s' visible=%d "
+                        "opacity='%s' addr=%p src='%.80s'\n",
+                        i, scan->GetId().c_str(), scan->IsVisible() ? 1 : 0,
+                        scan->GetProperty("opacity")->ToString().c_str(),
+                        reinterpret_cast<void *>(scan),
+                        scan->GetSourceURL().c_str());
+  }
+  abc::ConsolePrint(
+      "[AbcUi] chat-state doc visible=%d opacity='%s' display='%s' "
+      "src='%.80s'\n",
+      doc->IsVisible() ? 1 : 0, doc->GetProperty("opacity")->ToString().c_str(),
+      doc->GetProperty("display")->ToString().c_str(),
+      doc->GetSourceURL().c_str());
+  Rml::Element *log = doc->GetElementById("chat-log");
+  if (!log) {
+    abc::ConsoleWarn("[AbcUi] chat-state: #chat-log not found\n");
+    return;
+  }
+  abc::ConsolePrint("[AbcUi] chat-state log children=%d visible=%d "
+                    "opacity='%s' display='%s'\n",
+                    log->GetNumChildren(), log->IsVisible() ? 1 : 0,
+                    log->GetProperty("opacity")->ToString().c_str(),
+                    log->GetProperty("display")->ToString().c_str());
+  const int count = log->GetNumChildren();
+  for (int i = count > 2 ? count - 2 : 0; i < count; ++i) {
+    Rml::Element *row = log->GetChild(i);
+    abc::ConsolePrint("[AbcUi] chat-state row[%d] visible=%d rml='%.200s'\n", i,
+                      row->IsVisible() ? 1 : 0, row->GetInnerRML().c_str());
+  }
+}
+
 void closeProbeDocument() {
 #ifndef NDEBUG
   if (ProbeDoc) {
@@ -859,6 +1053,9 @@ void registerProbeCommand() {
   abc::ADD_COMMAND("abc_ui_menu", menuCommand);
   abc::ADD_COMMAND("abc_ui_feedback", feedbackCommand);
   abc::ADD_COMMAND("abc_ui_board", boardCommand);
+  abc::ADD_COMMAND("abc_ui_board_row", boardRowCommand);
+  abc::ADD_COMMAND("abc_ui_chat_state", chatStateCommand);
+  abc::ADD_COMMAND("abc_ui_mediaplayer", mediaPlayerCommand);
   abc::ADD_COMMAND("abc_ui_perf", perfCommand);
   abc::ADD_COMMAND("abc_ui_pointer_on", pointerOnCommand);
   abc::ADD_COMMAND("abc_ui_pointer_off", pointerOffCommand);

@@ -13,7 +13,8 @@
 #include "hooks.h"
 #include "modsys/FrameworkVersion.h"
 #include "modsys/ModuleManager.h"
-#include "render/Render.h"
+#include "render/BackendHost.h"
+#include "render/StandaloneView.h"
 #include "rmlui/RmlUiModule.h"
 #include "services/steam/SteamAPI.h"
 #include "rmlui/VGUI2ExtensionImport.h"
@@ -104,11 +105,18 @@ protected:
 #ifndef NDEBUG
     installDebugAssertHook();
 #endif
-    // Fatal Renderer check + interface grab (plan 05 §2 startup order).
+    // Render-backend composition root (issue #24 §startup order): select
+    // (cvar) / scan / load / validate / initialize - fatal via SysError when
+    // the selected backend is missing or unusable, no built-in fallback.
     // Rml assembly itself defers to the first HUD_Frame (see
     // RmlUiModule.h): the VGUI surface texture channel the font engine
     // needs is not usable this early (Phase 3 trace finding).
-    abc::MetaRendererInit();
+    abc::render::boot();
+    // In-house extra-view route (issue #24 comment): engine hooks install
+    // once per process, portal hooks per client instance; both degrade
+    // softly (model preview disabled) on unknown builds.
+    framework::standaloneview::installEngineHooks();
+    framework::standaloneview::installClientHooks();
     vgui2ext::init();
     steamapi::init();
     hooks::locateVanillaHudList();
@@ -131,6 +139,8 @@ protected:
     // shutdown() above must not drop them, or map changes would leave
     // suppression gaps).
     vgui2ext::shutdownNative();
+    // Backend release comes last: teardown paths above may still draw.
+    abc::render::shutdown();
   }
 };
 

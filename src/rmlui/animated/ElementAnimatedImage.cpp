@@ -266,25 +266,19 @@ bool ElementAnimatedImage::ensureOpen() {
   // The intrinsic size becomes known with the animation: lay out again.
   DirtyLayout();
 
-  if (avatarSource) {
-    // A replacement row resumes where the previous element left the source;
-    // the first element of a source simply starts at frame 0.
-    const double now = Rml::GetSystemInterface()->GetElapsedTime();
-    auto &clocks = avatarClocks();
-    if (clocks.size() > 512)
-      clocks.clear();
-    const auto [itor, inserted] = clocks.try_emplace(Source, now);
-    (void)inserted;
-    seekToClock(itor->second, now);
-    return TextureReady;
-  }
-
-  // Show frame 0 immediately (a controller may have made the element visible
-  // in this same HUD frame).
-  FrameView frame;
-  if (!Image->Rewind() || !Image->Read(frame))
-    return false;
-  return uploadFrame(frame);
+  // A replacement row (the scoreboard rebuilds its table every 0.5 s)
+  // resumes at the shared playback origin instead of restarting, for every
+  // source kind: the clock is keyed by the source string, so the first
+  // element of a source starts at frame 0 and a replacement element picks up
+  // where its predecessor was.
+  const double now = Rml::GetSystemInterface()->GetElapsedTime();
+  auto &clocks = avatarClocks();
+  if (clocks.size() > 512)
+    clocks.clear();
+  const auto [itor, inserted] = clocks.try_emplace(Source, now);
+  (void)inserted;
+  seekToClock(itor->second, now);
+  return TextureReady;
 }
 
 void ElementAnimatedImage::seekToClock(double startSeconds, double now) {
@@ -363,6 +357,9 @@ bool ElementAnimatedImage::advanceFrame() {
 bool ElementAnimatedImage::Restart() {
   if (!ensureOpen())
     return false;
+  // A controller restart also resets the shared playback origin, so a
+  // replacement element replays the one-shot from its first frame.
+  avatarClocks()[Source] = Rml::GetSystemInterface()->GetElapsedTime();
   FrameView frame;
   if (!Image->Rewind() || !Image->Read(frame) || !uploadFrame(frame))
     return false;

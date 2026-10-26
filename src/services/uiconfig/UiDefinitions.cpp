@@ -122,8 +122,8 @@ std::vector<MenuEntry> menuEntries(const Value &V, const std::string &Path,
 SettingDefinition setting(const Value &Item, const std::string &P) {
   fields(Item,
          {"cvar", "label", "section", "kind", "min", "max", "step", "default",
-          "options", "source", "requires", "requiresEnabled", "readOnly",
-          "hue"},
+          "options", "source", "requires", "requiresEnabled", "readOnly", "hue",
+          "allowEmpty"},
          P);
   SettingDefinition Row;
   Row.Cvar = text(Item, "cvar", P);
@@ -166,6 +166,11 @@ SettingDefinition setting(const Value &Item, const std::string &P) {
   else
     require(false, P + ".kind", "unknown setting kind");
   const bool String = Row.Kind == K::kText || Row.Kind == K::kStringEnum;
+  if (Item.HasMember("allowEmpty")) {
+    require(Item["allowEmpty"].IsBool() && Row.Kind == K::kText,
+            P + ".allowEmpty", "expected boolean on a text row");
+    Row.AllowEmpty = Item["allowEmpty"].GetBool();
+  }
   Row.HasDefault = Item.HasMember("default");
   if (String || Row.Kind == K::kBool || Row.Kind == K::kCommandToggle)
     require(!Item.HasMember("min") && !Item.HasMember("max") &&
@@ -180,9 +185,9 @@ SettingDefinition setting(const Value &Item, const std::string &P) {
                         }),
             P + ".default", "unsafe string default");
     if (Row.Kind == K::kText && Row.HasDefault)
-      require(!Row.DefaultString.empty() &&
+      require((Row.AllowEmpty || !Row.DefaultString.empty()) &&
                   Row.DefaultString.size() <= settings::kNameMaxBytes,
-              P + ".default", "text default must be 1..63 bytes");
+              P + ".default", "text default must fit the text row's domain");
     Row.Min = Row.Max = Row.Step = 0;
   } else {
     Row.DefaultValue = Row.HasDefault ? number(Item, "default", P) : 0;
@@ -218,7 +223,9 @@ SettingDefinition setting(const Value &Item, const std::string &P) {
     require(Row.Kind == K::kStringEnum &&
                 (Row.Source == "models/player" || Row.Source == "logos" ||
                  Row.Source == "logocolor" || Row.Source == "scence/video" ||
-                 Row.Source == "scence/audio"),
+                 Row.Source == "scence/audio" ||
+                 Row.Source == "menu-action-models" ||
+                 Row.Source == "menu-action-sequences"),
             P + ".source", "unknown string option provider");
     // File providers scan a directory for media files; their choices are
     // paths labelled by file stem (see SettingDefinition::FileChoices).

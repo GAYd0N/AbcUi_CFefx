@@ -433,6 +433,9 @@ int32_t apiRemoveRule(const char *address) {
 }
 
 void apiSetTab(int32_t kind) {
+  // Like the other intents, an unavailable composition-root binding is inert.
+  if (!access().setTab)
+    return;
   switch (kind) {
   case ABCUI_SB_TAB_LAN:
     access().setTab(static_cast<int>(QueryKind::Lan));

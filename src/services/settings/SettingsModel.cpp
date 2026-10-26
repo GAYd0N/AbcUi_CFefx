@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string_view>
+#include <utility>
 
 namespace services {
 namespace settings {
@@ -141,6 +142,19 @@ void SettingsModel::setStringChoices(const char *cvar,
     entry->options.push_back(std::move(choice.Value));
     entry->optionLabels.push_back(std::move(choice.Label));
   }
+}
+
+void SettingsModel::setChoiceRefresh(
+    std::function<void(SettingsModel &)> refresh) {
+  ChoiceRefresh_ = std::move(refresh);
+}
+
+void SettingsModel::refreshChoices() {
+  if (!ChoiceRefresh_ || RefreshingChoices_)
+    return;
+  RefreshingChoices_ = true;
+  ChoiceRefresh_(*this);
+  RefreshingChoices_ = false;
 }
 
 SettingsModel::RowRuntime *SettingsModel::runtime(const char *cvar) {
@@ -307,6 +321,7 @@ void SettingsModel::snapshot() {
       break; // handled above
     }
   }
+  refreshChoices();
 }
 
 bool SettingsModel::setDraftText(const char *cvar, const char *text) {
@@ -390,6 +405,11 @@ bool SettingsModel::validateString(const RowRuntime &entry,
                                    const char *text) const {
   if (!text)
     return false;
+  if (entry.row->Kind == SettingKind::kText && Seams_.validateText &&
+      !Seams_.validateText(entry.row->Cvar, text))
+    return false;
+  if (!*text && entry.row->Kind == SettingKind::kText && entry.row->AllowEmpty)
+    return true;
   if (!stringBytesValid(text, entry.row->Kind == SettingKind::kText))
     return false;
   if (entry.row->Kind == SettingKind::kStringEnum) {
@@ -425,11 +445,13 @@ bool SettingsModel::setDraftString(const char *cvar, const char *text) {
   // through this door.
   if (text && entry->engineText == text) {
     adoptEngineTextLocked(*entry, entry->engineText);
+    refreshChoices();
     return true;
   }
   if (!validateString(*entry, text)) {
     entry->draftText = text ? text : "";
     entry->state = RowState::kInvalid;
+    refreshChoices();
     return false;
   }
   entry->draftText = text;
@@ -438,6 +460,7 @@ bool SettingsModel::setDraftString(const char *cvar, const char *text) {
   } else if (entry->state != RowState::kConflict) {
     entry->state = RowState::kDirty;
   }
+  refreshChoices();
   return true;
 }
 
@@ -449,6 +472,7 @@ bool SettingsModel::adoptEngineValue(const char *cvar) {
     adoptEngineTextLocked(*entry, entry->engineText);
   else
     adoptEngineLocked(*entry, entry->engineValue);
+  refreshChoices();
   return true;
 }
 
@@ -485,6 +509,7 @@ void SettingsModel::resetDefaultsImpl(const std::vector<std::string> *Cvars) {
     Entry.state = sameValue(Fallback, Entry.engineValue) ? RowState::kClean
                                                          : RowState::kDirty;
   }
+  refreshChoices();
 }
 
 void SettingsModel::cancel() {
@@ -496,6 +521,7 @@ void SettingsModel::cancel() {
     else
       adoptEngineLocked(entry, entry.engineValue);
   }
+  refreshChoices();
 }
 
 services::settings::ApplyResult SettingsModel::applyRow(RowRuntime &entry) {
@@ -549,6 +575,7 @@ services::settings::ApplyResult SettingsModel::applyRow(RowRuntime &entry) {
 }
 
 std::vector<ApplyResult> SettingsModel::apply() {
+  refreshChoices();
   std::vector<ApplyResult> results;
   for (auto &entry : Rows_) {
     if (!editable(entry.row->Cvar) || entry.state == RowState::kClean ||
@@ -564,6 +591,7 @@ std::vector<ApplyResult> SettingsModel::apply() {
 }
 
 std::optional<ApplyResult> SettingsModel::applyOne(const char *cvar) {
+  refreshChoices();
   RowRuntime *entry = runtime(cvar);
   if (!entry || !editable(cvar) || entry->state == RowState::kClean ||
       entry->state == RowState::kQueued)

@@ -1,18 +1,21 @@
 #pragma once
 
-// Render types and constants shared with the Renderer plugin.
+// Render types and constants shared with the Renderer plugin; lives inside
+// the renderer backend DLL since the framework went backend-agnostic
+// (issue #24) - it is referenced by no other target.
 //
 // SYNCED VERBATIM (body below this comment block) from the pinned
 //   thirdparty/Renderer/src/gl_common.h (matched to the pinned submodule)
 // via cmake/CheckRenderCommonSync.cmake - do not edit the constants here
 // without re-syncing; the check-rendercommon-sync build step fails on drift.
 // The only adaptations are this header comment, the include guard, and the
-// minimal GL type shim standing in for qgl.h (no GLEW dependency).
+// minimal GL / vector shim standing in for qgl.h and abc/Math.h (the
+// backend links neither AbcCore nor GLEW).
 //
-// NOTE: the sync check compares from the OFFSET macro line onwards. The GL
-// shim block right below (4 typedefs + 5 GL_* format constants) has no
-// upstream counterpart and is therefore OUTSIDE the drift check - verify it
-// by hand against GL headers if the Renderer ever changes its qgl.h usage.
+// NOTE: the sync check compares from the OFFSET macro line onwards. The
+// shim block right below has no upstream counterpart and is therefore
+// OUTSIDE the drift check - verify it by hand against GL headers if the
+// Renderer ever changes its qgl.h usage.
 
 #ifndef ABC_RENDERCOMMON_H
 #define ABC_RENDERCOMMON_H
@@ -20,17 +23,22 @@
 #include <stdint.h>
 #include <metahook.h>
 
-#include <abc/Math.h>
+// abc/Math.h vector names, mirrored locally so the backend needs no AbcCore
+// headers (same declarations abc/Math.h makes for the HLSDK headers).
+using vec_t = float;
+using vec2_t = vec_t[2];
+using vec3_t = vec_t[3];
+using vec4_t = vec_t[4];
 
-// Renderer-side aliases that used to live in abc/Math.h. Keep them in this
-// shim so AbcCore stays renderer-free.
+// Renderer-side aliases that used to live in abc/Math.h.
 typedef float mat3x4[3][4];
 typedef float mat4[4][4];
 typedef float vec4[4];
 typedef int ivec4[4];
 typedef unsigned int uvec4[4];
 
-// Minimal GL types (Renderer-side constants reference a couple of these).
+// Minimal GL types (Renderer-side constants reference a couple of these;
+// GL/gl.h defines identical ones when the backend includes it).
 typedef unsigned int GLuint;
 typedef unsigned int GLenum;
 typedef int GLint;
@@ -247,7 +255,6 @@ public:
 #    define DRAW_TEXTURED_RECT_SCISSOR_ENABLED              0x8ull
 #    define DRAW_TEXTURED_RECT_ALPHA_TEST_ENABLED           0x10ull
 #    define DRAW_TEXTURED_RECT_MASK_TEXTURE_ENABLED         0x20ull
-#    define DRAW_TEXTURED_RECT_PREMULTIPLIED_ALPHA_ENABLED  0x40ull
 
 #    define DRAW_FILLED_RECT_ALPHA_BLEND_ENABLED          0x1ull
 #    define DRAW_FILLED_RECT_ADDITIVE_BLEND_ENABLED       0x2ull

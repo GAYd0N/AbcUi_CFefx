@@ -20,8 +20,10 @@ add_subdirectory("${ABC_CORE_DIR}" AbcCore-build)
 set_target_properties(abc_core PROPERTIES
     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
-# Renderer public interfaces are a direct AbcUi dependency. AbcCore deliberately
-# stays renderer-free so non-UI consumers do not inherit the Renderer checkout.
+# Renderer public interfaces feed the Renderer-backed render backend DLL
+# (backends/renderer, issue #24); the AbcUi framework target itself stays
+# renderer-free. AbcCore deliberately stays renderer-free so non-UI
+# consumers do not inherit the Renderer checkout.
 set(ABCUI_RENDERER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/Renderer")
 set(ABCUI_RENDERER_INCLUDE_DIR "${ABCUI_RENDERER_DIR}/include")
 if(NOT EXISTS "${ABCUI_RENDERER_INCLUDE_DIR}/Interface/IMetaRenderer.h")
@@ -36,8 +38,8 @@ abcui_prepare_mile_ffmpeg(ABCUI_MILE_FFMPEG_SDK)
 
 set(METAHOOK_INCLUDE_DIR "${ABC_CORE_DIR}/thirdparty/MetaHook/include")
 set(VGUI2EXTENSION_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/VGUI2Extension/include")
-# Steamworks SDK (headers only - steamapi/ binds exports at runtime, no
-# steam_api.lib import; see rmlui/SteamApiNative.cpp).
+# Steamworks SDK (headers only - services/steam binds exports at runtime,
+# no steam_api.lib import).
 set(STEAMSDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/SteamSDK")
 
 # --- FreeType (R-3) ---------------------------------------------------------
@@ -185,8 +187,9 @@ add_library(AbcUi MODULE
     src/modsys/ApiSettings.cpp
     src/modsys/ModuleDocuments.cpp
     src/modsys/ModuleServices.cpp
-    src/render/Render.cpp
+    src/render/BackendHost.cpp
     src/render/RadarRender.cpp
+    src/render/StandaloneView.cpp
     src/render/ScreenMetrics.cpp
     src/rmlui/AbcRenderInterface.cpp
     src/rmlui/model/ElementModel.cpp
@@ -223,8 +226,6 @@ add_library(AbcUi MODULE
     src/rmlui/LanguageChannel.cpp
     src/rmlui/SourceSpewStub.cpp
     src/services/steam/SteamAPI.cpp
-    src/services/steam/SteamApiBridge.cpp
-    src/services/steam/SteamApiNative.cpp
     src/rmlui/VGUI2ExtensionImport.cpp
     src/framework/ResourceFile.cpp
     src/framework/ShellActions.cpp
@@ -341,6 +342,17 @@ target_link_libraries(AbcUi PRIVATE Abc::Core RmlUi::RmlUi FreeImage abcui_webp
     abcui_miniz imm32 abc_ui_config)
 
 # First-party UI modules (each its own DLL + package; see modules/<id>/).
+# Module images are mapped by the loader's manual PE mapper, which refuses
+# static TLS. Two MSVC debug-conditional mechanisms compile to per-thread
+# static TLS: the thread-safe guards for function-local dynamic statics
+# (/Zc:threadSafeInit) and Just My Code instrumentation (/JMC). Both are
+# disabled for every module target - the media player's duration cache once
+# shipped a TLS directory through the first and its module was skipped at
+# boot with every feature of it silently missing (namespace-scope statics
+# initialize at image load and need no guard; JMC only steps into "user"
+# code, which these modules do not need while debugging).
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/Zc:threadSafeInit-> /JMC-)
+
 add_subdirectory(modules/demo)
 add_subdirectory(modules/recovery)
 add_subdirectory(modules/flashlight)
@@ -410,9 +422,25 @@ add_custom_target(check-rendercommon-sync
     COMMAND "${CMAKE_COMMAND}"
         "-DABCUI_REPO_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_LIST_DIR}/cmake/CheckRenderCommonSync.cmake"
-    COMMENT "Checking src/render/RenderCommon.h sync against thirdparty/Renderer"
+    COMMENT "Checking backends/renderer/RenderCommon.h sync against thirdparty/Renderer"
     VERBATIM)
-add_dependencies(AbcUi check-rendercommon-sync)
+
+# --- Render backends (issue #24) ---------------------------------------------
+# DI-loaded DLLs behind sdk/abcui/render_backend.h; the framework AbcUi.dll
+# target never sees a Renderer include directory (that is the mechanical
+# proof the coupling is gone).
+add_subdirectory(backends/renderer)
+add_dependencies(abcui_render_renderer check-rendercommon-sync)
+
+# UI-owned layouts and standalone-view symbols are a separate, offline
+# catalog. Validate the Windows records before building or packaging.
+add_custom_target(check-modelpreview-gamedata
+    COMMAND "${CMAKE_COMMAND}"
+        "-DABCUI_REPO_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_LIST_DIR}/cmake/CheckModelPreviewGameData.cmake"
+    COMMENT "Checking Win32 model preview gamedata"
+    VERBATIM)
+add_dependencies(AbcUi check-modelpreview-gamedata)
 
 # Include layout mirrors Renderer's renderer_settings interface set: the
 # VGUI2Extension interface headers include MetaHook VGUI/SourceSDK headers by
@@ -426,8 +454,6 @@ target_include_directories(AbcUi PRIVATE
     "${VGUI2EXTENSION_INCLUDE_DIR}"
     "${VGUI2EXTENSION_INCLUDE_DIR}/Interface"
     "${VGUI2EXTENSION_INCLUDE_DIR}/Interface/VGUI"
-    "${ABCUI_RENDERER_INCLUDE_DIR}"
-    "${ABCUI_RENDERER_INCLUDE_DIR}/Interface"
     "${METAHOOK_INCLUDE_DIR}/Interface"
     "${METAHOOK_INCLUDE_DIR}/Interface/VGUI"
     "${METAHOOK_INCLUDE_DIR}/VGUI"
@@ -438,6 +464,17 @@ if(ABC_GAME_DIR)
     install(TARGETS AbcUi
         RUNTIME DESTINATION "${ABC_GAME_DIR}/svencoop/metahook/plugins"
         LIBRARY DESTINATION "${ABC_GAME_DIR}/svencoop/metahook/plugins")
+    # Render backend DLLs load from abc/abcui/render_backend (issue #24).
+    install(TARGETS abcui_render_renderer
+        RUNTIME DESTINATION "${ABC_GAME_DIR}/svencoop/abc/abcui/render_backend"
+        LIBRARY DESTINATION "${ABC_GAME_DIR}/svencoop/abc/abcui/render_backend")
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets/gamedata/abcui-layout/"
+        DESTINATION "${ABC_GAME_DIR}/svencoop/metahook/gamedata/abc/abcui-layout")
+    # Native Studio content (the main page action groups): an engine Studio
+    # load needs a loose file in the game search path, so this tree is
+    # installed as is instead of riding a module ZIP.
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets/abc/abcui/models/"
+        DESTINATION "${ABC_GAME_DIR}/svencoop/abc/abcui/models")
     # Module packages produced by tools/pack.py (build a Release pack first).
     install(DIRECTORY "${ABCUI_MODULE_PACK_DIR}/"
         DESTINATION "${ABC_GAME_DIR}/svencoop/abc/abcui/modules")
@@ -448,6 +485,13 @@ if(ABC_GAME_DIR)
     endif()
     add_custom_target(deploy
         DEPENDS AbcUi pack_modules
+        # Drop previous-version packages first: the loader resolves a
+        # duplicated id by manifest version, but a stale zip on disk is still
+        # dead weight and can shadow a downgrade.
+        COMMAND "${CMAKE_COMMAND}"
+            "-DSOURCE_PACK_DIR=${ABCUI_MODULE_PACK_DIR}"
+            "-DDEST_DIR=${ABC_GAME_DIR}/svencoop/abc/abcui/modules"
+            -P "${CMAKE_CURRENT_LIST_DIR}/cmake/PruneModulePackages.cmake"
         COMMAND "${CMAKE_COMMAND}" --install "${CMAKE_BINARY_DIR}" --config "$<CONFIG>"
         COMMENT "Deploying AbcUi.dll and assets to ${ABC_GAME_DIR}")
 endif()
@@ -457,7 +501,10 @@ endif()
 # AbcUi-<version>.zip with the game root at the archive root, so it can be
 # extracted directly into the Sven Co-op directory:
 #   svencoop/metahook/plugins/AbcUi.dll
+#   svencoop/abc/abcui/render_backend/abcui_render_renderer.dll
 #   svencoop/abc/abcui/modules/*.zip (all UI resources)
+#   svencoop/abc/abcui/models/ (loose Studio action groups; see README)
+#   svencoop/metahook/gamedata/abc/abcui-layout/ (UI-owned engine layouts)
 #   svencoop/sound/abc/cfefx/*.wav (engine-played cfefx score effect)
 #   README.md
 # The target is named `dist` because `package` is reserved by the CPack
@@ -476,21 +523,31 @@ add_custom_target(dist
     COMMAND "${CMAKE_COMMAND}" -E rm -rf "${ABC_UI_STAGE_DIR}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory
         "${ABC_UI_STAGE_DIR}/svencoop/metahook/plugins"
-        "${ABC_UI_STAGE_DIR}/svencoop/abc"
+        "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/render_backend"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:AbcUi>"
         "${ABC_UI_STAGE_DIR}/svencoop/metahook/plugins/"
+    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:abcui_render_renderer>"
+        "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/render_backend/"
     COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/README.md" "${ABC_UI_STAGE_DIR}/"
     COMMAND "${CMAKE_COMMAND}" -E make_directory
         "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/modules"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${ABCUI_MODULE_PACK_DIR}"
         "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/modules"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory
+        "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/models"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/abc/abcui/models"
+        "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/models"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/sound"
         "${ABC_UI_STAGE_DIR}/svencoop/sound"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/gamedata/abcui-layout"
+        "${ABC_UI_STAGE_DIR}/svencoop/metahook/gamedata/abc/abcui-layout"
     COMMAND "${CMAKE_COMMAND}" -E chdir "${ABC_UI_STAGE_DIR}"
         "${CMAKE_COMMAND}" -E tar cfv
         "${CMAKE_BINARY_DIR}/dist/AbcUi-${ABC_UI_VERSION}.zip"
         --format=zip -- svencoop README.md
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/dist"
-    DEPENDS AbcUi pack_modules
+    DEPENDS AbcUi abcui_render_renderer pack_modules
     COMMENT "Packaging AbcUi-${ABC_UI_VERSION}.zip")

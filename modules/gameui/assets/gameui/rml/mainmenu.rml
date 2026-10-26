@@ -31,21 +31,32 @@
 
 	<!-- The character card is the screen's subject: this box is exactly what
 	     the preview camera frames. The default pose faces the screen turned
-	     25 degrees toward the player's left (angle yaw -25: the camera looks
-	     along -X from +X, so screen right is +Y and a negative yaw turns the
+	     15 degrees toward the player's left (angle yaw -15: the camera looks
+	     down 15 degrees from +X, so screen right is +Y and a negative yaw turns the
 	     model's front to the player's left). The source is the player's own
 	     model; the abc_ui_menu_model_path cvar overrides it while non-empty
-	     (read by gameui::engine::playerCardFacts). Visibility of the card is
-	     the module's sync decision, never inferred here. -->
+	     (read by gameui::engine::playerCardFacts). src / action-src / weapon /
+	     sequence are all projected from those engine facts every beat: the
+	     action group (abc_ui_menu_action_model, abc/abcui/models/menu_action/<name>.mdl)
+	     poses the displayed model and the weapon (abc_ui_menu_weapon_model,
+	     empty = no weapon) through the follow chain, and
+	     abc_ui_menu_model_sequence picks the group's stance. Visibility of the
+	     card is the module's sync decision, never inferred here. -->
 	<div id="player-card">
-		<!-- sequence 2 is the player model's own deep_idle (verified against
-		     the shipped models: [2] 'deep_idle', 31 frames @12fps), and the
-		     camera is the Renderer preview's verified default view. -->
-		<model id="player-model" src="models/player.mdl" sequence="2" animate="true" angles="0 -25 0"
+		<!-- The action group's sequence 0 is its menu idle; the cvar overrides
+		     it. Auto-framing fits the player's and held weapon's posed mesh
+		     vertices, not the invisible action model or bind-pose boxes.
+		     The larger stage and
+		     tight framing make the character prominent without scaling away
+		     the automatic fit or changing other model previews. The light
+		     shines directly onto the model's front: its ray is opposite the
+		     forward vector at the entity's -15 degree yaw. -->
+		<model id="player-model" src="models/player.mdl" sequence="0" animate="true" angles="0 -15 0"
+			action-src="abc/abcui/models/menu_action/display_male.mdl" weapon="models/p_m16.mdl"
 			controllers="127 127 127 127" blending="127 127"
-			auto-frame="true" frame-margin="1.2"
-			camera-origin="120 0 0" camera-angles="0 180 0" fov="40"
-			ambient="96" shade="110" light-color="1 0.96 0.9" light-direction="-0.6 -0.35 -1"/>
+			auto-frame="true" frame-margin="1.02"
+			camera-origin="120 0 32" camera-angles="15 180 0" fov="40"
+			ambient="96" shade="110" light-color="1 0.96 0.9" light-direction="-0.965926 0.258819 0"/>
 	</div>
 
 	<div id="friends-panel" class="abc-panel">

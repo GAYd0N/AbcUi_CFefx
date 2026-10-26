@@ -1,27 +1,8 @@
-// services::serverbrowser - Steam adapter (T17c). Binds the interfaces the
-// shipped browser itself uses, through the same modern entry path AbcUi
-// already relies on for identity/avatars and the installed binaries prove:
-//
-//   - steam_api.dll is already loaded and owned by the engine (hw.dll imports
-//     it statically, calls SteamAPI_Init at 0x01db3910 and pumps
-//     SteamAPI_RunCallbacks inside the frame loop 0x01d67950). This adapter
-//     never calls Init/Shutdown/RunCallbacks - it only reads.
-//   - platform/servers/serverbrowser.dll resolves
-//     "SteamMatchMakingServers002" via SteamInternal_FindOrCreateUserInterface
-//     (0x10003053 and five siblings) and drives the whole browser through it:
-//     request kinds at 0x10007940 (slots 0x00-0x14), ReleaseRequest 0x18,
-//     GetServerDetails 0x1c, CancelQuery 0x20 (0x10007ad0), RefreshQuery 0x24
-//     (0x10005230), GetServerCount 0x2c, RefreshServer 0x30 (0x100057c0),
-//     PingServer 0x34 + CancelServerQuery 0x40 (0x1000ad70/0x1000a2b0).
-//     The SDK header order matches every one of those call sites.
-//   - gameserveritem_t field offsets were cross-read at 0x10002ff0
-//     (map@0x2e gamedir@0x0e tags@0xec desc@0x4e players/max/bots@0x94..@0x9c
-//     secure@0xa1 appid@0x90) - the SDK header is the authoritative layout.
-//   - AppID: ISteamUtils::GetAppID() (runtime provides SteamUtils009 per
-//     hw.dll 0x01e61f24 / serverbrowser 0x100843f0; the header alias is
-//     tried second), with the engine-written steam_appid.txt as the offline
-//     fallback. The engine itself writes that file before SteamAPI_Init
-//     (hw.dll 0x01db3910) - 225840 on the test install.
+// Direct Steam server discovery, details, favorites and history through the
+// host-owned steam_api.dll. RuntimeAccess resolves SDK-versioned interfaces
+// via SteamAPI_GetHSteamUser / SteamInternal_FindOrCreateUserInterface.
+// The engine owns initialization, shutdown and callback pumping.
+// AppID comes from ISteamUtils, with the engine's steam_appid.txt as fallback.
 //
 // Threading: all provider API below runs on the owner (main) thread. Steam
 // list callbacks arrive from SteamAPI_RunCallbacks, which the engine calls on

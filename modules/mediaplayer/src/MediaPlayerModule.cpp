@@ -70,6 +70,10 @@ AbcUiSubscription MenuStateSubscription = 0;
 AbcUiSubscription InitHudSubscription = 0;
 
 std::vector<Track> Tracks;
+// Track-duration cache (see trackDuration): namespace scope, never a
+// function-local dynamic static - MSVC's thread-safe guard for those lives
+// in static TLS and the module loader refuses TLS images.
+std::vector<std::pair<std::string, double>> DurationCache;
 std::string PlaylistSource;
 std::string Hint;
 int Current = -1;
@@ -206,8 +210,12 @@ bool readEngineText(const std::string &path, uint32_t maxBytes,
 }
 
 double trackDuration(const std::string &path) {
-  static std::vector<std::pair<std::string, double>> cache;
-  for (const auto &entry : cache)
+  // Namespace scope on purpose (DurationCache below): a function-local
+  // dynamic static arms MSVC's thread-safe-init guard, whose per-thread
+  // epoch is static TLS - the module loader refuses TLS images outright
+  // (this exact static once shipped a TLS directory and the module was
+  // skipped at boot with every feature of it missing).
+  for (const auto &entry : DurationCache)
     if (entry.first == path)
       return entry.second;
   double seconds = 0.0;
@@ -220,9 +228,9 @@ double trackDuration(const std::string &path) {
                                  kMaxMediaBytes) == size)
       seconds = mediaplayer::mp3DurationSeconds(bytes.data(), bytes.size());
   }
-  if (cache.size() >= 128)
-    cache.erase(cache.begin());
-  cache.emplace_back(path, seconds);
+  if (DurationCache.size() >= 128)
+    DurationCache.erase(DurationCache.begin());
+  DurationCache.emplace_back(path, seconds);
   return seconds;
 }
 
@@ -820,6 +828,13 @@ void ABCUI_CALL onDocumentReady(void *) {
       Api->ui->elementAddListener(BoundRoot, "click", &onClick, nullptr);
   ChangeBinding =
       Api->ui->elementAddListener(BoundRoot, "change", &onChange, nullptr);
+  // Attributes ride outside the framework's #token text localization, so the
+  // input's placeholder is resolved and set from the module's own strings.
+  if (AbcUiElement *input = Api->ui->querySelector(Page, "mp-add-path"))
+    Api->ui->elementSetAttribute(
+        input, "placeholder",
+        translated("abcui.mediaplayer/MediaPlayer_AddPlaceholder", "")
+            .c_str());
   updateVolumeRow();
   renderPlaylist();
   renderTransport();
@@ -862,6 +877,36 @@ void ABCUI_CALL onInitHud(void *, const void *) {
 
 // ---- module lifecycle ----------------------------------------------------
 
+// The chained MediaPlayer command. A page that is not loaded cannot replace
+// anything: the command declines (once, with a console note) and the native
+// window opens.
+int ABCUI_CALL onMediaPlayerCommand(void *, const void *) {
+  if (!Page || !Api->documents->loaded(Page)) {
+    static bool Declined = false;
+    if (!Declined) {
+      Declined = true;
+      Api->core->print("mediaplayer: replacement page is not loaded; the "
+                       "native window stays\n");
+    }
+    return 0;
+  }
+  togglePage();
+  return 1;
+}
+
+bool CommandHooked = false;
+
+// The engine's MediaPlayer command is registered by the client DLL, which
+// can happen after this module's onLoad; subscribeCommand refuses a name it
+// cannot find, so the hook is retried every frame until it sticks.
+void tryHookCommand() {
+  if (CommandHooked)
+    return;
+  CommandHooked = Api->commands->subscribeCommand("MediaPlayer", 0,
+                                                  &onMediaPlayerCommand,
+                                                  nullptr) != 0;
+}
+
 void ABCUI_CALL onModuleLoad() {
   AbcUiDocumentDesc desc{};
   desc.structSize = sizeof(desc);
@@ -880,16 +925,7 @@ void ABCUI_CALL onModuleLoad() {
                                                  &onMenuState, nullptr);
   InitHudSubscription = Api->events->subscribe(ABCUI_CHANNEL_NETMSG_INIT_HUD, 0,
                                                &onInitHud, nullptr);
-  Api->commands->subscribeCommand(
-      "MediaPlayer", 0,
-      [](void *, const void *) -> int {
-        // No page means no replacement: leave the native window alone.
-        if (!Page || !Api->documents->loaded(Page))
-          return 0;
-        togglePage();
-        return 1;
-      },
-      nullptr);
+  tryHookCommand();
 }
 
 void ABCUI_CALL onModuleInit() {
@@ -897,6 +933,7 @@ void ABCUI_CALL onModuleInit() {
 }
 
 void ABCUI_CALL onModuleFrame(double frameTime) {
+  tryHookCommand();
   if (frameTime <= 0.0)
     return;
   if (State == Transport::kPlaying) {

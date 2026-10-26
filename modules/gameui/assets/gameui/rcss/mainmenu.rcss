@@ -85,19 +85,20 @@
    screenWidth / (screenHeight / 480) dp wide (768dp at 16:10, 853dp at 16:9),
    so fixed coordinates would drift with the aspect ratio - the composition
    (card centred between the entry column and the board) has to hold at every
-   aspect. The board keeps a fixed right anchor; it is small enough that the
-   two only share the corner the card's framing box crosses. */
+   aspect. Give the preview a wide stage, lowered beneath the title so the
+   character's head has breathing room and the feet stay above the footer.
+   The transparent stage can overlap the columns; the board paints above it. */
 
 #player-card {
 	position: absolute;
-	left: 42%;
-	top: 48dp;
-	width: 34%;
-	height: 396dp;
+	left: 34%;
+	top: 20dp;
+	width: 44%;
+	height: 424dp;
 }
 
-/* The live Studio preview; the Renderer draws it into its own FBO and the
-   element presents it, so the box here is exactly what the camera frames. */
+/* The engine draws the standalone Studio view; the backend captures it for
+   the element. This box is exactly what the preview camera frames. */
 #player-model {
 	display: block;
 	width: 100%;

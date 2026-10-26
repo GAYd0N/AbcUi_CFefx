@@ -99,6 +99,12 @@ void noteSurfaceWindow(const void *hwnd);
 // window moves and scroll updates are covered while composing.
 void updateImePlacement(Rml::Vector2f caretPosition, float lineHeight);
 
+// Candidate-page refresh for the imeState read: while one of our editors is
+// composing, re-read the page straight from the IME context. The SDL
+// candidates event can be superceded by a competing IME driver before our
+// AppProc seam sees it; the poll is the configuration-independent feed.
+void refreshCompositionCandidates();
+
 // While composing, the IME owns these keys: Enter commits, ESC cancels,
 // Backspace edits the composition. Feeding them to the editor as well
 // would commit AND insert a newline / close the window / delete behind

@@ -1,0 +1,481 @@
+{
+  "schemaVersion": 5,
+  "source": {
+    "snapshotSchemaVersion": 8,
+    "analysisOutputContractVersion": 3
+  },
+  "binaries": {
+    "client": {
+      "windows": {
+        "alias": [
+          "client_orig.dll",
+          "client_original.dll",
+          "client_org.dll"
+        ],
+        "crc32": "5d6c9a27",
+        "crc64": "f4d0ae7dac38c443",
+        "isBlob": false,
+        "md5": "b1ad68bdc1bc08e5ace7cd08f2d8f009",
+        "sha256": "5e3bd90c24e829c43344f0fe18368a71cad3c9b3405695e2489b469cf694624c",
+        "size": 1551360
+      }
+    },
+    "vgui2": {
+      "windows": {
+        "crc32": "9858ed83",
+        "crc64": "f0da18da98f09e4c",
+        "isBlob": false,
+        "md5": "e181b2bd463afbac3db05ff49ad59761",
+        "sha256": "814d05642da7e4fe3d066ae78b598d49993b8e0eea4036f1ea321821b4506dcf",
+        "size": 610304
+      }
+    },
+    "engine": {
+      "linux": {
+        "crc32": "fae3128c",
+        "crc64": "550d53bb48ba07cd",
+        "isBlob": false,
+        "md5": "42093f09aed223b1f4bfe0f027b8c83b",
+        "sha256": "aad1299bf2389070f9fa27a7413543e028f8b26ef50d7ecfaa11504be26e4b0e",
+        "size": 4011104
+      },
+      "windows": {
+        "crc32": "6c6ac798",
+        "crc64": "2f9d6118f0ebea99",
+        "isBlob": false,
+        "md5": "8057cc939789cc77194f4bd9ccbd8d62",
+        "sha256": "22fd4d1ad0d3e11a44e7cd5643fe9f6b8ded1234cce819cc242ba5a3fd338ce8",
+        "size": 2089472
+      }
+    }
+  },
+  "records": [
+    {
+      "platform": "windows",
+      "module": "client",
+      "symbolName": "AbcUi_PlayerExtraInfo_stride",
+      "kind": "scalar",
+      "payload": {
+        "scalar_name": "AbcUi_PlayerExtraInfo_stride",
+        "scalar_value": 88
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "client",
+      "symbolName": "AbcUiPlayerExtraInfoView.donor",
+      "kind": "structMember",
+      "payload": {
+        "struct_name": "AbcUiPlayerExtraInfoView",
+        "member_name": "donor",
+        "offset": "0x54"
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "client",
+      "symbolName": "AbcUiHudBaseView.flags",
+      "kind": "structMember",
+      "payload": {
+        "struct_name": "AbcUiHudBaseView",
+        "member_name": "flags",
+        "offset": "0x10"
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "vgui2",
+      "symbolName": "AbcUi_IPanel_IsWithinTraverse_index",
+      "kind": "scalar",
+      "payload": {
+        "scalar_name": "AbcUi_IPanel_IsWithinTraverse_index",
+        "scalar_value": 43
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "vgui2",
+      "symbolName": "AbcUi_IPanel_PaintTraverse_index",
+      "kind": "scalar",
+      "payload": {
+        "scalar_name": "AbcUi_IPanel_PaintTraverse_index",
+        "scalar_value": 41
+      }
+    },
+    {
+      "artifact": "ClientPortalManager_RenderPortals",
+      "id": "client/ClientPortalManager_RenderPortals.linux.yaml",
+      "kind": "function",
+      "module": "client",
+      "payload": {
+        "func_name": "ClientPortalManager_RenderPortals",
+        "func_rva": "0x15d88c",
+        "func_sig": "55 57 56 53 83 EC ?? E8 ?? ?? ?? ?? 81 C3 ?? ?? ?? ?? 8B AC 24 ?? ?? ?? ?? 8B B5 ?? ?? ?? ?? 39 B5 ?? ?? ?? ?? 74 ?? 90 8B 3E 85 FF 74 ?? 83 EC ??",
+        "func_size": "0xe93",
+        "func_va": "0x15d88c"
+      },
+      "platform": "linux",
+      "symbolName": "ClientPortalManager_RenderPortals"
+    },
+    {
+      "artifact": "ClientPortalManager_ResetAll",
+      "id": "client/ClientPortalManager_ResetAll.linux.yaml",
+      "kind": "function",
+      "module": "client",
+      "payload": {
+        "func_name": "ClientPortalManager_ResetAll",
+        "func_rva": "0x15b70e",
+        "func_sig": "55 57 56 53 83 EC ?? E8 ?? ?? ?? ?? 81 C3 ?? ?? ?? ?? 8B 74 24 ?? C7 86 ?? ?? ?? ?? ?? ?? ?? ?? C7 86 ?? ?? ?? ?? ?? ?? ?? ?? 8B 86 ?? ?? ?? ?? 89 86 ?? ?? ?? ?? C7 86 ?? ?? ?? ?? ?? ?? ?? ??",
+        "func_size": "0x27a",
+        "func_va": "0x15b70e"
+      },
+      "platform": "linux",
+      "symbolName": "ClientPortalManager_ResetAll"
+    },
+    {
+      "artifact": "CL_FxBlend",
+      "id": "engine/CL_FxBlend.linux.yaml",
+      "kind": "function",
+      "module": "engine",
+      "payload": {
+        "func_name": "CL_FxBlend",
+        "func_rva": "0x16cbe0",
+        "func_sig": "56 53 83 EC ?? E8 ?? ?? ?? ?? 81 C3 ?? ?? ?? ?? 8B 74 24 ?? DB 86 ?? ?? ?? ?? D8 8B ?? ?? ?? ?? D9 5C 24 ?? 8B 86 ?? ?? ?? ?? 83 F8 ?? 77 ?? 8B 94 83 ?? ?? ?? ??",
+        "func_size": "0x353",
+        "func_va": "0x16cbe0"
+      },
+      "platform": "linux",
+      "symbolName": "CL_FxBlend"
+    },
+    {
+      "artifact": "VGui_ViewportPaintBackground",
+      "id": "engine/VGui_ViewportPaintBackground.linux.yaml",
+      "kind": "function",
+      "module": "engine",
+      "payload": {
+        "func_name": "VGui_ViewportPaintBackground",
+        "func_rva": "0x180f10",
+        "func_sig": "55 57 56 53 E8 ?? ?? ?? ?? 81 C3 ?? ?? ?? ?? 83 EC ?? 8B 54 24 ?? 89 54 24 ?? E8 ?? ?? ?? ?? 8B 83 ?? ?? ?? ?? 8B AB ?? ?? ?? ?? 8B B3 ?? ?? ?? ?? 89 C1",
+        "func_size": "0x1e3",
+        "func_va": "0x180f10"
+      },
+      "platform": "linux",
+      "symbolName": "VGui_ViewportPaintBackground"
+    },
+    {
+      "artifact": "V_RenderView",
+      "id": "engine/V_RenderView.linux.yaml",
+      "kind": "function",
+      "module": "engine",
+      "payload": {
+        "func_name": "V_RenderView",
+        "func_rva": "0x181e70",
+        "func_sig": "81 EC ?? ?? ?? ?? 89 9C 24 ?? ?? ?? ?? D9 EE E8 ?? ?? ?? ?? 81 C3 ?? ?? ?? ?? 89 B4 24 ?? ?? ?? ?? 89 BC 24 ?? ?? ?? ?? 89 AC 24 ?? ?? ?? ?? 8B 83 ?? ?? ?? ?? D9 93 ?? ?? ?? ?? D9 93 ?? ?? ?? ??",
+        "func_size": "0x5a5",
+        "func_va": "0x181e70"
+      },
+      "platform": "linux",
+      "symbolName": "V_RenderView"
+    },
+    {
+      "artifact": "cl_worldmodel",
+      "id": "engine/cl_worldmodel.linux.yaml",
+      "kind": "global",
+      "module": "engine",
+      "payload": {
+        "gv_inst_disp": "0x2",
+        "gv_inst_length": "0x6",
+        "gv_inst_offset": "0xe6",
+        "gv_name": "cl_worldmodel",
+        "gv_pic_addend": "0x15ee8a0",
+        "gv_rva": "0x1bef58c",
+        "gv_sig": "55 57 56 53 E8 ?? ?? ?? ?? 81 C3 ?? ?? ?? ?? 83 EC ?? 8B B3 ?? ?? ?? ?? 89 F0 C1 E8 ?? F7 D8 83 E0 ?? 0F 84 ?? ?? ?? ?? 83 F8 ?? C7 06 ?? ?? ?? ??",
+        "gv_sig_va": "0x1c3740",
+        "gv_va": "0x1bef58c"
+      },
+      "platform": "linux",
+      "symbolName": "cl_worldmodel"
+    },
+    {
+      "artifact": "cls_signon",
+      "id": "engine/cls_signon.linux.yaml",
+      "kind": "global",
+      "module": "engine",
+      "payload": {
+        "gv_inst_disp": "0x2",
+        "gv_inst_length": "0x7",
+        "gv_inst_offset": "0x88",
+        "gv_name": "cls.signon",
+        "gv_pic_addend": "0x1bfb720",
+        "gv_rva": "0x1c2bbb0",
+        "gv_sig": "81 EC ?? ?? ?? ?? 89 9C 24 ?? ?? ?? ?? D9 EE E8 ?? ?? ?? ?? 81 C3 ?? ?? ?? ?? 89 B4 24 ?? ?? ?? ?? 89 BC 24 ?? ?? ?? ?? 89 AC 24 ?? ?? ?? ?? 8B 83 ?? ?? ?? ?? D9 93 ?? ?? ?? ?? D9 93 ?? ?? ?? ??",
+        "gv_sig_va": "0x181e70",
+        "gv_va": "0x1c2bbb0"
+      },
+      "platform": "linux",
+      "symbolName": "cls.signon"
+    },
+    {
+      "artifact": "cls_state",
+      "id": "engine/cls_state.linux.yaml",
+      "kind": "global",
+      "module": "engine",
+      "payload": {
+        "gv_inst_disp": "0x2",
+        "gv_inst_length": "0x6",
+        "gv_inst_offset": "0x2f",
+        "gv_name": "cls.state",
+        "gv_pic_addend": "0x1bfb7e8",
+        "gv_rva": "0x1bfb720",
+        "gv_sig": "81 EC ?? ?? ?? ?? 89 9C 24 ?? ?? ?? ?? D9 EE E8 ?? ?? ?? ?? 81 C3 ?? ?? ?? ?? 89 B4 24 ?? ?? ?? ?? 89 BC 24 ?? ?? ?? ?? 89 AC 24 ?? ?? ?? ?? 8B 83 ?? ?? ?? ?? D9 93 ?? ?? ?? ?? D9 93 ?? ?? ?? ??",
+        "gv_sig_va": "0x181e70",
+        "gv_va": "0x1bfb720"
+      },
+      "platform": "linux",
+      "symbolName": "cls.state"
+    },
+    {
+      "artifact": "currententity",
+      "id": "engine/currententity.linux.yaml",
+      "kind": "global",
+      "module": "engine",
+      "payload": {
+        "gv_inst_disp": "0x2",
+        "gv_inst_length": "0x6",
+        "gv_inst_offset": "0xa",
+        "gv_name": "currententity",
+        "gv_pic_addend": "0x30d6f18",
+        "gv_rva": "0x30d6dd8",
+        "gv_sig": "E8 ?? ?? ?? ?? 05 ?? ?? ?? ?? 8B 80 ?? ?? ?? ?? 8B 00 C3 8D B6 00 00 00 00 8D BC 27 00 00 00 00 8B 44 24 ?? E8 ?? ?? ?? ?? 81 C2 ?? ?? ?? ?? 85 C0 78 ?? 8B 92 ?? ?? ?? ?? 3B 82 ?? ?? ?? ?? 7D ?? 8D 0C C0 8D 04 88 C1 E0 ?? 8D 84 02 ?? ?? ?? ?? C3 8D B6 00 00 00 00 31 C0 C3 90 8D 74 26 00 8B 54 24 ?? E8 ?? ?? ?? ?? 05 ?? ?? ?? ?? 85 D2 78 ?? 8B 88 ?? ?? ?? ?? 3B 91 ?? ?? ?? ?? 7D ?? 69 81 ?? ?? ?? ?? ?? ?? ?? ?? 69 D2 ?? ?? ?? ?? 8D 84 10 ?? ?? ?? ?? 01 C8 C3 8D B6 00 00 00 00 31 C0 C3 8D B6 00 00 00 00 8D BC 27 00 00 00 00 E8 ?? ?? ?? ?? 05 ?? ?? ?? ?? 8B 80 ?? ?? ?? ?? 05 ?? ?? ?? ?? C3 8D 76 00 8D BC 27 00 00 00 00 E8 ?? ?? ?? ?? 05 ?? ?? ?? ?? 8B 90 ?? ?? ?? ?? 8B 80 ?? ?? ?? ?? 8B 0A 8B 54 24 ?? 89 0A 8B 54 24 ?? F2 0F 10 80 ?? ?? ?? ?? F2 0F 11 02 DD 80 ?? ?? ?? ??",
+        "gv_sig_allow_across_function_boundary": true,
+        "gv_sig_va": "0xee5d0",
+        "gv_va": "0x30d6dd8"
+      },
+      "platform": "linux",
+      "symbolName": "currententity"
+    },
+    {
+      "artifact": "r_blend",
+      "id": "engine/r_blend.linux.yaml",
+      "kind": "global",
+      "module": "engine",
+      "payload": {
+        "gv_inst_disp": "0x2",
+        "gv_inst_length": "0x6",
+        "gv_inst_offset": "0x2d",
+        "gv_name": "r_blend",
+        "gv_pic_addend": "0x7ac1230",
+        "gv_rva": "0x7ac112c",
+        "gv_sig": "53 E8 ?? ?? ?? ?? 81 C3 ?? ?? ?? ?? 83 EC ?? 8B 54 24 ?? 8B 83 ?? ?? ?? ?? 8B 00 89 90 ?? ?? ?? ?? 89 04 24 E8 ?? ?? ?? ?? 89 44 24 ?? 8B 83 ?? ?? ?? ??",
+        "gv_sig_va": "0xef510",
+        "gv_va": "0x7ac112c"
+      },
+      "platform": "linux",
+      "symbolName": "r_blend"
+    },
+    {
+      "artifact": "r_worldentity",
+      "id": "engine/r_worldentity.linux.yaml",
+      "kind": "global",
+      "module": "engine",
+      "payload": {
+        "gv_inst_disp": "0x2",
+        "gv_inst_length": "0x6",
+        "gv_inst_offset": "0xbf",
+        "gv_name": "r_worldentity",
+        "gv_pic_addend": "0x30d7560",
+        "gv_rva": "0x30d6e00",
+        "gv_sig": "55 57 56 53 E8 ?? ?? ?? ?? 81 C3 ?? ?? ?? ?? 83 EC ?? 8B B3 ?? ?? ?? ?? 89 F0 C1 E8 ?? F7 D8 83 E0 ?? 0F 84 ?? ?? ?? ?? 83 F8 ?? C7 06 ?? ?? ?? ??",
+        "gv_sig_va": "0x1c3740",
+        "gv_va": "0x30d6e00"
+      },
+      "platform": "linux",
+      "symbolName": "r_worldentity"
+    },
+    {
+      "artifact": "ClientPortalManager_RenderPortals",
+      "id": "client/ClientPortalManager_RenderPortals.windows.yaml",
+      "kind": "function",
+      "module": "client",
+      "payload": {
+        "func_name": "ClientPortalManager_RenderPortals",
+        "func_rva": "0x969f0",
+        "func_sig": "55 8B EC 6A FF 68 ?? ?? ?? ?? 64 A1 ?? ?? ?? ?? 50 81 EC 80 00 00 00 53 56 57 A1 ?? ?? ?? ?? 33 C5 50 8D 45 ??",
+        "func_size": "0xc71",
+        "func_va": "0x100969f0"
+      },
+      "platform": "windows",
+      "symbolName": "ClientPortalManager_RenderPortals"
+    },
+    {
+      "artifact": "ClientPortalManager_ResetAll",
+      "id": "client/ClientPortalManager_ResetAll.windows.yaml",
+      "kind": "function",
+      "module": "client",
+      "payload": {
+        "func_name": "ClientPortalManager_ResetAll",
+        "func_rva": "0x960a0",
+        "func_sig": "53 8B DC 83 EC 08 83 E4 F0 83 C4 04 55 8B 6B ?? 89 6C 24 ?? 8B EC 6A FF 68 ?? ?? ?? ?? 64 A1 ?? ?? ?? ?? 50 53 83 EC 28 56 57 A1 ?? ?? ?? ?? 33 C5 50 8D 45 ?? 64 A3 ?? ?? ?? ?? 8B F9 8B 87 ?? ?? ?? ?? 8D 4F ?? 0F 57 C0 C7 87 ?? ?? ?? ?? ?? ?? ?? ?? C7 87 ?? ?? ?? ?? ?? ?? ?? ?? 89 87 ?? ?? ?? ?? 0F 29 45 ?? C7 87 ?? ?? ?? ?? ?? ?? ?? ?? C7 87 ?? ?? ?? ?? ?? ?? ?? ?? C6 87 ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? 8D 4F ?? E8 ?? ?? ?? ?? 8B 87 ?? ?? ?? ?? 89 45 ?? 3B 87 ?? ?? ?? ?? 74 ?? 8B 30 85 F6 74 ?? 8D 8E ?? ?? ?? ?? C7 45 ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? 8D 8E ?? ?? ?? ?? E8 ?? ?? ?? ?? 68 ?? ?? ?? ?? 6A 06 6A 10 8D 46 ?? 50 E8 ?? ?? ?? ?? 68 D8 00 00 00 56 C7 45 ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? 8B 45 ?? 83 C4 08 83 C0 04 89 45 ?? 3B 87 ?? ?? ?? ?? 75 ?? 8B 87 ?? ?? ?? ??",
+        "func_sig_allow_across_function_boundary": true,
+        "func_size": "0x468",
+        "func_va": "0x100960a0"
+      },
+      "platform": "windows",
+      "symbolName": "ClientPortalManager_ResetAll"
+    },
+    {
+      "artifact": "CL_FxBlend",
+      "id": "engine/CL_FxBlend.windows.yaml",
+      "kind": "function",
+      "module": "engine",
+      "payload": {
+        "func_name": "CL_FxBlend",
+        "func_rva": "0x327c0",
+        "func_sig": "53 56 8B 74 24 ?? DB 86 ?? ?? ?? ?? 8B 86 ?? ?? ?? ?? DC 0D ?? ?? ?? ?? 83 F8 14 0F 87 ?? ?? ?? ?? FF 24 85 ?? ?? ?? ?? DD 05 ?? ?? ?? ?? DC C0 DE C1",
+        "func_size": "0x2a5",
+        "func_va": "0x1d327c0"
+      },
+      "platform": "windows",
+      "symbolName": "CL_FxBlend"
+    },
+    {
+      "artifact": "VGui_ViewportPaintBackground",
+      "id": "engine/VGui_ViewportPaintBackground.windows.yaml",
+      "kind": "function",
+      "module": "engine",
+      "payload": {
+        "func_name": "VGui_ViewportPaintBackground",
+        "func_rva": "0xc4140",
+        "func_sig": "83 EC 08 56 E8 ?? ?? ?? ?? A1 ?? ?? ?? ?? A3 ?? ?? ?? ?? A1 ?? ?? ?? ?? A3 ?? ?? ?? ?? A1 ?? ?? ?? ?? A3 ?? ?? ?? ?? A1 ?? ?? ?? ?? A3 ?? ?? ?? ?? E8 ?? ?? ?? ?? 85 C0 74 ?? 8D 44 24 ?? 50 8D 44 24 ??",
+        "func_size": "0x152",
+        "func_va": "0x1dc4140"
+      },
+      "platform": "windows",
+      "symbolName": "VGui_ViewportPaintBackground"
+    },
+    {
+      "artifact": "V_RenderView",
+      "id": "engine/V_RenderView.windows.yaml",
+      "kind": "function",
+      "module": "engine",
+      "payload": {
+        "func_name": "V_RenderView",
+        "func_rva": "0xcc720",
+        "func_sig": "81 EC F4 01 00 00 A1 ?? ?? ?? ?? 33 C4 89 84 24 ?? ?? ?? ?? D9 EE D9 15 ?? ?? ?? ?? D9 15 ?? ?? ?? ?? D9 15 ?? ?? ?? ?? D9 15 ?? ?? ?? ?? 56 D9 15 ?? ?? ?? ??",
+        "func_size": "0x26e",
+        "func_va": "0x1dcc720"
+      },
+      "platform": "windows",
+      "symbolName": "V_RenderView"
+    },
+    {
+      "artifact": "cl_worldmodel",
+      "id": "engine/cl_worldmodel.windows.yaml",
+      "kind": "global",
+      "module": "engine",
+      "payload": {
+        "gv_inst_disp": "0x2",
+        "gv_inst_length": "0x6",
+        "gv_inst_offset": "0x43",
+        "gv_name": "cl_worldmodel",
+        "gv_rva": "0x9cbc80",
+        "gv_sig": "55 8B EC 51 C7 45 ?? ?? ?? ?? ?? EB ?? 8B 45 ?? 83 C0 01 89 45 ?? 81 7D ?? ?? ?? ?? ?? 7D ?? 8B 4D ?? C7 04 8D ?? ?? ?? ?? ?? ?? ?? ?? EB ?? 68 B8 0B 00 00",
+        "gv_sig_va": "0x1d56c00",
+        "gv_va": "0x26cbc80"
+      },
+      "platform": "windows",
+      "symbolName": "cl_worldmodel"
+    },
+    {
+      "artifact": "cls_signon",
+      "id": "engine/cls_signon.windows.yaml",
+      "kind": "global",
+      "module": "engine",
+      "payload": {
+        "gv_inst_disp": "0x2",
+        "gv_inst_length": "0x7",
+        "gv_inst_offset": "0x4a",
+        "gv_name": "cls.signon",
+        "gv_rva": "0x3c9fd4",
+        "gv_sig": "81 EC F4 01 00 00 A1 ?? ?? ?? ?? 33 C4 89 84 24 ?? ?? ?? ?? D9 EE D9 15 ?? ?? ?? ?? D9 15 ?? ?? ?? ?? D9 15 ?? ?? ?? ?? D9 15 ?? ?? ?? ?? 56 D9 15 ?? ?? ?? ??",
+        "gv_sig_va": "0x1dcc720",
+        "gv_va": "0x20c9fd4"
+      },
+      "platform": "windows",
+      "symbolName": "cls.signon"
+    },
+    {
+      "artifact": "cls_state",
+      "id": "engine/cls_state.windows.yaml",
+      "kind": "global",
+      "module": "engine",
+      "payload": {
+        "gv_inst_disp": "0x2",
+        "gv_inst_length": "0x7",
+        "gv_inst_offset": "0x37",
+        "gv_name": "cls.state",
+        "gv_rva": "0x399a30",
+        "gv_sig": "81 EC F4 01 00 00 A1 ?? ?? ?? ?? 33 C4 89 84 24 ?? ?? ?? ?? D9 EE D9 15 ?? ?? ?? ?? D9 15 ?? ?? ?? ?? D9 15 ?? ?? ?? ?? D9 15 ?? ?? ?? ?? 56 D9 15 ?? ?? ?? ??",
+        "gv_sig_va": "0x1dcc720",
+        "gv_va": "0x2099a30"
+      },
+      "platform": "windows",
+      "symbolName": "cls.state"
+    },
+    {
+      "artifact": "currententity",
+      "id": "engine/currententity.windows.yaml",
+      "kind": "global",
+      "module": "engine",
+      "payload": {
+        "gv_inst_disp": "0x1",
+        "gv_inst_length": "0x5",
+        "gv_inst_offset": "0x0",
+        "gv_name": "currententity",
+        "gv_rva": "0x2253f80",
+        "gv_sig": "A1 ?? ?? ?? ?? C3 CC CC CC CC CC CC CC CC CC CC 8B 44 24 ?? 85 C0 78 ?? 3B 05 ?? ?? ?? ?? 7D ?? 69 C0 50 02 00 00 0F AE E8 05 ?? ?? ?? ?? C3 33 C0 C3 CC CC CC CC CC CC CC CC CC CC CC CC CC CC 8B 44 24 ?? 85 C0 78 ?? 3B 05 ?? ?? ?? ?? 7D ?? 69 C0 54 01 00 00 0F AE E8 69 0D ?? ?? ?? ?? ?? ?? ?? ?? 8D 80 ?? ?? ?? ?? 03 C1 C3 33 C0 C3 CC B8 ?? ?? ?? ?? C3 CC CC CC CC CC CC CC CC CC CC 8B 4C 24 ?? A1 ?? ?? ?? ?? 89 01 8B 44 24 ?? DD 05 ?? ?? ?? ?? DD 18 8B 44 24 ?? DD 05 ?? ?? ?? ?? DD 18 C3 CC CC CC CC CC CC CC CC CC CC CC CC FF 74 24 ?? E8 ?? ?? ?? ?? 8B 44 24 ?? 83 C4 04 C7 00 ?? ?? ?? ?? 8B 44 24 ?? C7 00 ?? ?? ?? ?? C3 CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC 8B 44 24 ?? A3 ?? ?? ?? ?? C3 CC CC CC CC CC CC D9 05 ?? ?? ?? ?? D9 C0 C7 05 ?? ?? ?? ?? ?? ?? ?? ??",
+        "gv_sig_allow_across_function_boundary": true,
+        "gv_sig_va": "0x1d918e0",
+        "gv_va": "0x3f53f80"
+      },
+      "platform": "windows",
+      "symbolName": "currententity"
+    },
+    {
+      "artifact": "r_blend",
+      "id": "engine/r_blend.windows.yaml",
+      "kind": "global",
+      "module": "engine",
+      "payload": {
+        "gv_inst_disp": "0x2",
+        "gv_inst_length": "0x6",
+        "gv_inst_offset": "0x2c",
+        "gv_name": "r_blend",
+        "gv_rva": "0x70f6188",
+        "gv_sig": "8B 0D ?? ?? ?? ?? 8B 44 24 ?? 89 81 ?? ?? ?? ?? FF 35 ?? ?? ?? ?? E8 ?? ?? ?? ?? 89 44 24 ?? 83 C4 04 DB 44 24 ?? DC 0D ?? ?? ?? ?? D9 1D ?? ?? ?? ?? C3",
+        "gv_sig_va": "0x1d91cf0",
+        "gv_va": "0x8df6188"
+      },
+      "platform": "windows",
+      "symbolName": "r_blend"
+    },
+    {
+      "artifact": "r_worldentity",
+      "id": "engine/r_worldentity.windows.yaml",
+      "kind": "global",
+      "module": "engine",
+      "payload": {
+        "gv_inst_disp": "0x1",
+        "gv_inst_length": "0x5",
+        "gv_inst_offset": "0x36",
+        "gv_name": "r_worldentity",
+        "gv_rva": "0x22533b0",
+        "gv_sig": "55 8B EC 51 C7 45 ?? ?? ?? ?? ?? EB ?? 8B 45 ?? 83 C0 01 89 45 ?? 81 7D ?? ?? ?? ?? ?? 7D ?? 8B 4D ?? C7 04 8D ?? ?? ?? ?? ?? ?? ?? ?? EB ?? 68 B8 0B 00 00",
+        "gv_sig_va": "0x1d56c00",
+        "gv_va": "0x3f533b0"
+      },
+      "platform": "windows",
+      "symbolName": "r_worldentity"
+    }
+  ]
+}

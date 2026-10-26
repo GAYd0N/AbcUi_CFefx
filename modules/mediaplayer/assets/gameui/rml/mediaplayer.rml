@@ -58,7 +58,7 @@
 		<div id="mp-list"></div>
 
 		<div id="mp-edit-row">
-			<input id="mp-add-path" type="text" maxlength="511" placeholder="#abcui.mediaplayer/MediaPlayer_AddPlaceholder"/>
+			<input id="mp-add-path" type="text" maxlength="511"/><!-- placeholder set from code: attributes ride outside the #token localization -->
 			<button id="mp-add" data-action="mp-add" data-label="#abcui.mediaplayer/MediaPlayer_Add">#abcui.mediaplayer/MediaPlayer_Add</button>
 			<button id="mp-remove" data-action="mp-remove" data-label="#abcui.mediaplayer/MediaPlayer_Remove">#abcui.mediaplayer/MediaPlayer_Remove</button>
 			<button id="mp-up" data-action="mp-up" data-label="#abcui.mediaplayer/MediaPlayer_MoveUp">&#9650;</button>

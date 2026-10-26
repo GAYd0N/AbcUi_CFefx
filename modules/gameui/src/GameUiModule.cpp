@@ -82,6 +82,11 @@ AbcUiCvarHandle MusicVolume = nullptr;
 AbcUiAudio Music = 0;
 std::string AppliedMusic;
 bool MusicRefused = false;
+// The engine's own startup track (media/gamestartup*.mp3) plays on the engine
+// mp3 stream, which the module's independent SDL channel does not replace.
+// One stop per no-level menu presentation keeps the two from overlapping.
+bool EngineMusicStopped = false;
+bool MenuWasVisible = false;
 
 void onModuleInit() {
   MusicSource = Api->console->registerCvar(
@@ -111,6 +116,19 @@ void onModuleFrame(double) {
     Music = 0;
     AppliedMusic = source;
     MusicRefused = false;
+  }
+  // The original menu music is the engine's startup stream: the legacy engine
+  // track used to be replaced by "mp3 loop", but this module plays its own
+  // channel, so the engine keeps sounding media/gamestartup*.mp3 underneath.
+  // Stop it once when the no-level menu takes the music over; a later menu
+  // presentation re-arms the latch (MediaPlayer, which also owns the engine
+  // stream, is closed by the level transition before that edge).
+  if (visible && !MenuWasVisible)
+    EngineMusicStopped = false;
+  MenuWasVisible = visible;
+  if (visible && !EngineMusicStopped && !AppliedMusic.empty()) {
+    EngineMusicStopped = true;
+    Api->console->engineCommand("mp3 stop");
   }
   if (visible && !Music && !MusicRefused && !AppliedMusic.empty()) {
     const int result = Api->audio->open(AppliedMusic.c_str(), 1, &Music);
@@ -177,6 +195,8 @@ void onModuleShutdown() {
   Music = 0;
   AppliedMusic.clear();
   MusicRefused = false;
+  EngineMusicStopped = false;
+  MenuWasVisible = false;
   // The documents die with the context; every page forgets its handles.
   votepage::shutdown();
   playerlistpage::shutdown();

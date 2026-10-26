@@ -83,7 +83,7 @@ int BuiltPageCount = -1;
 // re-query the engine, so the dialog re-renders on change only).
 uint32_t ConfirmRenderedRevision = ~0u;
 
-// Option sets last projected into the select rows (cvar -> values): the
+// Option sets last projected into select rows (cvar -> value/label pairs): the
 // widget is rebuilt only when the set actually changed.
 std::vector<std::pair<std::string, std::vector<std::string>>> SelectShown;
 // The resolution options last projected into the display select.

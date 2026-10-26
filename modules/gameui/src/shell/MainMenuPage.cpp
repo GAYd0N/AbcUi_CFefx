@@ -227,8 +227,17 @@ void projectFacts() {
     setInnerRml("player-model-name", escapeText(card.modelLabel).c_str());
     if (AbcUiElement *preview = node("player-model")) {
       const std::string path = card.modelPath;
-      if (attributeOf(preview, "src") != path)
-        Api->ui->elementSetAttribute(preview, "src", path.c_str());
+      // The card is one follow chain: the action group poses the displayed
+      // model and the weapon (empty attributes drop that entity).
+      const auto setAttribute = [preview](const char *name,
+                                          const std::string &value) {
+        if (attributeOf(preview, name) != value)
+          Api->ui->elementSetAttribute(preview, name, value.c_str());
+      };
+      setAttribute("src", path);
+      setAttribute("action-src", card.actionModel);
+      setAttribute("weapon", card.weaponModel);
+      setAttribute("sequence", std::to_string(card.sequence));
       Api->ui->elementSetProperty(preview, "display",
                                   path.empty() ? "none" : "block");
     }
@@ -507,6 +516,10 @@ void dismiss() {
 bool wantsPage(const AbcUiMenuState *state, int32_t &section) {
   if (!state || !state->up)
     return false;
+  AbcUiVideoFacts video{};
+  video.structSize = sizeof(video);
+  if (Api->settings->videoFacts(&video) && video.awaitingConfirm)
+    return false;
   if (state->page == ABCUI_MENU_PAGE_MAIN) {
     section = ABCUI_MENU_SECTION_MAIN;
     return true;
@@ -530,10 +543,16 @@ void onMenuState(void *, const void *payload) {
 void onMenuPaint(void *, const void *payload) {
   const auto *state = static_cast<const AbcUiMenuState *>(payload);
   int32_t section = 0;
-  if (!state || !wantsPage(state, section) || !Page)
+  if (!state || !wantsPage(state, section) || !Page) {
+    dismiss();
     return;
-  if (!Api->documents->visible(Page))
+  }
+  // The video flow hides menu documents without changing the page stack.
+  // Its dismissal therefore need not emit menu.state; restore on paint.
+  if (!Api->documents->visible(Page)) {
+    present(section, state->overlays == 0);
     return;
+  }
   // The entry conditions, the card and the friends board follow their
   // facts while the page is up.
   render();

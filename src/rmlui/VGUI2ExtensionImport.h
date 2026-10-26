@@ -31,7 +31,7 @@ void shutdownNative();
 bool available();
 
 // Texture channel (ids live in the surface texture namespace that
-// IMetaRenderer's DrawTexturedRect consumes). Returns 0 when unavailable.
+// the render backend's textured draw consumes). Returns 0 when unavailable.
 int createTexture();
 void uploadTexture(int textureId, const unsigned char *rgba, int width,
                    int height);

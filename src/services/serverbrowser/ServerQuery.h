@@ -6,24 +6,9 @@
 // the offline acceptance test (05 doc tier 1); the Steam adapter
 // (ServerQuerySteam.cpp) implements IServerQueryProvider.
 //
-// Evidence (T17a, installed binaries, Ghidra; image bases hw 0x01d00000,
-// GameUI/serverbrowser 0x10000000):
-//   - The query backend of the shipped browser is Steam's
-//     ISteamMatchmakingServers "SteamMatchMakingServers002", bound through
-//     the same modern entry path rmlui/SteamApiNative.cpp already uses
-//     (SteamAPI_GetHSteamUser + SteamInternal_FindOrCreateUserInterface;
-//     platform/servers/serverbrowser.dll does the same at 0x10003053 etc.).
-//   - vtable slots verified at shipped call sites: 0x00-0x14 the six
-//     Request*ServerList kinds, 0x18 ReleaseRequest, 0x1c GetServerDetails,
-//     0x20 CancelQuery (0x10007ad0), 0x24 RefreshQuery (0x10005230), 0x2c
-//     GetServerCount, 0x30 RefreshServer (0x100057c0), 0x34 PingServer
-//     (0x1000ad70), 0x38 PlayerDetails, 0x40 CancelServerQuery (0x1000a2b0).
-//   - gameserveritem_t field offsets verified at shipped read sites
-//     (0x10002ff0 reads map@0x2e, gamedir@0x0e, tags@0xec, desc@0x4e,
-//     players@0x94, bots@0x9c, max@0x98, secure@0xa1, lastPlayed@0xa4).
-//   - hw.dll owns SteamAPI_Init and pumps SteamAPI_RunCallbacks every frame
-//     (frame loop 0x01d67950); the module must never init/shutdown/pump
-//     Steam itself.
+// ServerQuerySteam binds ISteamMatchmakingServers directly from the host's
+// steam_api.dll using the SDK interface version and RuntimeAccess. The engine
+// owns Steam initialization, shutdown and callback pumping.
 //
 // Lifecycle contract (T17 step b, frozen for T18):
 //   - States: Idle / Querying / Completed / Cancelled / Failed. Failure

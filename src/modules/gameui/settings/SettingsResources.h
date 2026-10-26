@@ -13,6 +13,8 @@ bool writeModFile(const char *relativePath,
                   const std::vector<unsigned char> &bytes, std::string &error);
 std::vector<std::string> scanModDirectories(const char *relativeDir);
 std::vector<std::string> scanModFileBasenames(const char *relativeDir);
+// Native action models and the sequence choices derived from the model draft.
+void configureMenuActionChoices(services::settings::SettingsModel &model);
 // Files directly under <mod>/<relativeDir> whose extension matches one of
 // `extensions` (case-insensitive, ".wav" form), sorted by value. The value is
 // <valuePrefix><name>; the label is the name without its extension. Raw

@@ -23,7 +23,45 @@ State &state() {
   static State instance;
   return instance;
 }
+
+// abc_ui_input_events diagnostics: how many candidate reads ran and what the
+// last one saw (0 bytes = the IME context carried no list at read time;
+// eventCount -1 = the SDL payload was absent or failed validation).
+unsigned DebugFeeds = 0;
+unsigned DebugLastBytes = 0;
+unsigned DebugEventFeeds = 0;
+int DebugLastEventCount = -1;
+// Raw payload capture for the layout identification dump.
+unsigned DebugPayloadSeen = 0;
+unsigned DebugPayloadWords[8] = {};
 } // namespace
+
+void noteCandidatesPayload(const unsigned *words) {
+  DebugPayloadSeen++;
+  for (int i = 0; i < 8; i++)
+    DebugPayloadWords[i] = words[i];
+}
+
+void imePayloadDebug(unsigned &seen, unsigned *words) {
+  seen = DebugPayloadSeen;
+  if (words)
+    for (int i = 0; i < 8; i++)
+      words[i] = DebugPayloadWords[i];
+}
+
+void imeDebug(unsigned &feeds, unsigned &lastBytes, unsigned &eventFeeds,
+             int &lastEventCount, int &count, int &selected, bool &anchorValid,
+             int &compositionBytes) {
+  const auto &s = state();
+  feeds = DebugFeeds;
+  lastBytes = DebugLastBytes;
+  eventFeeds = DebugEventFeeds;
+  lastEventCount = DebugLastEventCount;
+  count = static_cast<int>(s.candidates.size());
+  selected = s.selected;
+  anchorValid = s.anchorValid;
+  compositionBytes = static_cast<int>(s.composition.size());
+}
 
 void shutdown() {
   state() = {};
@@ -48,8 +86,11 @@ void applyPlatformCandidates(HIMC context) {
   // One horizontal row, like the game's own IME window: the page is short
   // (<= 10 entries) and a row keeps the panel from covering the play area.
   constexpr bool horizontal = true;
+  DebugFeeds++;
+  DebugLastBytes = 0;
   if (context) {
     const DWORD bytes = ImmGetCandidateListW(context, 0, nullptr, 0);
+    DebugLastBytes = bytes;
     if (bytes > sizeof(CANDIDATELIST) && bytes <= 1024 * 1024) {
       std::vector<unsigned char> block(bytes, 0);
       auto *list = reinterpret_cast<LPCANDIDATELIST>(block.data());
@@ -104,6 +145,34 @@ void applyPlatformCandidates(HIMC context) {
 
 void feedCandidatesFromIme(void *himc) {
   applyPlatformCandidates(static_cast<HIMC>(himc));
+}
+
+// The SDL candidates event carries the page the IME's TSF side extracted
+// (SDL3-style payload): UTF-8 strings, the selection index and nothing else -
+// on TSF-driven IMEs the IMM32 CANDIDATELIST this process can read stays
+// empty, so this payload is the authoritative source when present.
+void feedCandidatesFromEvent(const char *const *candidates, int count,
+                             int selected) {
+  std::vector<std::string> page;
+  int selection = -1;
+  DebugEventFeeds++;
+  DebugLastEventCount = count;
+  if (candidates)
+    for (int i = 0; i < count && static_cast<int>(page.size()) < 16; i++)
+      if (candidates[i] && candidates[i][0])
+        page.emplace_back(candidates[i]);
+  if (selected >= 0 && selected < static_cast<int>(page.size()))
+    selection = selected;
+  auto &s = state();
+  s.candidates = std::move(page);
+  s.selected = selection;
+  s.horizontal = true;
+}
+
+void clearCandidates() {
+  auto &s = state();
+  s.candidates.clear();
+  s.selected = -1;
 }
 
 void setAnchor(float x, float y, float lineHeight) {

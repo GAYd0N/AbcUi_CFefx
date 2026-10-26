@@ -1,9 +1,11 @@
 /* gindicator.rcss - GrenadeIndicatorPanel layout, from the old
    abcenchance/res/GrenadeIndicatorPanel.res (fullscreen panel, 24x24 grenade
    icon centered on the projected world position). Marker elements are created
-   per tracked entity by GIndicatorPanel::onData and positioned in raw px.
-   Icon tint = old scheme GIndicator.DrawColor = DefaultTransparent
-   (0 255 0 125). */
+   per tracked entity by grenadeOnRedraw and positioned in raw px. A grenade
+   outside the viewport (or behind the eye) clamps to the screen edge instead
+   of disappearing: the direction triangle sits on the edge and the icon just
+   inboard of it. Icon tint = old scheme GIndicator.DrawColor
+   (DefaultTransparent, the HUD accent at half alpha). */
 
 #gindicator {
 	position: absolute;
@@ -26,6 +28,23 @@
 	display: none;
 	width: 24px;
 	height: 24px;
-	/* DefaultTransparent (0 255 0 125). */
+}
+
+#gindicator .grenade .icon {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	width: 24px;
+	height: 24px;
+	/* DefaultTransparent (0 255 0 125) in the old scheme; the HUD accent
+	   takes that role now. */
+	image-color: var(--abc-hud-accent-dim);
+}
+
+#gindicator .grenade .arrow {
+	position: absolute;
+	display: none;
+	width: 14px;
+	height: 14px;
 	image-color: var(--abc-hud-accent-dim);
 }

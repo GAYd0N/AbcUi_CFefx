@@ -3,6 +3,7 @@
 #include "ApiTable.h"
 #include "ApiSnapshot.h"
 #include "rmlui/RmlUiModule.h"
+#include "rmlui/TextInput.h"
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include "ModuleResources.h"
@@ -146,15 +147,24 @@ int32_t apiImeLanguageTag(char *out, uint32_t outSize) {
 int32_t apiImeState(AbcUiImeState *out) {
   if (!out)
     return ABCUI_ERROR_INVALID;
+  // Refresh the candidate page while a composition runs (the read is the
+  // configuration-independent feed; see refreshCompositionCandidates).
+  rmlui::refreshCompositionCandidates();
   AbcUiImeState state{};
   state.structSize = sizeof(state);
   auto *context = rmlui::context();
   auto *focus = context ? context->GetFocusElement() : nullptr;
   auto *document = focus ? focus->GetOwnerDocument() : nullptr;
   const auto owner = module_resources::current();
-  if (owner && document && document->IsVisible() &&
-      document->GetSourceURL().starts_with("mod://" + owner->id + "/"))
-    rmlui::ime::snapshot(state);
+  // RmlUi reports source URLs with ':' escaped to '|' (StreamFile's
+  // url-safe path), so a mod:// document answers "mod|//..." - match both
+  // forms or every module editor would fail the ownership check.
+  if (owner && document && document->IsVisible()) {
+    const std::string url = document->GetSourceURL();
+    if (url.starts_with("mod://" + owner->id + "/") ||
+        url.starts_with("mod|//" + owner->id + "/"))
+      rmlui::ime::snapshot(state);
+  }
   abi::copySnapshot(out, state);
   return ABCUI_OK;
 }

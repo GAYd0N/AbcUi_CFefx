@@ -67,6 +67,7 @@ struct SettingDefinition {
   // labels the dropdown with the file stem and the write validation accepts
   // a relative path.
   bool FileChoices = false;
+  bool AllowEmpty = false;
   bool Bounded = true;
   bool HasDefault = true;
   settings::SettingKind Kind = settings::SettingKind::kBool;

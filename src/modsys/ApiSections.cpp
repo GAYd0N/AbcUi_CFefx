@@ -1024,15 +1024,10 @@ int apiLevelName(char *out, uint32_t outSize) {
   return static_cast<int>(text.size());
 }
 
-int32_t apiEnsureSayTextFirst() {
-  return netmsg::ensureSayTextFirst();
-}
-
 const AbcUiDataApi kDataApi = {
     sizeof(AbcUiDataApi), apiHudState,    apiLevelName,
     apiPlayerState,       apiThirdPerson, apiTraceEndPos,
     apiModelIndex,        apiViewHeight,  apiServerInfo,
-    apiEnsureSayTextFirst,
 };
 
 } // namespace

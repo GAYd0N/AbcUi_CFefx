@@ -14,9 +14,6 @@ namespace settings {
 
 namespace {
 constexpr const char *kStorePath = "abc/abcui/model_favorites.json";
-// The scan feeding the picker caps at the same count; a list beyond this is
-// treated as a damaged store rather than an achievement.
-constexpr size_t kMaxFavorites = 512;
 
 // The on-disk schema. Field order defines the written key order only; the
 // parser is key-based (a missing key keeps the default).
@@ -98,13 +95,10 @@ void ModelFavorites::sanitize(std::vector<std::string> &favorites) {
   for (auto &model : favorites) {
     if (!entryTextValid(model))
       continue;
-    if (std::find(clean.begin(), clean.end(), model) != clean.end())
-      continue;
     clean.push_back(std::move(model));
-    if (clean.size() >= kMaxFavorites)
-      break;
   }
   std::sort(clean.begin(), clean.end());
+  clean.erase(std::unique(clean.begin(), clean.end()), clean.end());
   favorites = std::move(clean);
 }
 

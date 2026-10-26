@@ -61,6 +61,11 @@ struct SdlTextEditingEvent {
   int Length;
 };
 
+// The candidates event's payload shape has flipped between engine builds
+// (the documented one crashed live), so no struct view is declared for it:
+// the handler probes the raw words with full pointer validation and every
+// event is dumped raw for the on-machine probe (see the 0x304 branch).
+
 HWND gameWindow();
 
 // Composition state machine over Rml's TextInputContext, following the pin
@@ -334,6 +339,27 @@ void updateImePlacement(Rml::Vector2f caretPosition, float lineHeight) {
   ImmReleaseContext(window, context);
 }
 
+// Frame-time candidate refresh while composing. The event-driven feeds
+// (SDL_EVENT_TEXT_EDITING_CANDIDATES, the ActivateKeyboard caret hook) are
+// both unreliable on this install: the VGUI2Extension proxy supercedes the
+// candidates event before plugins late in the chain, and an IME driver that
+// owns the window messages can keep it from being emitted at all. The
+// CANDIDATELIST stays readable from the IME context for the whole
+// composition (VGUI2Extension's own candidate window reads it at event time
+// on this very install), so polling once per imeState read covers every
+// configuration. Cheap and bounded: only while one of our editors composes.
+void refreshCompositionCandidates() {
+  if (!adapter().composing())
+    return;
+  const HWND window = gameWindow();
+  if (!window)
+    return;
+  if (const HIMC context = ImmGetContext(window)) {
+    ime::feedCandidatesFromIme(context);
+    ImmReleaseContext(window, context);
+  }
+}
+
 void feedTextInput(const char *utf8) {
   const std::string_view sanitized = framework::text::sanitizeUtf8(utf8);
   if (sanitized.empty())
@@ -412,22 +438,80 @@ void onSurfaceAppEvent(const void *sdlEvent) {
     feedTextEditing(editing->Text, editing->Start);
     break;
   }
-  case kSdlEventTextEditingCandidates:
-    // The page is read from the IME itself (imm32 CANDIDATELIST, see
-    // feedCandidatesFromIme), never from this event: its payload layout in
-    // this build is not the documented one - a live crash read the count
-    // field as the string-array pointer. The event is used as the "the page
-    // changed" trigger only (paging/selection change without a caret move).
+  case kSdlEventTextEditingCandidates: {
     Counters.AppProcCandidates++;
-    if (adapter().hasActiveEditor()) {
-      if (const HWND window = gameWindow()) {
-        if (const HIMC context = ImmGetContext(window)) {
-          ime::feedCandidatesFromIme(context);
-          ImmReleaseContext(window, context);
-        }
+    // Layout identification first, decisions after: the payload shape has
+    // flipped between engine builds, so every event is dumped raw (the
+    // probe prints it) and both known layouts are probed with full
+    // validation before anything is dereferenced.
+    const auto *raw = static_cast<const unsigned *>(sdlEvent);
+    ime::noteCandidatesPayload(raw);
+    if (!adapter().hasActiveEditor())
+      break;
+    // Crash-safe pointer validation (the first live attempt dereferenced
+    // the count field as the array pointer).
+    struct Memory {
+      static bool readable(const void *address, size_t bytes) {
+        if (!address)
+          return false;
+        MEMORY_BASIC_INFORMATION info = {};
+        if (!VirtualQuery(address, &info, sizeof(info)))
+          return false;
+        if (info.State != MEM_COMMIT)
+          return false;
+        const DWORD protect = info.Protect & 0xFF;
+        const bool readablePage =
+            protect == PAGE_READONLY || protect == PAGE_READWRITE ||
+            protect == PAGE_WRITECOPY || protect == PAGE_EXECUTE_READ ||
+            protect == PAGE_EXECUTE_READWRITE ||
+            protect == PAGE_EXECUTE_WRITECOPY;
+        if (!readablePage)
+          return false;
+        const auto base = reinterpret_cast<uintptr_t>(info.BaseAddress);
+        return reinterpret_cast<uintptr_t>(address) + bytes <=
+               base + info.RegionSize;
+      }
+    };
+    const auto validShape = [&](const void *array, int count, int selected) {
+      const size_t arrayBytes = static_cast<size_t>(count) * sizeof(void *);
+      return count > 0 && count <= 32 && selected >= -1 && selected <= 32 &&
+             Memory::readable(array, arrayBytes) &&
+             Memory::readable(*static_cast<const void *const *>(array), 1);
+    };
+    // Layout A (the VGUI2Extension proxy declares this one): array pointer,
+    // count, selection.
+    const char *const *arrayA =
+        reinterpret_cast<const char *const *>(raw[3]);
+    const int countA = static_cast<int>(raw[4]);
+    const int selectedA = static_cast<int>(raw[5]);
+    if (validShape(arrayA, countA, selectedA)) {
+      ime::feedCandidatesFromEvent(arrayA, countA, selectedA);
+      break;
+    }
+    // Layout B (the count-first build): count, array pointer, selection.
+    const int countB = static_cast<int>(raw[3]);
+    const char *const *arrayB =
+        reinterpret_cast<const char *const *>(raw[4]);
+    const int selectedB = static_cast<int>(raw[5]);
+    if (validShape(arrayB, countB, selectedB)) {
+      ime::feedCandidatesFromEvent(arrayB, countB, selectedB);
+      break;
+    }
+    // Explicit close (both layouts agree on null pointer + zero count) or a
+    // payload this build does not carry strings in.
+    if (!arrayA && countA == 0) {
+      ime::clearCandidates();
+      break;
+    }
+    // Legacy IMM32 IMEs publish the page through the context instead.
+    if (const HWND window = gameWindow()) {
+      if (const HIMC context = ImmGetContext(window)) {
+        ime::feedCandidatesFromIme(context);
+        ImmReleaseContext(window, context);
       }
     }
     break;
+  }
   default:
     break; // keys/mouse/wheel ride the T06 event sources
   }

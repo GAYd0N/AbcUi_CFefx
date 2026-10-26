@@ -18,7 +18,9 @@
 #include "../framework/PanelManager.h"
 #include "../modsys/ModuleResources.h"
 #include "../framework/Theme.h"
-#include "../render/Render.h"
+#include "../render/BackendHost.h"
+#include "../render/IRenderBackend.h"
+#include "../render/RadarRender.h"
 #include "texture/Avatars.h"
 #include "../data/HudState.h"
 #include "../data/WeaponResource.h"
@@ -143,32 +145,16 @@ void PerfAccumulateRender(double ms) {
 void captureFirstFrameEvidence();
 #endif
 
-class RendererCallbacks : public IMetaRendererCallbacks {
+// The framework side of the render-backend frame contract (issue #24): the
+// backend calls these beats at the right moment inside its own frame source
+// (Renderer callbacks today). renderFrame replaces the old RendererCallbacks
+// pass; worldPassBeat runs the radar world pass where the old RadarCallbacks
+// OnPreRenderView did.
+class FrameworkFrameSink : public abc::render::IFrameSink {
 public:
-  void OnBeginRendering(int *, int *, int *, int *) override {}
-  void OnRenderFrameStart() override {}
-  void OnBeginRenderingPost(int *, int *, int *, int *) override {}
-  void OnFreeFrameBuffers() override {
-    modelpreview::invalidateAll();
-    // The menu backdrop owns three engine FBOs (down/ping/pong); they die
-    // with the renderer's targets in the same event, so drop their handles
-    // too or render() keeps binding released attachments.
-    backdrop::invalidateTargets();
-  }
-  void OnGenerateFrameBuffers() override {}
-  void OnPreRenderView() override {}
-  void OnPreRenderViewPost() override {}
-  void OnPostRenderView() override {}
-  void OnPostRenderViewPost() override {}
-  void OnRenderEndFrame() override {
-    renderFrame();
-  }
-
-  // Render the Rml scene onto the final buffer, once per engine frame,
-  // right before it is blitted to screen (see module header note).
-  void renderFrame() {
-    auto *renderer = abc::MetaRenderer();
-    if (!renderer || !RenderInterface || !Context)
+  void renderFrame() override {
+    abc::render::IRenderBackend *backend = abc::render::backend();
+    if (!backend || !RenderInterface || !Context)
       return;
     // Menu backdrop first: it captures the frame that was just presented
     // and blurs it, so the Rml pass below draws over the finished blur.
@@ -181,9 +167,7 @@ public:
         Context->Update();
     }
     model::renderPreviews();
-    renderer->PushFrameBuffer();
-    renderer->BindFrameBuffer(renderer->GetFinalBufferFBO());
-    RenderInterface->beginFrame();
+    backend->beginFrame();
 #ifndef NDEBUG
     const PerfTimer renderTimer;
 #endif
@@ -199,13 +183,26 @@ public:
     captureFirstFrameEvidence();
 #endif
     RenderInterface->endFrame();
-    renderer->PopFrameBuffer();
+    backend->endFrame();
+  }
+
+  void invalidateTargets() override {
+    // The backend already freed its own FBOs; drop the framework-side
+    // registrations and owners here (old OnFreeFrameBuffers beat).
+    modelpreview::invalidateAll();
+    backdrop::invalidateTargets();
+  }
+
+  void worldPassBeat() override {
+    // Radar world pass, inside the backend's frame (old OnPreRenderView
+    // beat of RadarCallbacks).
+    framework::radarrender::onWorldPassBeat();
   }
 
   std::unique_ptr<AbcRenderInterface> RenderInterface;
 };
 
-RendererCallbacks Callbacks;
+FrameworkFrameSink FrameSink;
 std::unique_ptr<AbcSystemInterface> SystemInterface;
 std::unique_ptr<AbcFileInterface> FileInterface;
 bool Initialised = false;
@@ -357,7 +354,7 @@ PerfSnapshot perfSnapshot() {
 #endif
 
 AbcRenderInterface *renderInterface() {
-  return Callbacks.RenderInterface.get();
+  return FrameSink.RenderInterface.get();
 }
 
 int loadedFontCount() {
@@ -389,16 +386,19 @@ void init() {
   if (!vgui2ext::nativeCallbacksRegistered())
     framework::fatalExit("VGUI2Extension entry seam unavailable; the original "
                          "GameUI cannot be suppressed (strict takeover)");
-  if (!abc::MetaRenderer())
-    framework::fatalExit(
-        "Renderer interface unavailable; nothing can be drawn");
+  // render::boot() already refused startup without a backend (fatalExit),
+  // so a null backend here is a process teardown race, not a recoverable
+  // state.
+  abc::render::IRenderBackend *backend = abc::render::backend();
+  if (!backend)
+    framework::fatalExit("render backend unavailable; nothing can be drawn");
 
   SystemInterface = std::make_unique<AbcSystemInterface>();
   FileInterface = std::make_unique<AbcFileInterface>();
-  Callbacks.RenderInterface = std::make_unique<AbcRenderInterface>();
+  FrameSink.RenderInterface = std::make_unique<AbcRenderInterface>();
   Rml::SetSystemInterface(SystemInterface.get());
   Rml::SetFileInterface(FileInterface.get());
-  Rml::SetRenderInterface(Callbacks.RenderInterface.get());
+  Rml::SetRenderInterface(FrameSink.RenderInterface.get());
   if (!Rml::Initialise())
     framework::fatalExit("Rml::Initialise failed (Rml core unavailable)");
   model::registerElement();
@@ -407,14 +407,13 @@ void init() {
   animated::registerElement();
   backdrop::registerElement();
 
-  const auto width = static_cast<int>(abc::MetaRenderer()->GetSwapChainWidth());
-  const auto height =
-      static_cast<int>(abc::MetaRenderer()->GetSwapChainHeight());
+  const int width = backend->surfaceWidth();
+  const int height = backend->surfaceHeight();
   // The text/IME handler is context-scoped (T07): WidgetTextInput calls its
   // OnActivate/OnDeactivate/OnDestroy as our editors gain/lose/lose focus.
   Context =
       Rml::CreateContext("abcui", Rml::Vector2i(width, height),
-                         Callbacks.RenderInterface.get(), &rmlui::textInput());
+                         FrameSink.RenderInterface.get(), &rmlui::textInput());
   if (!Context)
     framework::fatalExit("Rml::CreateContext failed (Rml context unavailable)");
 
@@ -433,7 +432,7 @@ void init() {
 
   Rml::Debugger::Initialise(Context);
   Rml::Debugger::SetVisible(false);
-  abc::MetaRenderer()->RegisterRenderCallbacks(&Callbacks);
+  abc::render::backend()->installFrameSink(&FrameSink);
   Initialised = true;
   abc::ConsolePrint("[AbcUi] RmlUi %s ready (context %dx%d)\n",
                     Rml::GetVersion().c_str(), width, height);
@@ -468,8 +467,8 @@ void shutdown() {
     return;
   }
   Initialised = false;
-  if (auto *renderer = abc::MetaRenderer())
-    renderer->UnregisterRenderCallbacks(&Callbacks);
+  if (abc::render::IRenderBackend *backend = abc::render::backend())
+    backend->removeFrameSink();
   // Modules release what they own while the context still exists (their
   // documents die with it, never after - see modules/Module.h).
   if (Sink.shutdown)
@@ -481,13 +480,13 @@ void shutdown() {
   // are deleted only afterwards, including never-delivered avatar uploads.
   // clearAdditiveTextures() before that keeps recycled ids off the additive
   // program if any handle outside the database ever existed.
-  Callbacks.RenderInterface->clearAdditiveTextures();
+  FrameSink.RenderInterface->clearAdditiveTextures();
   Context = nullptr;
   Rml::Shutdown();
   sprites::shutdown();
   avatars::shutdown();
   steamapi::shutdown();
-  Callbacks.RenderInterface.reset();
+  FrameSink.RenderInterface.reset();
   FileInterface.reset();
   SystemInterface.reset();
   vgui2ext::shutdown();
@@ -506,9 +505,9 @@ void onFrame(double frameTime) {
     if (!Initialised || !Context)
       return;
     framework::Theme::applyScale(Context);
-    Context->SetDimensions(Rml::Vector2i(
-        static_cast<int>(abc::MetaRenderer()->GetSwapChainWidth()),
-        static_cast<int>(abc::MetaRenderer()->GetSwapChainHeight())));
+    Context->SetDimensions(
+        Rml::Vector2i(abc::render::backend()->surfaceWidth(),
+                      abc::render::backend()->surfaceHeight()));
   }
   framework::PanelManager::setSessionActive(
       services::nativeUiBridge().hasLevel());
@@ -582,9 +581,9 @@ void onVidInit() {
   if (!Initialised)
     return;
   framework::Theme::applyScale(Context);
-  Context->SetDimensions(Rml::Vector2i(
-      static_cast<int>(abc::MetaRenderer()->GetSwapChainWidth()),
-      static_cast<int>(abc::MetaRenderer()->GetSwapChainHeight())));
+  Context->SetDimensions(
+      Rml::Vector2i(abc::render::backend()->surfaceWidth(),
+                    abc::render::backend()->surfaceHeight()));
   framework::PanelManager::vidInitAll();
   if (Sink.vidInit)
     Sink.vidInit();

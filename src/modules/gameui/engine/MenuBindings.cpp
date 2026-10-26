@@ -1,11 +1,13 @@
 // Engine seams extracted from GameUiModule.cpp; no page ownership.
 #include <abc/CvarCmd.h>
+#include <abc/Parse.h>
 #include <abc/Plugin.h>
 #include "rmlui/InputBridge.h"
 #include "rmlui/VGUI2ExtensionImport.h"
 #include "data/PlayerResource.h"
 #include "rmlui/modelpreview/Options.h"
 #include "services/playerlist/MuteBackend.h"
+#include <algorithm>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -32,12 +34,23 @@ PlayerCardFacts playerCardFacts() {
   // same view the Renderer's model loader uses - so a spelling the game
   // cannot load (a model folder that is not installed) shows the stock
   // generic model instead of an empty card.
+  const auto Exists = [](const std::string &Path) {
+    return !abc::g_pFileSystem || abc::g_pFileSystem->FileExists(Path.c_str());
+  };
   Facts.ModelPath = modelpreview::resolveCardModelPath(
-      readCvarString("abc_ui_menu_model_path"), Facts.ModelName,
-      [](const std::string &Path) {
-        return !abc::g_pFileSystem ||
-               abc::g_pFileSystem->FileExists(Path.c_str());
-      });
+      readCvarString("abc_ui_menu_model_path"), Facts.ModelName, Exists);
+  // The menu's own action group drives the pose of the displayed model and
+  // the weapon merged onto it; a group the engine cannot see is dropped so
+  // the card falls back to the model drawing on its own.
+  Facts.ActionModel = modelpreview::resolveActionModelPath(
+      readCvarString("abc_ui_menu_action_model"), Exists);
+  Facts.WeaponModel = modelpreview::resolveWeaponModelPath(
+      readCvarString("abc_ui_menu_weapon_model"));
+  // Sequence selection for the action group: an unusable spelling keeps 0.
+  if (const auto Parsed =
+          abc::ParseNumber<int>(readCvarString("abc_ui_menu_model_sequence"));
+      Parsed && *Parsed >= 0)
+    Facts.Sequence = std::min(*Parsed, 65535);
   return Facts;
 }
 

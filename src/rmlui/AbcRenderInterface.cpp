@@ -16,8 +16,8 @@
 #include "texture/SpriteResource.h"
 #include "../framework/ImageLoader.h"
 #include "../modsys/ModuleVfs.h"
-#include "render/Render.h"
-#include "render/RenderCommon.h"
+#include "../render/BackendHost.h"
+#include "../render/IRenderBackend.h"
 #include "VGUI2ExtensionImport.h"
 
 namespace rmlui {
@@ -30,13 +30,6 @@ namespace {
 // flipping (the image itself is flipped out of FreeImage's bottom-up order
 // in LoadTexture below).
 constexpr bool kFlipTextureUpload = false;
-
-constexpr uint64_t kProgramAlphaBlend = DRAW_TEXTURED_RECT_ALPHA_BLEND_ENABLED;
-constexpr uint64_t kProgramFilledAlphaBlend =
-    DRAW_FILLED_RECT_ALPHA_BLEND_ENABLED;
-// Sprite icons: kRenderTransAdd parity (src*a + dest) - see header note.
-constexpr uint64_t kProgramSpriteAdditive =
-    DRAW_TEXTURED_RECT_ALPHA_BASED_ADDITIVE_ENABLED;
 
 void ToStraightColor(const Rml::ColourbPremultiplied &in, float out[4]) {
   const float a = in.alpha / 255.0f;
@@ -90,8 +83,8 @@ void AbcRenderInterface::beginFrame() {
 
 void AbcRenderInterface::endFrame() {
   if (TwoDActive) {
-    if (IMetaRenderer *renderer = abc::MetaRenderer())
-      renderer->Finish2D();
+    if (abc::render::IRenderBackend *backend = abc::render::backend())
+      backend->finish2D();
     TwoDActive = false;
     AppliedScissor = false;
     AppliedScissorRect = Rml::Rectanglei::MakeInvalid();
@@ -101,18 +94,9 @@ void AbcRenderInterface::endFrame() {
 Rml::CompiledGeometryHandle
 AbcRenderInterface::CompileGeometry(Rml::Span<const Rml::Vertex> vertices,
                                     Rml::Span<const int> indices) {
-  // The baked shapes must stay byte-identical to the renderer's vertex
-  // types - the Draw* calls copy our arrays through memcpy (R-14 lesson:
-  // mirror layouts are pinned here, drift cannot pass silently).
-  static_assert(sizeof(BakedTexturedVertex) == sizeof(texturedrectvertex_t));
-  static_assert(offsetof(BakedTexturedVertex, texcoord) ==
-                offsetof(texturedrectvertex_t, texcoord));
-  static_assert(offsetof(BakedTexturedVertex, col) ==
-                offsetof(texturedrectvertex_t, col));
-  static_assert(sizeof(BakedFilledVertex) == sizeof(filledrectvertex_t));
-  static_assert(offsetof(BakedFilledVertex, col) ==
-                offsetof(filledrectvertex_t, col));
-
+  // Baked shapes use the backend contract's vertex POD; the backend DLL
+  // pins its own layout against its native types (R-14 lesson: mirror
+  // layouts are pinned where they are consumed).
   if (vertices.empty() || indices.empty())
     return {};
 
@@ -122,13 +106,13 @@ AbcRenderInterface::CompileGeometry(Rml::Span<const Rml::Vertex> vertices,
   geometry->Textured.resize(vertices.size());
   for (size_t i = 0; i < vertices.size(); i++) {
     const Rml::Vertex &v = vertices[i];
-    float *pos = geometry->Textured[i].pos;
+    float *position = geometry->Textured[i].position;
     float *texcoord = geometry->Textured[i].texcoord;
-    pos[0] = v.position.x;
-    pos[1] = v.position.y;
+    position[0] = v.position.x;
+    position[1] = v.position.y;
     texcoord[0] = v.tex_coord.x;
     texcoord[1] = v.tex_coord.y;
-    ToStraightColor(v.colour, geometry->Textured[i].col);
+    ToStraightColor(v.colour, geometry->Textured[i].color);
   }
   geometry->Indices.reserve(indices.size());
   for (const int index : indices)
@@ -142,8 +126,8 @@ AbcRenderInterface::CompileGeometry(Rml::Span<const Rml::Vertex> vertices,
 void AbcRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry,
                                         Rml::Vector2f translation,
                                         Rml::TextureHandle texture) {
-  IMetaRenderer *renderer = abc::MetaRenderer();
-  if (!renderer || geometry == 0)
+  abc::render::IRenderBackend *backend = abc::render::backend();
+  if (!backend || geometry == 0)
     return;
 
   const auto *source = reinterpret_cast<const CompiledGeometry *>(geometry);
@@ -167,18 +151,18 @@ void AbcRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry,
   }
   const bool scissor = ScissorEnabled;
 
-  // Per-state 2D setup (matrix push/pop balanced by endFrame).
+  // Per-state 2D setup (translation stack balanced by endFrame).
   if (!TwoDActive || AppliedScissor != scissor ||
       (scissor && !(AppliedScissorRect == ScissorRect))) {
     endFrame();
     if (scissor) {
-      // Set2DEx takes GL window coords (bottom-left origin); Rml rects
-      // are top-left origin, hence the y flip around screen height.
-      const int screenH = static_cast<int>(renderer->GetSwapChainHeight());
-      renderer->Set2DEx(ScissorRect.Left(), screenH - ScissorRect.Bottom(),
-                        ScissorRect.Width(), ScissorRect.Height());
+      // set2D takes GL window coords (bottom-left origin); Rml rects are
+      // top-left origin, hence the y flip around screen height.
+      const int screenH = backend->surfaceHeight();
+      backend->set2D(ScissorRect.Left(), screenH - ScissorRect.Bottom(),
+                     ScissorRect.Width(), ScissorRect.Height());
     } else {
-      renderer->Set2D();
+      backend->set2D(0, 0, backend->surfaceWidth(), backend->surfaceHeight());
     }
     TwoDActive = true;
     AppliedScissor = scissor;
@@ -186,26 +170,23 @@ void AbcRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry,
   }
 
   // The common path's whole per-frame work: hand the translation (element
-  // offset minus the Set2DEx re-basing) to the world matrix - glTranslate
-  // semantics, and the draw reads world×proj per call - and draw straight
-  // from the baked arrays. Both parts are whole pixels (RmlUi rounds its
-  // render translations; scissor rects are integer), so this is exactly the
-  // old `applyTransform(v.position + translation)` under an identity Rml
-  // transform, computed on the GPU.
+  // offset minus the set2D re-basing) to the backend's translation stack -
+  // and draw straight from the baked arrays. Both parts are whole pixels
+  // (RmlUi rounds its render translations; scissor rects are integer), so
+  // this is exactly the old `applyTransform(v.position + translation)` under
+  // an identity Rml transform, computed on the GPU.
   const float offsetX =
       translation.x - (scissor ? static_cast<float>(ScissorRect.Left()) : 0.0f);
   const float offsetY =
       translation.y - (scissor ? static_cast<float>(ScissorRect.Top()) : 0.0f);
   const bool translateOnGpu =
       !TransformActive && (offsetX != 0.0f || offsetY != 0.0f);
-  if (translateOnGpu) {
-    renderer->PushWorldMatrix();
-    renderer->TranslateWorldMatrix(offsetX, offsetY, 0.0f);
-  }
+  if (translateOnGpu)
+    backend->pushTranslation(offsetX, offsetY);
 
-  const BakedTexturedVertex *texturedVertices = source->Textured.data();
-  const BakedFilledVertex *filledVertices = nullptr;
-  const BakedTexturedVertex *scratchTextured = nullptr;
+  const abc::render::Vertex *texturedVertices = source->Textured.data();
+  const abc::render::FilledVertex *filledVertices = nullptr;
+  const abc::render::Vertex *scratchTextured = nullptr;
   if (TransformActive) {
     // Rare path (CSS-transformed elements): M·(v + translation) - the
     // GL2 sample order: translate first, then the loaded matrix - minus
@@ -215,36 +196,36 @@ void AbcRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry,
       ScratchFilled.resize(vertexCount);
       for (size_t i = 0; i < vertexCount; i++) {
         const Rml::Vector2f pos =
-            applyTransform(Rml::Vector2f(source->Textured[i].pos[0],
-                                         source->Textured[i].pos[1]) +
+            applyTransform(Rml::Vector2f(source->Textured[i].position[0],
+                                         source->Textured[i].position[1]) +
                            translation);
-        ScratchFilled[i].pos[0] =
+        ScratchFilled[i].position[0] =
             pos.x - (scissor ? static_cast<float>(ScissorRect.Left()) : 0.0f);
-        ScratchFilled[i].pos[1] =
+        ScratchFilled[i].position[1] =
             pos.y - (scissor ? static_cast<float>(ScissorRect.Top()) : 0.0f);
-        ScratchFilled[i].col[0] = source->Textured[i].col[0];
-        ScratchFilled[i].col[1] = source->Textured[i].col[1];
-        ScratchFilled[i].col[2] = source->Textured[i].col[2];
-        ScratchFilled[i].col[3] = source->Textured[i].col[3];
+        ScratchFilled[i].color[0] = source->Textured[i].color[0];
+        ScratchFilled[i].color[1] = source->Textured[i].color[1];
+        ScratchFilled[i].color[2] = source->Textured[i].color[2];
+        ScratchFilled[i].color[3] = source->Textured[i].color[3];
       }
       filledVertices = ScratchFilled.data();
     } else {
       ScratchTextured.resize(vertexCount);
       for (size_t i = 0; i < vertexCount; i++) {
-        const BakedTexturedVertex &v = source->Textured[i];
-        const Rml::Vector2f pos =
-            applyTransform(Rml::Vector2f(v.pos[0], v.pos[1]) + translation);
-        BakedTexturedVertex &out = ScratchTextured[i];
-        out.pos[0] =
+        const abc::render::Vertex &v = source->Textured[i];
+        const Rml::Vector2f pos = applyTransform(
+            Rml::Vector2f(v.position[0], v.position[1]) + translation);
+        abc::render::Vertex &out = ScratchTextured[i];
+        out.position[0] =
             pos.x - (scissor ? static_cast<float>(ScissorRect.Left()) : 0.0f);
-        out.pos[1] =
+        out.position[1] =
             pos.y - (scissor ? static_cast<float>(ScissorRect.Top()) : 0.0f);
         out.texcoord[0] = v.texcoord[0];
         out.texcoord[1] = v.texcoord[1];
-        out.col[0] = v.col[0];
-        out.col[1] = v.col[1];
-        out.col[2] = v.col[2];
-        out.col[3] = v.col[3];
+        out.color[0] = v.color[0];
+        out.color[1] = v.color[1];
+        out.color[2] = v.color[2];
+        out.color[3] = v.color[3];
       }
       scratchTextured = ScratchTextured.data();
     }
@@ -255,84 +236,79 @@ void AbcRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry,
     if (baked->Filled.empty()) {
       baked->Filled.resize(vertexCount);
       for (size_t i = 0; i < vertexCount; i++) {
-        baked->Filled[i].pos[0] = source->Textured[i].pos[0];
-        baked->Filled[i].pos[1] = source->Textured[i].pos[1];
-        baked->Filled[i].col[0] = source->Textured[i].col[0];
-        baked->Filled[i].col[1] = source->Textured[i].col[1];
-        baked->Filled[i].col[2] = source->Textured[i].col[2];
-        baked->Filled[i].col[3] = source->Textured[i].col[3];
+        baked->Filled[i].position[0] = source->Textured[i].position[0];
+        baked->Filled[i].position[1] = source->Textured[i].position[1];
+        baked->Filled[i].color[0] = source->Textured[i].color[0];
+        baked->Filled[i].color[1] = source->Textured[i].color[1];
+        baked->Filled[i].color[2] = source->Textured[i].color[2];
+        baked->Filled[i].color[3] = source->Textured[i].color[3];
       }
     }
     filledVertices = baked->Filled.data();
   }
 
-  // Texture handles are surface texture ids (int namespace). The baked
-  // shapes are layout-identical to the renderer's vertex types (static
-  // asserts at CompileGeometry), so the casts below are byte-transparent.
+  // Texture handles are surface texture ids (int namespace).
   if (texture == 0) {
-    renderer->DrawFilledRect(
-        reinterpret_cast<const filledrectvertex_t *>(filledVertices),
-        vertexCount, source->Indices.data(), indexCount,
-        kProgramFilledAlphaBlend, "AbcUi filled");
+    abc::render::FilledDraw draw;
+    draw.vertices = filledVertices;
+    draw.vertexCount = vertexCount;
+    draw.indices = source->Indices.data();
+    draw.indexCount = indexCount;
+    draw.mode = abc::render::Blend::StraightAlpha;
+    draw.label = "AbcUi filled";
+    backend->drawFilled(draw);
   } else {
     const auto record = Textures.find(texture);
     if (record == Textures.end()) {
       if (translateOnGpu)
-        renderer->PopWorldMatrix();
+        backend->popTranslation();
       return;
     }
     int textureId = record->second.Id;
+    // External masked textures (radar map): the mask id rides the registered
+    // slot, read live so a shape toggle needs no texture reload (the Rml
+    // cache holds one entry for the URI).
+    int maskTexture = 0;
+    abc::render::Blend blend = AdditiveTextures.count(texture)
+                                   ? abc::render::Blend::Additive
+                                   : abc::render::Blend::StraightAlpha;
     if (!record->second.ExternalPrefix.empty()) {
       const auto live = ExternalTextures.find(record->second.ExternalPrefix);
       if (live == ExternalTextures.end()) {
         if (translateOnGpu)
-          renderer->PopWorldMatrix();
+          backend->popTranslation();
         return;
       }
       textureId = static_cast<int>(live->second.Texture);
-    }
-    const auto *drawVertices = reinterpret_cast<const texturedrectvertex_t *>(
-        TransformActive ? scratchTextured : texturedVertices);
-    uint64_t program = AdditiveTextures.count(texture) ? kProgramSpriteAdditive
-                                                       : kProgramAlphaBlend;
-    if (!record->second.ExternalPrefix.empty()) {
-      const auto live = ExternalTextures.find(record->second.ExternalPrefix);
-      if (live != ExternalTextures.end()) {
-        switch (live->second.Blend) {
-        case TextureBlend::Additive:
-          program = kProgramSpriteAdditive;
-          break;
-        case TextureBlend::PremultipliedAlpha:
-          program = DRAW_TEXTURED_RECT_PREMULTIPLIED_ALPHA_ENABLED;
-          break;
-        case TextureBlend::StraightAlpha:
-          break;
-        }
+      switch (live->second.Blend) {
+      case TextureBlend::Additive:
+        blend = abc::render::Blend::Additive;
+        break;
+      case TextureBlend::PremultipliedAlpha:
+        blend = abc::render::Blend::PremultipliedAlpha;
+        break;
+      case TextureBlend::StraightAlpha:
+        break;
       }
+      if (live->second.MaskSlot && *live->second.MaskSlot)
+        maskTexture = *live->second.MaskSlot;
     }
-    // External masked textures (radar map): the mask id rides the registered
-    // slot, read live so a shape toggle needs no texture reload (the Rml
-    // cache holds one entry for the URI).
-    bool drewMasked = false;
-    for (const auto &[prefix, external] : ExternalTextures) {
-      if (record->second.ExternalPrefix != prefix || !external.MaskSlot ||
-          !*external.MaskSlot)
-        continue;
-      program |= DRAW_TEXTURED_RECT_MASK_TEXTURE_ENABLED;
-      renderer->DrawTexturedRectMask(
-          textureId, *external.MaskSlot, drawVertices, vertexCount,
-          source->Indices.data(), indexCount, program, "AbcUi masked");
-      drewMasked = true;
-      break;
-    }
-    if (!drewMasked)
-      renderer->DrawTexturedRect(textureId, drawVertices, vertexCount,
-                                 source->Indices.data(), indexCount, program,
-                                 "AbcUi");
+    const abc::render::Vertex *drawVertices =
+        TransformActive ? scratchTextured : texturedVertices;
+    abc::render::Draw draw;
+    draw.vertices = drawVertices;
+    draw.vertexCount = vertexCount;
+    draw.indices = source->Indices.data();
+    draw.indexCount = indexCount;
+    draw.texture = textureId;
+    draw.maskTexture = maskTexture;
+    draw.mode = blend;
+    draw.label = maskTexture ? "AbcUi masked" : "AbcUi";
+    backend->drawTextured(draw);
   }
 
   if (translateOnGpu)
-    renderer->PopWorldMatrix();
+    backend->popTranslation();
 }
 
 void AbcRenderInterface::registerExternalTexture(const Rml::String &uriPrefix,
@@ -531,15 +507,8 @@ AbcRenderInterface::GenerateTexture(Rml::Span<const Rml::byte> source,
 
 int AbcRenderInterface::uploadSurfaceTexture(const unsigned char *rgba,
                                              int width, int height) {
-  // The upload goes through the VGUI2 surface's own texture path, which is
-  // not re-entrant with the renderer's batched 2D pass: an upload issued
-  // between queued 2D draws leaves the freshly uploaded texture sampling as
-  // opaque black (live-caught 2026-10-16: the create-game page's map list
-  // introduced new glyphs, RmlUi regenerated the font atlases in the middle
-  // of the frame and every glyph of the page painted as a black rectangle).
-  // Closing the pass first hands the renderer a clean batch; the next draw
-  // re-installs Set2D/Set2DEx (the usual pair discipline).
-  endFrame();
+  // The shared surface channel ends any active 2D pass before uploading.
+  // The next draw reinstalls the viewport and projection lazily.
   const int id = vgui2ext::createTexture();
   if (id == 0) {
     static bool Warned = false;
@@ -577,15 +546,8 @@ void AbcRenderInterface::ReleaseTexture(Rml::TextureHandle texture) {
   const auto record = Textures.find(texture);
   if (record == Textures.end())
     return;
-  if (record->second.Owned) {
-    // A font-atlas rebuild releases the previous generation while the
-    // current Rml pass may already have queued text draws against it.
-    // Deleting the VGUI texture before flushing that batch leaves those
-    // draws sampling a destroyed id (all affected glyphs become black
-    // rectangles until the next pass rebuilds its geometry).
-    endFrame();
+  if (record->second.Owned)
     vgui2ext::deleteTextureById(record->second.Id);
-  }
   Textures.erase(record);
 }
 

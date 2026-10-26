@@ -752,8 +752,10 @@ int32_t onClick(void *, AbcUiElement *target, const AbcUiElementEvent *event) {
     // the blacklist mutations stay page-owned. A dimmed entry is inert.
     if (entry && !action.empty() &&
         !Api->ui->elementClassSet(entry, "sb-disabled")) {
-      if (action == "sb-connect" || action == "sb-favorite-toggle") {
+      if (action == "sb-connect") {
         Api->serverbrowser->connect();
+      } else if (action == "sb-favorite-toggle") {
+        Api->serverbrowser->toggleFavorite();
       } else if (action == "sb-block" || action == "sb-block-ip") {
         handleBlacklistAction(entry, action);
       }

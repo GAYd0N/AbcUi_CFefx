@@ -159,9 +159,8 @@ void ServerQuery::refreshAll() {
           static_cast<int>(Filters.size()));
     return;
   }
-  // RefreshQuery is valid while the request handle is alive - the shipped
-  // Refresh button (serverbrowser.dll 0x10005230 -> slot 0x24) re-pings the
-  // whole list even after a completed refresh, and Steam posts another
+  // RefreshQuery re-pings the whole list while its request handle is alive,
+  // even after a completed refresh, and Steam posts another
   // RefreshComplete ("The request object must be released by calling
   // ReleaseRequest"; the callback contract in isteammatchmaking.h). The
   // generation advances so a UI can reset its receive bookkeeping, and the
@@ -179,8 +178,8 @@ void ServerQuery::refreshAll() {
 bool ServerQuery::refreshServer(int index) {
   if (Closed || Request == 0 || !Provider)
     return false;
-  // Per-server refresh re-pings one entry of a live list (slot 0x30 at
-  // serverbrowser.dll 0x100057c0); valid in the same states as refreshAll.
+  // Per-server refresh re-pings one entry of a live Steam list; valid in
+  // the same states as refreshAll.
   if (Status != QueryStatus::Querying && Status != QueryStatus::Completed)
     return false;
   if (index < 0 || index >= static_cast<int>(Entries.size()))

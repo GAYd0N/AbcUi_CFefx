@@ -167,7 +167,7 @@ extern int BuiltPageCount;
 // re-query the engine, so the dialog re-renders on change only).
 extern uint32_t ConfirmRenderedRevision;
 
-// Option sets last projected into the select rows (cvar -> values): the
+// Option sets last projected into select rows (cvar -> value/label pairs): the
 // widget is rebuilt only when the set actually changed.
 extern std::vector<std::pair<std::string, std::vector<std::string>>>
     SelectShown;

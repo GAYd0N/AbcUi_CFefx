@@ -4,6 +4,8 @@
 #include <ivoicetweak.h>
 #include "rmlui/VGUI2ExtensionImport.h"
 #include "modules/gameui/engine/SettingsBindings.h"
+#include "rmlui/modelpreview/Options.h"
+#include <string_view>
 namespace gameui::engine {
 services::settings::SettingsModel::Seams settingsSeams() {
   services::settings::SettingsModel::Seams seams;
@@ -30,6 +32,10 @@ services::settings::SettingsModel::Seams settingsSeams() {
   seams.readString = [](const char *name) -> const char * {
     const cvar_t *cvar = abc::CVAR_GET_POINTER(name);
     return cvar ? cvar->string : nullptr;
+  };
+  seams.validateText = [](const char *name, const char *value) {
+    return std::string_view(name) != "abc_ui_menu_weapon_model" || !*value ||
+           !modelpreview::resolveWeaponModelPath(value).empty();
   };
   // T13 command toggles (in_mlook/in_jlook): IGameUIFuncs::IsKeyDown for
   // the truth, the engine command channel for +mlook/-mlook (buffered -

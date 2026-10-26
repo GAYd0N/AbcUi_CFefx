@@ -3,24 +3,27 @@
 // framework::radarrender - the radar's world-to-FBO producer (route 2).
 //
 // The radar panel is a UI module, but rendering the world from above is a
-// renderer-facing concern and stays in the framework (the same rule that
-// keeps the render bridge, video decode and avatar textures framework-side).
-// This service owns the 1024^2 FBO, the meta-renderer callbacks (including
-// the frame-buffer regeneration seam) and a borrowed module-uploaded mask, and
-// registers the FBO colour texture with AbcRenderInterface as the external
-// "radarfbo://" texture family.
+// render-backend concern and runs through the backend's world-pass
+// capability (abc::render::IWorldPass, issue #24): the backend owns the
+// 1024^2 target, the frame beat and the GPU pass; this service keeps the
+// orchestration (cvar save/restore, camera math, zoom), a borrowed
+// module-uploaded mask and the external-texture registration of the target
+// colour texture as "radarfbo://".
 //
-// The module drives it through the SDK `radar` section: setActive(true) while
-// the plate is on screen, setMask() for the plate shape, and a
-// generation counter it appends to the texture URI (RmlUi caches textures per
-// source string, so a regenerated FBO needs a new suffix).
+// The module drives it through the SDK `radar` section: setActive(true)
+// while the plate is on screen, setMask() for the plate shape, and a
+// generation counter it appends to the texture URI (RmlUi caches textures
+// per source string, so a regenerated FBO needs a new suffix).
 
 namespace framework {
 
 namespace radarrender {
 
-// Starts the producer lazily (first call) and keeps it registered for the
-// process lifetime; `active` false skips the world pass entirely.
+// The backend's world-render beat (Renderer: OnPreRenderView). Runs the
+// pass while the plate is active; called from the framework frame sink.
+void onWorldPassBeat();
+
+// Keeps the producer target alive; `active` false skips the world pass.
 void setActive(bool active);
 
 // Selects the mask texture the external-texture draw applies (square/round).

@@ -188,11 +188,13 @@ size_t boot() {
   if (handle == INVALID_HANDLE_VALUE)
     return 0; // no module directory: zero modules is a valid setup
 
-  // Reject every duplicate id before loading anything. Enumeration order
-  // must never choose which package provides an id.
+  // One id may arrive in several packages: an in-place upgrade leaves the
+  // previous version beside the new one. Enumeration order must never choose
+  // which package provides an id, so validation runs first and the highest
+  // manifest version wins; equal versions stay ambiguous and the id is
+  // skipped entirely.
   std::map<std::string, Candidate> candidates;
-  std::set<std::string> discoveredIds;
-  std::set<std::string> duplicateIds;
+  std::set<std::string> ambiguousIds;
   std::string error;
   do {
     if (find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
@@ -206,6 +208,7 @@ size_t boot() {
     }
     Candidate candidate;
     candidate.image = std::move(image);
+    candidate.path = find.cFileName;
     PackageEntry manifestEntry;
     if (!candidate.image->file().read("manifest.json", manifestEntry, &error)) {
       abc::ConsoleWarn("[AbcUi] module package \"%s\" skipped: %s\n",
@@ -216,15 +219,6 @@ size_t boot() {
                        manifestEntry.size, candidate.manifest, &error)) {
       abc::ConsoleWarn("[AbcUi] module package \"%s\" skipped: %s\n",
                        find.cFileName, error.c_str());
-      continue;
-    }
-    const std::string id = candidate.manifest.id;
-    if (!discoveredIds.insert(id).second) {
-      duplicateIds.insert(id);
-      candidates.erase(id);
-      abc::ConsoleWarn("[AbcUi] module id \"%s\" is duplicated; "
-                       "all packages with this id skipped\n",
-                       id.c_str());
       continue;
     }
     if (candidate.manifest.abi != ABCUI_ABI_VERSION) {
@@ -239,7 +233,36 @@ size_t boot() {
                        candidate.manifest.minAbcUi.c_str());
       continue;
     }
-    candidates.emplace(id, std::move(candidate));
+    const std::string id = candidate.manifest.id;
+    const auto existing = candidates.find(id);
+    if (existing == candidates.end()) {
+      candidates.emplace(id, std::move(candidate));
+      continue;
+    }
+    const int order = compareVersions(candidate.manifest.version,
+                                      existing->second.manifest.version);
+    if (order > 0) {
+      abc::ConsoleWarn("[AbcUi] module id \"%s\" is packaged more than once; "
+                       "using %s (\"%s\"), skipping %s (\"%s\")\n",
+                       id.c_str(), candidate.manifest.version.c_str(),
+                       candidate.path.c_str(),
+                       existing->second.manifest.version.c_str(),
+                       existing->second.path.c_str());
+      existing->second = std::move(candidate);
+    } else if (order < 0) {
+      abc::ConsoleWarn("[AbcUi] module id \"%s\" is packaged more than once; "
+                       "using %s (\"%s\"), skipping %s (\"%s\")\n",
+                       id.c_str(), existing->second.manifest.version.c_str(),
+                       existing->second.path.c_str(),
+                       candidate.manifest.version.c_str(),
+                       candidate.path.c_str());
+    } else {
+      abc::ConsoleWarn("[AbcUi] module id \"%s\" is duplicated at version %s; "
+                       "all packages with this id skipped\n",
+                       id.c_str(), candidate.manifest.version.c_str());
+      candidates.erase(existing);
+      ambiguousIds.insert(id);
+    }
   } while (FindNextFileA(handle, &find));
   FindClose(handle);
 
@@ -257,7 +280,7 @@ size_t boot() {
   // are missing/failed or whose conflicts are loaded. Whatever remains was
   // part of a dependency cycle.
   std::set<std::string> loadedIds;
-  std::set<std::string> failedIds = duplicateIds;
+  std::set<std::string> failedIds = ambiguousIds;
   bool progress = true;
   while (progress) {
     progress = false;

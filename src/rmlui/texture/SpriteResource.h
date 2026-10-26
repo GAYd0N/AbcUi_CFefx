@@ -26,7 +26,7 @@
 //   spralpha://<atlas>/<l>,<t>,<r>,<b>
 //                      -> same crop, drawn straight-alpha (old
 //                         kRenderTransTexture sprites: weapon crosshairs)
-// Textures are VGUI2 surface texture ids (the IMetaRenderer draw namespace),
+// Textures are VGUI2 surface texture ids (the engine texture-id namespace every render backend binds),
 // created lazily and cached per URI. Atlas frames decode once.
 //
 // HUD sprites are Additive format; we render them straight-alpha with the

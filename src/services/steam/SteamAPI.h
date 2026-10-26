@@ -1,20 +1,9 @@
 #pragma once
 
-// rmlui::steamapi - the virtual Steam access layer (user directive: keep the
-// consumer surface backend-agnostic so the implementation can swap between
-// the SteamAPIBridge plugin and a direct Steamworks connection later).
-//
-// Three layers:
-//   - This header: the contract consumers code against (PlayerResource names,
-//     Scoreboard avatars). No Steam types leak here.
-//   - SteamApiNative / SteamApiBridge: two interchangeable backends behind
-//     the same probe/contract shape (SteamApiBackend.h).
-//   - Backend selection (SteamAPI.cpp): the bridge is probed first - the
-//     original D-07 direction - but it only wins when it carries the FULL
-//     capability set (SteamID + persona + avatar). The upstream C-ABI bridge
-//     currently ships SteamID only, so in practice the native steam_api.dll
-//     backend serves; when the bridge grows Friends/avatar coverage it takes
-//     over without a consumer-side change.
+// Steam identity and avatars, bound directly to the host's steam_api.dll.
+// Consumers use this Steam-type-free contract; RuntimeAccess shares the
+// same interface resolution path with server discovery and friends.
+// The engine owns Steam initialization, shutdown and callback pumping.
 //
 // Every call is safe when Steam is absent (dedicated/uninitialized): values
 // degrade (0 / empty / false), nothing crashes.
@@ -27,17 +16,11 @@ namespace steamapi {
 
 using SteamId64 = std::uint64_t;
 
-enum class Backend {
-  None,      // no usable provider
-  NativeApi, // the game's steam_api.dll (ISteamUser/Friends/Utils)
-  Bridge,    // MetaHookSv SteamAPIBridge.dll (C ABI)
-};
-
-// LoadClient time probe: binds whichever backend wins. Safe to re-call.
+// LoadClient time probe of the host Steam runtime. Safe to re-call; consumers
+// retry lazily if the DLL or Steam user was not ready during LoadClient.
 void init();
 void shutdown();
 
-Backend backend();
 bool available();
 
 // Local player's SteamID64; 0 when unavailable.

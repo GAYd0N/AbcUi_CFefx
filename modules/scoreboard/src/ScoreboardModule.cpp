@@ -406,14 +406,18 @@ void rebuildTable() {
       return;
     }
     // Steam animated avatars play through the framework's generic <animimg>;
-    // every other row keeps the static <img> path unchanged.
+    // every other row keeps the static <img> path unchanged. The bundled
+    // default avatar is an APNG, so rows without a Steam identity (bots)
+    // play it through <animimg> instead of freezing on the first frame.
+    constexpr const char *kDefaultAvatar =
+        "mod://abcui.scoreboard/hud/img/default_avatar.apng";
     std::string source;
-    const bool animated =
-        info.steamId64 != 0 &&
-        moduleui::animatedAvatarUri(Api, info.steamId64, source);
-    if (!animated)
-      source = moduleui::avatarUri(
-          Api, info.steamId64, "mod://abcui.scoreboard/img/default_avatar.png");
+    bool animated = info.steamId64 != 0 &&
+                    moduleui::animatedAvatarUri(Api, info.steamId64, source);
+    if (!animated) {
+      source = moduleui::avatarUri(Api, info.steamId64, kDefaultAvatar);
+      animated = source == kDefaultAvatar;
+    }
     appendFmt(out,
               "<div class='cell c-avatar'><div class='avatar-frame' "
               "style='width:{:.0f}px; height:{:.0f}px;'>"

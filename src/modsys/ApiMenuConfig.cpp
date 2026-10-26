@@ -81,14 +81,19 @@ int32_t apiPlayerCard(AbcUiPlayerCard *out) {
   const auto &seam = access();
   if (!seam.playerCard || !out)
     return 0;
-  std::string playerName, modelPath, modelLabel;
-  seam.playerCard(playerName, modelPath, modelLabel);
+  std::string playerName, modelPath, modelLabel, actionModel, weaponModel;
+  int sequence = 0;
+  seam.playerCard(playerName, modelPath, modelLabel, actionModel, weaponModel,
+                  sequence);
 
   AbcUiPlayerCard full{};
   full.structSize = sizeof(AbcUiPlayerCard);
   copyText(playerName, full.playerName, sizeof(full.playerName));
   copyText(modelPath, full.modelPath, sizeof(full.modelPath));
   copyText(modelLabel, full.modelLabel, sizeof(full.modelLabel));
+  copyText(actionModel, full.actionModel, sizeof(full.actionModel));
+  copyText(weaponModel, full.weaponModel, sizeof(full.weaponModel));
+  full.sequence = sequence;
 
   abi::copySnapshot(out, full);
   return 1;

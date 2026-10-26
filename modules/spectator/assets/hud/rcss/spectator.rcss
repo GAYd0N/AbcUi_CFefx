@@ -1,20 +1,35 @@
 /* spectator.rcss - observer bottom bar. The native panel is a dark plate with
-   three bordered cells (health, armor, mode : target) anchored bottom-centre;
+   three bordered cells (health, armor, mode : target) anchored bottom-left;
    the replacement keeps that geometry in dp and uses the HUD accent for the
    values. When no target is shown the two vital cells are display:none and
    the mode cell stretches across the bar. */
 
+/* The body itself must fill the document: its only child is absolutely
+   positioned, so an auto-sized body would collapse to 0x0 and clip the bar
+   away entirely (the same full-screen body rule the other HUD panels use). */
+#spectator {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+}
+
+/* The bar is an opaque full-width strip that covers the native viewport
+   panel: the client's observer bar is a VGUI panel the vgui2 paint gate
+   cannot reach, so the replacement masks it instead. 39dp is the native
+   strip's 26 YRES units expressed in dp (both scale with screen height). */
 #spectator-bar {
 	position: absolute;
-	left: 24%;
-	width: 52%;
-	bottom: 8dp;
-	height: 30dp;
+	left: 0;
+	width: 100%;
+	bottom: 0;
+	height: 39dp;
 	display: flex;
 	flex-direction: row;
 	align-items: stretch;
-	background-color: #000000bf;
-	border: 1dp solid #3b3a22;
+	background-color: #000000;
+	border-top: 1dp #3b3a22;
 }
 
 .spec-cell {
@@ -24,14 +39,14 @@
 	justify-content: center;
 	height: 100%;
 	padding: 0 10dp;
-	border-right: 1dp solid #3b3a22;
+	border-right: 1dp #3b3a22;
 	white-space: nowrap;
 }
 
 #spec-mode {
 	flex: 1 1 auto;
 	min-width: 0;
-	border-right: none;
+	border-right: 0dp;
 }
 
 .spec-vital {

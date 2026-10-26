@@ -9,13 +9,6 @@
    columns are percentages of the module width so the table fills whatever
    the aspect ratio leaves between the page gutter and the filter column. */
 
-/* Typography note (live-verified 2026-10-15, 1280x800 = 480dp/1.667px per
-   dp): text at 8.5dp (a 14.17px font handle) painted every glyph as a filled
-   black box on this page, at every colour and every element - measured with
-   pixel probes plus an in-game colour experiment. 9dp renders normally, so
-   this page stays on the 9dp body tier (the same size the theme's buttons
-   use). The pre-existing playerlist 8.5dp rule is outside this page. */
-
 /* ---- page identity ------------------------------------------------------ */
 
 #sb-head {

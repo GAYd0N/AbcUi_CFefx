@@ -18,9 +18,11 @@ struct MenuShellAccess {
   // The maxclients split (Main vs Pause rows and their conditions).
   bool (*multiplayer)() = nullptr;
   // The character card's engine facts (player name, Studio model path the
-  // preview renders, model label).
+  // preview renders, model label, the action group + weapon that pose it and
+  // the group sequence).
   void (*playerCard)(std::string &playerName, std::string &modelPath,
-                     std::string &modelLabel) = nullptr;
+                     std::string &modelLabel, std::string &actionModel,
+                     std::string &weaponModel, int &sequence) = nullptr;
   // The footer note (the engine build).
   void (*buildNote)(std::string &note) = nullptr;
 };

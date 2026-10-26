@@ -325,14 +325,12 @@ typedef struct AbcUiAddEntityEvent {
   float origin[3];
 } AbcUiAddEntityEvent;
 
-// textfeed.saytext - one chat line (SayText usermsg). Veto channel: a sink
-// returning nonzero swallows the native CHudSayText draw, which is how
-// exactly one chat log stays on screen (every sink passes = the native
+// textfeed.saytext - one chat line (SayText usermsg, plus the server
+// console's own TextMsg/HUD_PRINTTALK lines re-published with client 0).
+// Veto channel: a sink returning nonzero swallows the native draw, which is
+// how exactly one chat log stays on screen (every sink passes = the native
 // handler chains, keeping chat alive while the Rml log is disabled).
 // `text` and the four parameters are dispatch-scoped pointers.
-// A replacement chat that owns the surface can promote the framework hook
-// above another plugin's link with data->ensureSayTextFirst (0.9.1); the
-// displaced head is then the pass-through while every sink passes.
 #define ABCUI_CHANNEL_TEXTFEED_SAY_TEXT "textfeed.saytext"
 typedef struct AbcUiSayTextEvent {
   int32_t client; // sender entity index

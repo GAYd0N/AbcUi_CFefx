@@ -40,8 +40,8 @@ void writePluginBool(VGUI2Extension_CallbackContext *ctx, bool value) {
 }
 
 // T08 entry layer: the inner IGameUI funnel. Everything that opens or closes
-// the native menu converges here (the engine's ESC/key handlers and
-// ServerBrowser.dll all route through ActivateGameUI/HideGameUI, directly or
+// the native menu converges here (the engine's ESC/key handlers and native
+// UI route through ActivateGameUI/HideGameUI, directly or
 // via the IBaseUI methods the extension proxies). While the bridge is armed
 // these handlers answer the two queries from the replacement state and
 // consume the two actions, so the vanilla CGameUI internals (panel flips,

@@ -13,6 +13,12 @@ namespace modelpreview {
 // the stock `models/player.mdl` the card's document also defaults to).
 constexpr const char *kGenericModelPath = "models/player.mdl";
 
+// Action groups (the menu stance models) live loose under the plugin's own
+// game-content folder: module ZIPs are UI resources only, an engine Studio
+// load needs a real file in the game search path.
+constexpr const char *kActionModelDir = "abc/abcui/models/menu_action/";
+constexpr const char *kActionModelDefault = "display_male";
+
 // Resolves a Studio path spelling the way the shipped cvars spell one: a
 // value that already names a file (".../*.mdl") is used verbatim, anything
 // else is read as the model's directory name under models/player/. An empty
@@ -23,6 +29,21 @@ std::string resolveModelPath(std::string_view Spelling,
 
 // Existence probe for one resolved Studio path (engine filesystem fact).
 using ModelExists = std::function<bool(const std::string &)>;
+
+// The main page's action group (cvar `abc_ui_menu_action_model`): a bare
+// spelling names a group in kActionModelDir ("display_male" ->
+// "abc/abcui/models/menu_action/display_male.mdl"), a .mdl path
+// file is used verbatim. Empty or invalid spelling selects the default group.
+// A missing group yields an empty path: the card then draws its own model
+// without the follow/merge chain.
+std::string resolveActionModelPath(std::string_view Spelling,
+                                   const ModelExists &Exists);
+
+// The main page's weapon model (cvar `abc_ui_menu_weapon_model`): only a
+// complete game-relative .mdl path with a directory is accepted, verbatim
+// ("models/p_m16.mdl"). No filename aliases or inferred paths. Empty (or
+// unusable) means no weapon. <model weapon> uses the same validation.
+std::string resolveWeaponModelPath(std::string_view Spelling);
 
 // The character card's source: `Spelling` (the menu's own override cvar; empty
 // when unset) resolves through the grammar above with `PlayerModel` as the
@@ -35,9 +56,8 @@ std::string resolveCardModelPath(std::string_view Spelling,
                                  std::string_view PlayerModel,
                                  const ModelExists &Exists);
 
-// The card's camera, light and background in the Renderer's entity_view_t
-// units: the Renderer only provides the isolated view scope, so the preview
-// owns what the view shows and how it is lit.
+// The card's camera, Studio lighting and background. LightDirection is the
+// world-space light-ray direction, normalized by the draw bridge.
 struct PreviewView {
   std::array<float, 3> Origin{120, 0, 0};
   std::array<float, 3> Angles{0, 180, 0};
@@ -54,7 +74,14 @@ struct PreviewView {
 
 struct Options {
   PreviewView View;
+  // The displayed player model ("src").
   std::string Source;
+  // The action group that drives the displayed model and the weapon
+  // ("action-src"): evaluated without rendering before each follow draw so
+  // matching bones consume its saved pose. Empty keeps single-entity behaviour.
+  std::string ActionSource;
+  // The weapon model merged onto the action group ("weapon"). Empty = none.
+  std::string WeaponSource;
   std::array<float, 3> Origin{};
   std::array<float, 3> Angles{};
   std::array<int, 3> RenderColor{255, 255, 255};
@@ -72,10 +99,12 @@ struct Options {
   float FrameRate = 1;
   float Scale = 1;
   bool Animate = true;
-  // Auto framing: derive the camera distance from the model's own bounding
-  // box so any player model (a 72-unit human, a 35-unit creature, a large
-  // monster) fills the same box. The camera-origin/fov attributes are then
-  // ignored for the placement; FrameMargin scales the fitted extent
+  // Auto framing: fit the visible posed player/weapon mesh vertices so
+  // models of different sizes fill the same box. Before the first sampled
+  // pose, the displayed player's bounds bootstrap the view. Camera-origin/fov
+  // attributes are then
+  // ignored for placement, while camera-angles sets the viewing direction.
+  // FrameMargin scales the fitted extent
   // (1.0 = the box is exactly filled, 1.15 leaves a margin).
   bool AutoFrame = false;
   float FrameMargin = 1.15f;
@@ -87,6 +116,9 @@ struct Options {
   // Unknown DOM attributes (id/class/style) are not errors. Invalid known
   // attributes leave the previous value unchanged and return false.
   bool set(std::string_view Name, std::string_view Value);
+  // A safe, relative Studio path: ends with ".mdl" (case-insensitive), no
+  // "..", no backslash/colon/control bytes and no leading slash. Both
+  // "models/..." content paths and the plugin's "abc/..." action groups pass.
   static bool isModelPath(std::string_view Path);
 };
 

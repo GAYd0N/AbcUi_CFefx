@@ -5,7 +5,6 @@
 #include "ApiSnapshot.h"
 
 #include <algorithm>
-#include <cstring>
 #include <string>
 #include <vector>
 
@@ -44,6 +43,18 @@ services::console::ConsoleBuffer &buffer() {
 
 services::console::ConsoleBackend &backend() {
   return services::console::consoleBackend();
+}
+
+// One complete local line into the mirror. The buffer assembles fragments
+// until a newline, so a local line without its terminator would stay
+// pending and join whatever the engine prints next on the same row.
+void pushLocalLine(const std::string &text) {
+  if (text.empty())
+    return;
+  std::string line = text;
+  if (line.back() != '\n')
+    line.push_back('\n');
+  buffer().pushText(line.data(), line.size(), false);
 }
 
 uint64_t apiGeneration(void) {
@@ -86,7 +97,7 @@ int32_t apiCopySince(uint64_t since, void *out, uint32_t max, uint32_t stride) {
 void apiPushLocalLine(const char *text) {
   if (!text)
     return;
-  buffer().pushText(text, std::strlen(text), false);
+  pushLocalLine(text);
 }
 
 int32_t apiSubmit(const char *command, int32_t *unknown) {
@@ -123,7 +134,7 @@ void apiNoteUnknownCommand(const char *command) {
   const auto at = line.find(marker);
   if (at != std::string::npos)
     line.replace(at, marker.size(), verb);
-  buffer().pushText(line.data(), line.size(), false);
+  pushLocalLine(line);
 }
 
 int32_t apiHistoryCount(void) {

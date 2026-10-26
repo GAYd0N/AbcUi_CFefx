@@ -27,7 +27,8 @@ bool parseCrop(std::string_view body, int rect[4]) {
     if (!value)
       return false;
     values[i] = *value;
-    at = end + 1;
+    // Park on the separator: the i > 0 branch consumes the comma itself.
+    at = end;
   }
   for (int i = 0; i < 4; ++i)
     rect[i] = values[i];

@@ -32,7 +32,33 @@
       "cvar": "abc_ui_menu_model_path",
       "label": "#abcui.gameui/Settings_MenuModel",
       "section": "menu",
-      "kind": "text"
+      "kind": "text",
+      "allowEmpty": true,
+      "default": ""
+    },
+    {
+      "cvar": "abc_ui_menu_action_model",
+      "label": "#abcui.gameui/Settings_MenuActionModel",
+      "section": "menu",
+      "kind": "string-enum",
+      "source": "menu-action-models",
+      "default": "display_male"
+    },
+    {
+      "cvar": "abc_ui_menu_model_sequence",
+      "label": "#abcui.gameui/Settings_MenuActionSequence",
+      "section": "menu",
+      "kind": "string-enum",
+      "source": "menu-action-sequences",
+      "default": "0"
+    },
+    {
+      "cvar": "abc_ui_menu_weapon_model",
+      "label": "#abcui.gameui/Settings_MenuWeaponModel",
+      "section": "menu",
+      "kind": "text",
+      "allowEmpty": true,
+      "default": "models/p_m16.mdl"
     },
     {
       "cvar": "abc_ui_menu_backdrop_blur",

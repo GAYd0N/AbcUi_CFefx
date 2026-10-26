@@ -15,8 +15,8 @@
 
 #include "../AbcRenderInterface.h"
 #include "../RmlUiModule.h"
-#include "../../render/Render.h"
-#include "../../render/RenderCommon.h"
+#include "../../render/BackendHost.h"
+#include "../../render/IRenderBackend.h"
 #include "../../services/GameUiBridge.h"
 #include "../../services/video/AsyncDecoder.h"
 #include "../video/VideoTexture.h"
@@ -47,10 +47,10 @@ struct Backdrop::State {
   std::string VideoSource;
   int Rounds = 2;
 
-  FBO_Container_t Down{};
-  FBO_Container_t Ping{};
-  FBO_Container_t Pong{};
-  bool TargetsValid = false;
+  // The capture/blur FBO chain is backend-owned now; the framework only
+  // tracks the resulting texture id (changes when the backend recreates the
+  // chain - resize or frame-buffer regeneration) and the diagnostics size.
+  unsigned int LastTexture = 0;
   int TargetWidth = 0;
   int TargetHeight = 0;
 
@@ -68,18 +68,10 @@ struct Backdrop::State {
   std::string Uri;
   bool Published = false;
 
-  void freeTargets() {
-    auto *renderer = abc::MetaRenderer();
-    if (renderer) {
-      renderer->PushFrameBuffer();
-      for (FBO_Container_t *target : {&Down, &Ping, &Pong}) {
-        if (target->s_hBackBufferFBO)
-          renderer->FreeFBO(target);
-        *target = {};
-      }
-      renderer->PopFrameBuffer();
-    }
-    TargetsValid = false;
+  void releaseChain() {
+    if (abc::render::IBlurPass *blur = abc::render::blurPass())
+      blur->invalidate();
+    LastTexture = 0;
     TargetWidth = TargetHeight = 0;
   }
 
@@ -131,14 +123,14 @@ int Backdrop::blurRounds() const {
 
 void Backdrop::invalidateTargets() {
   Data->unpublish();
-  Data->freeTargets();
+  Data->releaseChain();
 }
 
 void Backdrop::shutdown() {
   if (!Data)
     return;
   Data->unpublish();
-  Data->freeTargets();
+  Data->releaseChain();
   Data->Media.close();
   Data->Frame.release();
   Data->Uri.clear();
@@ -215,9 +207,9 @@ void Backdrop::pumpVideo(double frameTime, bool Enabled) {
 
 bool Backdrop::render() {
   State &state = *Data;
-  auto *renderer = abc::MetaRenderer();
+  abc::render::IBlurPass *blur = abc::render::blurPass();
   auto *rendererInterface = rmlui::renderInterface();
-  if (!renderer || !rendererInterface)
+  if (!blur || !rendererInterface)
     return false;
 
   bool Republished = false;
@@ -232,27 +224,28 @@ bool Backdrop::render() {
   if (mode == Mode::kAuto)
     mode = inLevel ? Mode::kLive : Mode::kVideo;
 
-  // Source resolution: a requested video without a frame yet degrades to the
-  // live frame (and the other way round), so the backdrop is never missing.
+  // Source resolution (the old chain, byte for byte): live frame while in a
+  // level, else a decoded video frame, else - for anything but a forced live
+  // view - the final buffer again. A zero sourceTexture requests the
+  // backend's final buffer; the backend reports a missing source by
+  // returning 0.
+  const bool hasVideo = state.Frame.valid() && state.Frame.textureId() != 0;
   unsigned int sourceTexture = 0;
-  if (mode == Mode::kLive && inLevel) {
-    if (FBO_Container_t * final = renderer->GetFinalBufferFBO())
-      sourceTexture = final->s_hBackBufferTex;
-  }
-  if (sourceTexture == 0 && state.Frame.valid()) {
-    sourceTexture = static_cast<unsigned int>(state.Frame.textureId());
-    if (sourceTexture != 0)
+  const bool solid = [&]() {
+    if (mode == Mode::kLive && inLevel)
+      return false; // final buffer
+    if (hasVideo) {
+      sourceTexture = static_cast<unsigned int>(state.Frame.textureId());
       mode = Mode::kVideo;
-  }
-  if (sourceTexture == 0 && mode != Mode::kLive) {
-    if (FBO_Container_t * final = renderer->GetFinalBufferFBO())
-      sourceTexture = final->s_hBackBufferTex;
-    if (sourceTexture != 0)
-      mode = Mode::kLive;
-  }
-  if (sourceTexture == 0) {
-    // Nothing to blur: a flat backdrop still covers the window (the page's
-    // own background colour shows through).
+      return false;
+    }
+    if (mode != Mode::kLive) {
+      mode = Mode::kLive; // final buffer fallback
+      return false;
+    }
+    return true; // forced live view, no map, no frame
+  }();
+  if (solid) {
     if (state.Effective != Mode::kSolid) {
       state.unpublish();
       state.Uri.clear();
@@ -262,75 +255,46 @@ bool Backdrop::render() {
   }
   state.Effective = mode;
 
-  const int width = std::max(
-      static_cast<int>(renderer->GetSwapChainWidth()) / kDownscale, kMinEdge);
-  const int height = std::max(
-      static_cast<int>(renderer->GetSwapChainHeight()) / kDownscale, kMinEdge);
-  if (!state.TargetsValid || state.TargetWidth != width ||
-      state.TargetHeight != height) {
-    state.unpublish();
-    state.freeTargets();
-    renderer->PushFrameBuffer();
-    const struct {
-      FBO_Container_t *Target;
-      const char *Name;
-    } targets[] = {{&state.Down, "AbcUi backdrop source"},
-                   {&state.Ping, "AbcUi backdrop blur A"},
-                   {&state.Pong, "AbcUi backdrop blur B"}};
-    for (const auto &target : targets) {
-      target.Target->iWidth = width;
-      target.Target->iHeight = height;
-      renderer->GenFrameBuffer(target.Target, target.Name);
-      renderer->FrameBufferColorTexture(target.Target, GL_RGBA8);
+  const abc::render::IRenderBackend *backend = abc::render::backend();
+  const int width =
+      std::max((backend ? backend->surfaceWidth() : 0) / kDownscale, kMinEdge);
+  const int height =
+      std::max((backend ? backend->surfaceHeight() : 0) / kDownscale, kMinEdge);
+  abc::render::IBlurPass::Request request;
+  request.width = width;
+  request.height = height;
+  request.sourceTexture = sourceTexture;
+  request.rounds = state.Rounds;
+  const unsigned int texture = blur->render(request);
+  if (texture == 0) {
+    // Nothing to blur: a flat backdrop still covers the window (the page's
+    // own background colour shows through).
+    if (state.Effective != Mode::kSolid) {
+      state.unpublish();
+      state.Uri.clear();
     }
-    renderer->PopFrameBuffer();
-    state.TargetsValid = true;
-    state.TargetWidth = width;
-    state.TargetHeight = height;
-    // A fresh texture id behind the same registration key: publish a new
-    // URI so Rml re-resolves once.
+    state.Effective = Mode::kSolid;
+    return false;
+  }
+  state.TargetWidth = width;
+  state.TargetHeight = height;
+  // A fresh texture id behind the same registration key (backend recreated
+  // the chain on resize/regeneration): publish a new URI so Rml re-resolves
+  // once.
+  if (state.LastTexture != texture) {
+    state.LastTexture = texture;
     Publish();
     Republished = true;
-  }
-
-  // The source can come back after a solid frame (unpublish() cleared the
-  // URI while the FBOs stayed valid): publish again before capturing.
-  if (!state.Published) {
+  } else if (!state.Published) {
+    // The source can come back after a solid frame (unpublish() cleared the
+    // URI while the chain stayed valid): publish again.
     Publish();
     Republished = true;
-  }
-
-  // Capture: an opaque white fill first, then the source alpha-blended over
-  // it. The fill forces the blur chain's alpha to 1 whatever the source's
-  // alpha channel holds (the final buffer's alpha is not specified).
-  const float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-  renderer->PushFrameBuffer();
-  renderer->BindFrameBuffer(&state.Down);
-  renderer->Set2DEx(0, 0, width, height);
-  renderer->ClearColor(const_cast<float *>(white));
-  renderer->DrawFilledQuad(0, 0, width, height, white,
-                           DRAW_FILLED_RECT_ALPHA_BLEND_ENABLED,
-                           "abcui backdrop fill");
-  renderer->DrawTexturedQuad(
-      static_cast<int>(sourceTexture), 0, 0, width, height, white,
-      DRAW_TEXTURED_RECT_ALPHA_BLEND_ENABLED, "abcui backdrop capture");
-  renderer->Finish2D();
-  renderer->PopFrameBuffer();
-
-  // Gaussian rounds: horizontal then vertical, ping-ponging between the two
-  // blur targets (the Renderer's own bloom chain shape). Zero rounds keep
-  // the raw capture: `from` stays the Down target, which is what the
-  // published texture then points at.
-  FBO_Container_t *from = &state.Down;
-  for (int round = 0; round < state.Rounds; round++) {
-    renderer->BlurPass(from, &state.Ping, 1.0f, false);
-    renderer->BlurPass(&state.Ping, &state.Pong, 1.0f, true);
-    from = &state.Pong;
   }
 
   rendererInterface->registerExternalTexture(
-      kTexturePrefix, static_cast<Rml::TextureHandle>(from->s_hBackBufferTex),
-      width, height, nullptr);
+      kTexturePrefix, static_cast<Rml::TextureHandle>(texture), width, height,
+      nullptr);
   // The URI only changes with the texture (see above): the per-frame pixel
   // changes ride the same texture handle, so Rml's texture cache is not
   // disturbed and the element writes no DOM while the backdrop is steady.
