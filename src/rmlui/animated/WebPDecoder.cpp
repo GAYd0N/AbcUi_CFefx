@@ -6,6 +6,7 @@
 #include <webp/demux.h>
 
 #include <cstdint>
+#include <memory>
 #include <utility>
 
 namespace rmlui::animated::detail {
@@ -24,11 +25,6 @@ bool probeWebP(std::span<const std::byte> data) {
 
 class WebPAnimation final : public AnimatedImage {
 public:
-  ~WebPAnimation() override {
-    if (Decoder)
-      WebPAnimDecoderDelete(Decoder);
-  }
-
   bool open(std::vector<std::byte> bytes, std::string source,
             std::string &error) {
     Bytes = std::move(bytes);
@@ -39,21 +35,25 @@ public:
                            Bytes.size()};
 
     // Metadata pass: durations come from the container, no pixels decode.
-    WebPDemuxer *demux = WebPDemux(&data);
+    std::unique_ptr<WebPDemuxer, decltype(&WebPDemuxDelete)> demux(
+        WebPDemux(&data), WebPDemuxDelete);
     if (!demux) {
       error = "webp container rejected";
       return false;
     }
-    const uint32_t declaredWidth = WebPDemuxGetI(demux, WEBP_FF_CANVAS_WIDTH);
-    const uint32_t declaredHeight = WebPDemuxGetI(demux, WEBP_FF_CANVAS_HEIGHT);
+    const uint32_t declaredWidth =
+        WebPDemuxGetI(demux.get(), WEBP_FF_CANVAS_WIDTH);
+    const uint32_t declaredHeight =
+        WebPDemuxGetI(demux.get(), WEBP_FF_CANVAS_HEIGHT);
     WebPIterator iter;
-    if (WebPDemuxGetFrame(demux, 1, &iter)) {
+    if (WebPDemuxGetFrame(demux.get(), 1, &iter)) {
+      const std::unique_ptr<WebPIterator, decltype(&WebPDemuxReleaseIterator)>
+          iterator(&iter, WebPDemuxReleaseIterator);
       do {
         Durations.push_back(iter.duration);
       } while (WebPDemuxNextFrame(&iter));
-      WebPDemuxReleaseIterator(&iter);
     }
-    WebPDemuxDelete(demux);
+    demux.reset();
 
     std::size_t canvasBytes = 0;
     if (!framework::ResourceLimits::imageBytes(static_cast<int>(declaredWidth),
@@ -70,9 +70,9 @@ public:
     }
     options.color_mode = MODE_RGBA;
     options.use_threads = 0;
-    Decoder = WebPAnimDecoderNew(&data, &options);
+    Decoder.reset(WebPAnimDecoderNew(&data, &options));
     WebPAnimInfo info = {};
-    if (!Decoder || !WebPAnimDecoderGetInfo(Decoder, &info)) {
+    if (!Decoder || !WebPAnimDecoderGetInfo(Decoder.get(), &info)) {
       error = "webp animation decoder rejected";
       return false;
     }
@@ -91,7 +91,7 @@ public:
   bool Rewind() override {
     if (!Decoder)
       return false;
-    WebPAnimDecoderReset(Decoder);
+    WebPAnimDecoderReset(Decoder.get());
     NextIndex = 0;
     return true;
   }
@@ -101,7 +101,7 @@ public:
       return false;
     uint8_t *buffer = nullptr;
     int timestamp = 0;
-    if (!WebPAnimDecoderGetNext(Decoder, &buffer, &timestamp) || !buffer)
+    if (!WebPAnimDecoderGetNext(Decoder.get(), &buffer, &timestamp) || !buffer)
       return false;
     out.Pixels = buffer;
     out.Width = PixelWidth;
@@ -113,7 +113,8 @@ public:
   }
 
 private:
-  WebPAnimDecoder *Decoder = nullptr;
+  std::unique_ptr<WebPAnimDecoder, decltype(&WebPAnimDecoderDelete)> Decoder{
+      nullptr, WebPAnimDecoderDelete};
   int NextIndex = 0;
 };
 

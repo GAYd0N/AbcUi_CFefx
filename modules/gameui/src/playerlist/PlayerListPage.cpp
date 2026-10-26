@@ -215,11 +215,14 @@ int32_t onClick(void *, AbcUiElement *target, const AbcUiElementEvent *event) {
     // boundary as values, not a colon-delimited/truncated command string.
     const int slot = Api->ui->elementAttributeInt(entry, "data-index", 0);
     const std::string steam = attributeOf(entry, "data-steamid");
-    const unsigned long long steamId64 =
-        steam.empty() ? 0 : std::strtoull(steam.c_str(), nullptr, 10);
+    const auto steamId64 = steam.empty()
+                               ? std::optional<uint64_t>(0)
+                               : moduleui::parseNumber<uint64_t>(steam);
+    if (!steamId64)
+      return 1;
     const std::string name = attributeOf(entry, "data-name");
     Api->playerlist->refresh();
-    Api->playerlist->select(steamId64, slot, name.c_str());
+    Api->playerlist->select(*steamId64, slot, name.c_str());
     render();
     return 1;
   }

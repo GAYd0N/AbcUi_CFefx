@@ -18,7 +18,7 @@ std::vector<ServerOption> parseServerOptions(const std::string &Text) {
     if (Name == "sv_lan" || Name == "sv_password" || Name == "hostname" ||
         Name == "maxplayers")
       continue;
-    if ((Name.rfind("mp_", 0) != 0 && Name.rfind("sv_", 0) != 0) ||
+    if ((!Name.starts_with("mp_") && !Name.starts_with("sv_")) ||
         !std::all_of(Name.begin(), Name.end(),
                      [](unsigned char C) {
                        return (C >= 'a' && C <= 'z') ||

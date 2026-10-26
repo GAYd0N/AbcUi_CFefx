@@ -1,5 +1,6 @@
 // framework::ResourceFile implementation - see ResourceFile.h.
 #include "ResourceFile.h"
+#include "FileSystemHandles.h"
 #include "modsys/ModuleVfs.h"
 #include <cstring>
 
@@ -84,36 +85,29 @@ bool read(std::string_view path, std::vector<std::byte> &bytes,
       normalized.starts_with("abc/abcui/"))
     return false;
 
-  FileHandle_t file = abc::g_pFileSystem->Open(normalized.c_str(), "rb");
+  const auto file =
+      openEngineFile(*abc::g_pFileSystem, normalized.c_str(), "rb");
   if (!file)
     return false;
 
-  struct CloseFile {
-    FileHandle_t Handle;
-    ~CloseFile() {
-      if (Handle)
-        abc::g_pFileSystem->Close(Handle);
-    }
-  } close{file};
-
-  const unsigned size = abc::g_pFileSystem->Size(file);
+  const unsigned size = abc::g_pFileSystem->Size(file.get());
   if (size > maxBytes ||
       size > static_cast<std::size_t>((std::numeric_limits<int>::max)()))
     return false;
   if (size == 0)
-    return abc::g_pFileSystem->IsOk(file);
+    return abc::g_pFileSystem->IsOk(file.get());
 
   bytes.resize(size);
   std::size_t total = 0;
   while (total < bytes.size()) {
     const int remaining = static_cast<int>(bytes.size() - total);
     const int got =
-        abc::g_pFileSystem->Read(bytes.data() + total, remaining, file);
+        abc::g_pFileSystem->Read(bytes.data() + total, remaining, file.get());
     if (got <= 0)
       break;
     total += static_cast<std::size_t>(got);
   }
-  const bool ok = total == bytes.size() && abc::g_pFileSystem->IsOk(file);
+  const bool ok = total == bytes.size() && abc::g_pFileSystem->IsOk(file.get());
   if (!ok)
     bytes.clear();
   return ok;

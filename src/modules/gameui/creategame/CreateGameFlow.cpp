@@ -1,5 +1,6 @@
 // gameui::CreateGameFlow implementation - see CreateGameFlow.h.
 #include "CreateGameFlow.h"
+#include "framework/FileSystemHandles.h"
 
 #include <abc/Console.h>
 #include <abc/CvarCmd.h>
@@ -33,15 +34,14 @@ void CreateGameFlow::loadCatalog() {
   if (abc::g_pFileSystem) {
     const char *pathIds[] = {nullptr, "GAMEDOWNLOAD"};
     for (const char *pathId : pathIds) {
-      FileFindHandle_t handle = FILESYSTEM_INVALID_FIND_HANDLE;
+      framework::EngineFileSearch search(*abc::g_pFileSystem);
+      auto &handle = search.handle;
       const char *name =
           abc::g_pFileSystem->FindFirst("maps/*.bsp", &handle, pathId);
       while (name) {
         catalog.addRawName(name);
         name = abc::g_pFileSystem->FindNext(handle);
       }
-      if (handle != FILESYSTEM_INVALID_FIND_HANDLE)
-        abc::g_pFileSystem->FindClose(handle);
     }
   } else {
     abc::ConsoleWarn("[AbcUi] map catalog: engine filesystem unavailable\n");

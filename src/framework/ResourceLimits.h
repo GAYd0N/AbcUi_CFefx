@@ -59,7 +59,7 @@ inline bool identifierName(std::string_view name) {
 // HLSDK "weapon_" prefix; require it before anything server-supplied reaches
 // pfnServerCmd.
 inline bool weaponCommandName(std::string_view name) {
-  return name.size() > 7 && name.size() <= 127 &&
-         name.substr(0, 7) == "weapon_" && identifierName(name);
+  return name.size() > 7 && name.size() <= 127 && name.starts_with("weapon_") &&
+         identifierName(name);
 }
 } // namespace framework::ResourceLimits

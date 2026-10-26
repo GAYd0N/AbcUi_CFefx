@@ -357,7 +357,7 @@ int croppedTexture(const std::string &atlasFile, const wrect_t &rect,
 }
 
 int textureForUri(const std::string &uri, int &width, int &height) {
-  if (uri.rfind("spr://", 0) == 0) {
+  if (uri.starts_with("spr://")) {
     std::string atlasFile;
     wrect_t rect{};
     if (!findHudSprite(uri.c_str() + 6, atlasFile, rect))
@@ -370,7 +370,7 @@ int textureForUri(const std::string &uri, int &width, int &height) {
       return 0;
     return croppedTexture(atlasFile, rect, false);
   }
-  if (uri.rfind("spricon://", 0) == 0) {
+  if (uri.starts_with("spricon://")) {
     // spricon://<atlas>/<l>,<t>,<r>,<b>
     std::string atlasFile;
     int values[4] = {0, 0, 0, 0};
@@ -389,7 +389,7 @@ int textureForUri(const std::string &uri, int &width, int &height) {
       return 0;
     return croppedTexture(atlasFile, rect, false);
   }
-  if (uri.rfind("spralpha://", 0) == 0) {
+  if (uri.starts_with("spralpha://")) {
     // spralpha://<atlas>/<l>,<t>,<r>,<b> - straight-alpha crop (old
     // kRenderTransTexture sprites: the weapon crosshairs).
     std::string atlasFile;

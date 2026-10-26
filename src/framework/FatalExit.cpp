@@ -6,6 +6,8 @@
 
 #include <windows.h>
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdio>
 #include <filesystem>
 
@@ -36,7 +38,9 @@ void appendExternalLog(const char *line) {
       time.wSecond, line);
   if (written > 0) {
     DWORD ignored = 0;
-    WriteFile(file, stamped, static_cast<DWORD>(written), &ignored, nullptr);
+    const auto count =
+        (std::min)(static_cast<std::size_t>(written), sizeof(stamped) - 1);
+    WriteFile(file, stamped, static_cast<DWORD>(count), &ignored, nullptr);
   }
   CloseHandle(file);
 }

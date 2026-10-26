@@ -16,16 +16,17 @@
 // (Mp3Duration). Progress is therefore a display estimate; it is what
 // drives the automatic next-track hand-off, mirroring the native player's
 // end-of-stream advance.
+#include "../../common/UiText.h"
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 
 #include "Mp3Duration.h"
+#include "../../common/Parse.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
-#include <cstdlib>
 #include <cstring>
 #include <format>
 #include <string>
@@ -106,37 +107,15 @@ std::string translated(const char *token, const char *fallback) {
 }
 
 std::string escapeText(std::string_view text) {
-  const char *source = text.empty() ? "" : text.data();
-  const int needed = Api->ui->escapeRml(source, nullptr, 0);
-  if (needed <= 0)
-    return {};
-  std::string out(static_cast<std::size_t>(needed) + 1, '\0');
-  Api->ui->escapeRml(source, out.data(), static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<std::size_t>(needed));
-  return out;
+  return moduleui::escapeText(Api, text);
 }
 
 std::string escapeAttribute(std::string_view text) {
-  const char *source = text.empty() ? "" : text.data();
-  const int needed = Api->ui->escapeRmlAttribute(source, nullptr, 0);
-  if (needed <= 0)
-    return {};
-  std::string out(static_cast<std::size_t>(needed) + 1, '\0');
-  Api->ui->escapeRmlAttribute(source, out.data(),
-                              static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<std::size_t>(needed));
-  return out;
+  return moduleui::escapeAttribute(Api, text);
 }
 
 std::string attributeOf(AbcUiElement *element, const char *name) {
-  const int needed = Api->ui->elementAttribute(element, name, nullptr, 0);
-  if (needed <= 0)
-    return {};
-  std::string out(static_cast<std::size_t>(needed) + 1, '\0');
-  Api->ui->elementAttribute(element, name, out.data(),
-                            static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<std::size_t>(needed));
-  return out;
+  return moduleui::readString(Api->ui->elementAttribute, element, name);
 }
 
 AbcUiElement *node(const char *id) {
@@ -778,10 +757,10 @@ int32_t ABCUI_CALL onClick(void *, AbcUiElement *target,
   } else if (action == "mp-stop") {
     stopPlayback();
   } else if (action == "mp-play") {
-    const int row = std::atoi(index.c_str());
-    if (row >= 0 && row < static_cast<int>(Tracks.size())) {
-      Selected = row;
-      startTrack(row, true);
+    const auto row = moduleui::parseNumber<int>(index);
+    if (row && *row >= 0 && *row < static_cast<int>(Tracks.size())) {
+      Selected = *row;
+      startTrack(*row, true);
       renderPlaylist();
     }
   } else if (action == "mp-remove") {
@@ -812,8 +791,10 @@ int32_t ABCUI_CALL onChange(void *, AbcUiElement *target,
     return 0;
   char value[16] = {};
   if (Api->ui->elementValue(target, value, sizeof(value)) > 0) {
-    setVolumePercent(std::atoi(value));
-    updateVolumeRow();
+    if (const auto volume = moduleui::parseNumber<int>(value)) {
+      setVolumePercent(*volume);
+      updateVolumeRow();
+    }
   }
   return 1;
 }

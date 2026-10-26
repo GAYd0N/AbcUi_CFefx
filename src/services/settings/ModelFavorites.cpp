@@ -1,5 +1,6 @@
 // services::settings::ModelFavorites implementation - see the header.
 #include "ModelFavorites.h"
+#include "ChoiceValidation.h"
 
 #include <AIGCJson.hpp>
 
@@ -7,7 +8,6 @@
 #include <abc/Console.h>
 
 #include <algorithm>
-#include <cstring>
 
 namespace services {
 namespace settings {
@@ -24,16 +24,7 @@ struct ModelFavoritesJson {
 };
 
 bool entryTextValid(const std::string &model) {
-  if (model.empty() || model.size() > 63)
-    return false;
-  for (const char c : model) {
-    const unsigned char byte = static_cast<unsigned char>(c);
-    if (byte < 0x20 || byte == 0x7f)
-      return false;
-    if (std::strchr("\"'`\\;/|<>*?[]:", c))
-      return false;
-  }
-  return model != "." && model != "..";
+  return model.size() <= 63 && choiceTokenValid(model);
 }
 } // namespace
 
@@ -90,16 +81,11 @@ bool ModelFavorites::save() const {
 }
 
 void ModelFavorites::sanitize(std::vector<std::string> &favorites) {
-  std::vector<std::string> clean;
-  clean.reserve(favorites.size());
-  for (auto &model : favorites) {
-    if (!entryTextValid(model))
-      continue;
-    clean.push_back(std::move(model));
-  }
-  std::sort(clean.begin(), clean.end());
-  clean.erase(std::unique(clean.begin(), clean.end()), clean.end());
-  favorites = std::move(clean);
+  std::erase_if(favorites,
+                [](const auto &model) { return !entryTextValid(model); });
+  std::ranges::sort(favorites);
+  const auto duplicates = std::ranges::unique(favorites);
+  favorites.erase(duplicates.begin(), duplicates.end());
 }
 
 } // namespace settings

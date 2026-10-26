@@ -9,6 +9,7 @@
 // direction), netmsg.popnum (addon carrier numbers) and hud.addentity
 // (grenade tracking; the module tracks entities by index, never by the
 // engine-owned pointer).
+#include "../../common/Text.h"
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 
@@ -496,13 +497,7 @@ std::string formatPopValue(int value) {
                   // D-17 keeps the value visible)
   // D-17: the tokens carry {0} placeholders and substitute here - no printf
   // near the table text.
-  const std::string key = "{0}";
-  const std::string number = std::to_string(value);
-  size_t at = 0;
-  while ((at = text.find(key, at)) != std::string::npos) {
-    text.replace(at, key.size(), number);
-    at += number.size();
-  }
+  moduleui::replaceAll(text, "{0}", std::to_string(value));
   return text;
 }
 

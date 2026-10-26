@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <condition_variable>
 #include <mutex>
+#include <stop_token>
 #include <thread>
 
 namespace video {
@@ -29,15 +30,15 @@ struct AsyncDecoder::State {
     std::string Error;
   };
   std::mutex Mutex;
-  std::condition_variable Wake;
-  std::thread Worker;
+  std::condition_variable_any Wake;
   Request Next;
   std::unique_ptr<Result> Ready;
   bool Pending = false;
-  bool Stopping = false;
   bool Paused = false;
+  // Last member: stop and join before any state used by the worker dies.
+  std::jthread Worker;
 
-  void run() {
+  void run(std::stop_token Stop) {
     Decoder Media;
     Request Applied;
     bool Opened = false;
@@ -45,8 +46,8 @@ struct AsyncDecoder::State {
       Request Work;
       {
         std::unique_lock Lock(Mutex);
-        Wake.wait(Lock, [&] { return Pending || Stopping; });
-        if (Stopping)
+        if (!Wake.wait(Lock, Stop, [&] { return Pending; }) ||
+            Stop.stop_requested())
           return;
         Work = Next;
         Next.Delta = 0;
@@ -83,7 +84,8 @@ struct AsyncDecoder::State {
       std::lock_guard Lock(Mutex);
       // Source changes and pause invalidate in-flight results. At most
       // one ready frame exists; a slow UI never builds a decode backlog.
-      if (!Stopping && !Paused && Work.Generation == Next.Generation)
+      if (!Stop.stop_requested() && !Paused &&
+          Work.Generation == Next.Generation)
         Ready = std::move(Output);
     }
   }
@@ -113,10 +115,10 @@ bool AsyncDecoder::open(const char *Path, int Width, int Height) {
   Data->Ready.reset();
   Data->Paused = false;
   Data->Pending = true;
-  Data->Stopping = false;
   Error.clear();
   if (!Data->Worker.joinable())
-    Data->Worker = std::thread([this] { Data->run(); });
+    Data->Worker = std::jthread(
+        [state = Data.get()](std::stop_token stop) { state->run(stop); });
   Data->Wake.notify_one();
   return true;
 }
@@ -160,13 +162,10 @@ void AsyncDecoder::pause() {
 }
 
 void AsyncDecoder::close() {
-  {
-    std::lock_guard Lock(Data->Mutex);
-    Data->Stopping = true;
-    Data->Wake.notify_one();
-  }
-  if (Data->Worker.joinable())
+  if (Data->Worker.joinable()) {
+    Data->Worker.request_stop();
     Data->Worker.join();
+  }
   Data->Next = {};
   Data->Ready.reset();
   Data->Pending = false;

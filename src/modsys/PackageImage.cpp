@@ -29,50 +29,43 @@ std::unique_ptr<PackageImage> PackageImage::open(const char *path,
     return nullptr;
   }
   const std::wstring wide = wideFromUtf8(path);
+  std::unique_ptr<PackageImage> image(new PackageImage());
 
-  HANDLE file = CreateFileW(
+  image->FileHandle = CreateFileW(
       wide.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
       FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
-  if (file == INVALID_HANDLE_VALUE) {
+  if (image->FileHandle == INVALID_HANDLE_VALUE) {
     if (error)
       *error = "package file cannot be opened";
     return nullptr;
   }
 
   LARGE_INTEGER fileSize{};
-  if (!GetFileSizeEx(file, &fileSize) || fileSize.QuadPart <= 0 ||
+  if (!GetFileSizeEx(image->FileHandle, &fileSize) || fileSize.QuadPart <= 0 ||
       fileSize.QuadPart > 1024ll * 1024 * 1024) {
-    CloseHandle(file);
     if (error)
       *error = "package file size is unreadable or empty";
     return nullptr;
   }
 
-  HANDLE mapping =
-      CreateFileMappingW(file, nullptr, PAGE_READONLY, 0, 0, nullptr);
-  if (!mapping) {
-    CloseHandle(file);
+  image->Mapping = CreateFileMappingW(image->FileHandle, nullptr, PAGE_READONLY,
+                                      0, 0, nullptr);
+  if (!image->Mapping) {
     if (error)
       *error = "package file cannot be mapped";
     return nullptr;
   }
 
-  void *view = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
-  if (!view) {
-    CloseHandle(mapping);
-    CloseHandle(file);
+  image->View = MapViewOfFile(image->Mapping, FILE_MAP_READ, 0, 0, 0);
+  if (!image->View) {
     if (error)
       *error = "package mapping view failed";
     return nullptr;
   }
 
-  std::unique_ptr<PackageImage> image(new PackageImage());
-  image->FileHandle = file;
-  image->Mapping = mapping;
-  image->View = view;
   image->Size = static_cast<size_t>(fileSize.QuadPart);
 
-  image->File = PackageFile::open(view, image->Size, error);
+  image->File = PackageFile::open(image->View, image->Size, error);
   if (!image->File) {
     // `error` already carries the parse failure.
     return nullptr;

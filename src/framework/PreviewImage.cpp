@@ -54,7 +54,7 @@ void hue(ImageLoader::PaletteColor &Pixel, int Color) {
 } // namespace
 
 bool parsePreviewUri(const std::string &Uri, PreviewRequest &Output) {
-  if (Uri.rfind("preview://", 0) != 0)
+  if (!Uri.starts_with("preview://"))
     return false;
   std::vector<std::string> Parts;
   size_t Start = 10;

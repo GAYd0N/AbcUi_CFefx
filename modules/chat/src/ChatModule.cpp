@@ -13,6 +13,7 @@
 // fades out one second after hud_saytext_time elapses.
 #include "saytext/SayText.h"
 
+#include "../../common/UiText.h"
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 #include "../../common/ImeOverlay.h"
@@ -104,16 +105,7 @@ void setProperty(AbcUiElement *element, const char *name, const char *value) {
 }
 
 std::string escapeText(const std::string &text) {
-  if (text.empty())
-    return text;
-  const int needed = Api->ui->escapeRml(text.c_str(), nullptr, 0);
-  if (needed <= 0)
-    return std::string();
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->escapeRml(text.c_str(), out.data(),
-                     static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
+  return moduleui::escapeText(Api, text);
 }
 
 // ---- visibility (abc_ui_chat / hud_saytext / CaptionMod) ----
@@ -342,13 +334,7 @@ std::string inputText() {
   AbcUiElement *input = inputElement();
   if (!input)
     return std::string();
-  const int needed = Api->ui->elementValue(input, nullptr, 0);
-  if (needed <= 0)
-    return std::string();
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->elementValue(input, out.data(), static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
+  return moduleui::readString(Api->ui->elementValue, input);
 }
 
 void setInputText(const std::string &text) {

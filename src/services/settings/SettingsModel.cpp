@@ -2,6 +2,7 @@
 // dependency: every backend touchpoint rides the injected seams, so the
 // production model links into the offline acceptance unchanged.
 #include "SettingsModel.h"
+#include "ChoiceValidation.h"
 
 #include <abc/Parse.h>
 
@@ -52,23 +53,6 @@ bool stringBytesValid(const char *text, bool nameLike) {
   return true;
 }
 
-bool optionTokenValid(const char *text) {
-  // Enum tokens come from our own scans, but the write validates anyway
-  // (defence in depth): filename charset, no separators or traversal.
-  if (!text || !*text)
-    return false;
-  for (const char *p = text; *p; ++p) {
-    const unsigned char c = static_cast<unsigned char>(*p);
-    if (c < 0x20 || c == 0x7f)
-      return false;
-    if (std::strchr("\"'`\\;/|<>*?[]:", *p))
-      return false;
-  }
-  if (std::string_view(text) == "." || std::string_view(text) == "..")
-    return false;
-  return true;
-}
-
 } // namespace
 
 // File-choice rows (menu video / music scans): the value is a relative path
@@ -79,23 +63,17 @@ bool optionTokenValid(const char *text) {
 // own scan). The menu music validates the cvar's track text with the same
 // rule before it is spliced into an "mp3 loop <track>" command.
 bool fileChoiceValueValid(const char *text) {
-  if (!text || !*text)
+  if (!text)
     return false;
-  if (std::string_view(text).starts_with("mod://"))
-    text += 6;
-  for (const char *p = text; *p; ++p) {
-    const unsigned char c = static_cast<unsigned char>(*p);
-    if (c < 0x20 || c == 0x7f)
-      return false;
-    if (std::strchr("\"'`\\|<>*?[]:", *p))
-      return false;
-  }
-  const std::string value(text);
-  if (value.front() == '/' || value.back() == '/')
+  std::string_view value(text);
+  if (value.starts_with("mod://"))
+    value.remove_prefix(6);
+  if (value.empty() || value.front() == '/' || value.back() == '/' ||
+      value.find("..") != value.npos ||
+      value.find_first_of("\"'`\\|<>*?[]:") != value.npos)
     return false;
-  if (value.find("..") != std::string::npos)
-    return false; // no traversal, not even inside a name chain
-  return true;
+  return std::ranges::none_of(
+      value, [](unsigned char c) { return c < 0x20 || c == 0x7f; });
 }
 
 SettingsModel::SettingsModel(const SettingRow *rows, int count) {
@@ -420,7 +398,7 @@ bool SettingsModel::validateString(const RowRuntime &entry,
     // File rows carry a relative path instead of a bare token, with the
     // path-shaped charset above.
     if (entry.row->FileChoices ? !fileChoiceValueValid(text)
-                               : !optionTokenValid(text))
+                               : !choiceTokenValid(text))
       return false;
     bool known = std::binary_search(entry.options.begin(), entry.options.end(),
                                     std::string(text));

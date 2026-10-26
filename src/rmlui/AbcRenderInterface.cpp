@@ -13,6 +13,7 @@
 #include <abc/Console.h>
 
 #include "texture/Avatars.h"
+#include "texture/AvatarSource.h"
 #include "texture/SpriteResource.h"
 #include "../framework/ImageLoader.h"
 #include "../modsys/ModuleVfs.h"
@@ -348,9 +349,9 @@ void AbcRenderInterface::ReleaseGeometry(Rml::CompiledGeometryHandle geometry) {
 Rml::TextureHandle AbcRenderInterface::LoadTexture(Rml::Vector2i &dimensions,
                                                    const Rml::String &source) {
   // Explicit native game content, never shared framework UI resources.
-  if (source.rfind("engine://", 0) == 0)
+  if (source.starts_with("engine://"))
     return loadFileTexture(dimensions, source.substr(9));
-  if (source.rfind("preview://", 0) == 0) {
+  if (source.starts_with("preview://")) {
     framework::PreviewRequest Request;
     if (!framework::parsePreviewUri(source, Request) || !abc::g_pFileSystem)
       return 0;
@@ -380,7 +381,7 @@ Rml::TextureHandle AbcRenderInterface::LoadTexture(Rml::Vector2i &dimensions,
   // the URI prefix; the query suffix is a cache-bust, the current handle
   // lives in the registry.
   for (const auto &[prefix, external] : ExternalTextures) {
-    if (source.rfind(prefix, 0) != 0 || !external.Texture)
+    if (!source.starts_with(prefix) || !external.Texture)
       continue;
     dimensions.x = external.Width;
     dimensions.y = external.Height;
@@ -390,7 +391,7 @@ Rml::TextureHandle AbcRenderInterface::LoadTexture(Rml::Vector2i &dimensions,
   // "spralpha://...") resolve through the sprite data layer, never the file
   // interface (the scheme prefix also keeps Rml from joining the document
   // directory).
-  if (source.rfind("spr://", 0) == 0 || source.rfind("spricon://", 0) == 0) {
+  if (source.starts_with("spr://") || source.starts_with("spricon://")) {
     int width = 0, height = 0;
     const Rml::TextureHandle handle =
         retainTexture(sprites::textureForUri(source, width, height), false);
@@ -403,21 +404,22 @@ Rml::TextureHandle AbcRenderInterface::LoadTexture(Rml::Vector2i &dimensions,
     }
     return handle;
   }
-  if (source.rfind("avatar://", 0) == 0) {
+  if (source.starts_with("avatar://")) {
     // avatar://<steamid64>[?gen] - scoreboard avatars (data::avatars);
     // the scoreboard bumps `gen` when an avatar lands so Rml re-resolves.
-    const std::string body = source.substr(9);
-    const uint64_t steamId = strtoull(body.c_str(), nullptr, 10);
+    const auto steamId = avatars::parseSourceId(source, "avatar://");
+    if (!steamId)
+      return 0;
     int width = 0, height = 0;
-    const Rml::TextureHandle handle =
-        retainTexture(avatars::textureFor(steamId, width, height, true), false);
+    const Rml::TextureHandle handle = retainTexture(
+        avatars::textureFor(*steamId, width, height, true), false);
     if (handle) {
       dimensions.x = width;
       dimensions.y = height;
     }
     return handle;
   }
-  if (source.rfind("spralpha://", 0) == 0) {
+  if (source.starts_with("spralpha://")) {
     int width = 0, height = 0;
     const Rml::TextureHandle handle =
         retainTexture(sprites::textureForUri(source, width, height), false);
@@ -428,12 +430,12 @@ Rml::TextureHandle AbcRenderInterface::LoadTexture(Rml::Vector2i &dimensions,
     }
     return handle;
   }
-  if (source.rfind("mod://", 0) == 0) {
+  if (source.starts_with("mod://")) {
     // Module package image: resolve through the module VFS, decode from the
     // (zero-copy) entry view.
     return loadModuleTexture(dimensions, source, false);
   }
-  if (source.rfind("modadd://", 0) == 0) {
+  if (source.starts_with("modadd://")) {
     // Additive package-image twin of mod://.
     return loadModuleTexture(dimensions, "mod://" + source.substr(9), true);
   }

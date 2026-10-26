@@ -239,13 +239,7 @@ int32_t onClick(void *, AbcUiElement *target, const AbcUiElementEvent *event) {
   if (action == kActionFilter) {
     std::string query;
     if (AbcUiElement *filter = node("vm-filter")) {
-      const int needed = Api->ui->elementValue(filter, nullptr, 0);
-      if (needed > 0) {
-        query.resize(static_cast<size_t>(needed) + 1, '\0');
-        Api->ui->elementValue(filter, query.data(),
-                              static_cast<uint32_t>(query.size()));
-        query.resize(static_cast<size_t>(needed));
-      }
+      query = moduleui::readString(Api->ui->elementValue, filter);
     }
     Api->votemenu->setFilter(query.c_str());
     showHint(nullptr);

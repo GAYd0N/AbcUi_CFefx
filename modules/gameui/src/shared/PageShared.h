@@ -8,51 +8,33 @@
 
 #include <abcui/events.h>
 #include <abcui/module_api.h>
+#include "../../../common/Parse.h"
+#include "../../../common/Text.h"
+#include "../../../common/UiText.h"
 
-#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <cstring>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <system_error>
 
 // The framework's table, borrowed once per process and dropped on unload.
 inline const AbcUiModuleApi *Api = nullptr;
 
-// Strict, locale-independent number parsing (std::from_chars): nullopt on
-// empty input, trailing junk or overflow. Module packages cannot include
-// the framework's abc::ParseNumber, so this is the local twin.
 inline std::optional<int> parseInt(std::string_view text) {
-  if (text.empty())
-    return std::nullopt;
-  int value = 0;
-  const char *const end = text.data() + text.size();
-  const auto result = std::from_chars(text.data(), end, value);
-  if (result.ec != std::errc{} || result.ptr != end)
-    return std::nullopt;
-  return value;
+  return moduleui::parseNumber<int>(text);
 }
 
 inline std::optional<float> parseFloat(std::string_view text) {
-  if (text.empty())
-    return std::nullopt;
-  float value = 0.0f;
-  const char *const end = text.data() + text.size();
-  const auto result = std::from_chars(text.data(), end, value);
-  if (result.ec != std::errc{} || result.ptr != end || !std::isfinite(value))
-    return std::nullopt;
-  return value;
+  return moduleui::parseNumber<float>(text);
 }
 
 // Bounded copy into an ABI struct's fixed char array: truncate with a
 // terminator instead of overrunning the caller's storage.
 template <std::size_t N>
 void copyCString(char (&dest)[N], std::string_view text) {
-  const std::size_t count = text.size() < N - 1 ? text.size() : N - 1;
-  std::memcpy(dest, text.data(), count);
-  dest[count] = '\0';
+  moduleui::copyCString(dest, text);
 }
 
 // ui->translate is not a measure-then-copy call (it takes the whole string
@@ -76,13 +58,7 @@ inline std::string resolve(const char *text) {
 }
 
 inline std::string escapeText(const char *text) {
-  const int needed = Api->ui->escapeRml(text ? text : "", nullptr, 0);
-  if (needed <= 0)
-    return {};
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->escapeRml(text, out.data(), static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
+  return moduleui::escapeText(Api, text);
 }
 
 inline std::string escapeText(const std::string &text) {
@@ -94,14 +70,7 @@ inline std::string escapeText(const std::string &text) {
 // to it, and a later declaration would not be visible inside that body (the
 // call would resolve to the string overload itself and recurse forever).
 inline std::string escapeAttribute(const char *text) {
-  const int needed = Api->ui->escapeRmlAttribute(text ? text : "", nullptr, 0);
-  if (needed <= 0)
-    return {};
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->escapeRmlAttribute(text, out.data(),
-                              static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
+  return moduleui::escapeAttribute(Api, text);
 }
 
 inline std::string escapeAttribute(const std::string &text) {
@@ -109,12 +78,5 @@ inline std::string escapeAttribute(const std::string &text) {
 }
 
 inline std::string attributeOf(AbcUiElement *element, const char *name) {
-  const int needed = Api->ui->elementAttribute(element, name, nullptr, 0);
-  if (needed <= 0)
-    return {};
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->elementAttribute(element, name, out.data(),
-                            static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
+  return moduleui::readString(Api->ui->elementAttribute, element, name);
 }

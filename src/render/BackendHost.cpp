@@ -23,6 +23,7 @@
 #include <abcui/render_backend.h>
 
 #include "../framework/FatalExit.h"
+#include "../framework/NativeHandles.h"
 
 namespace abc::render {
 
@@ -446,13 +447,13 @@ void scanDirectory(const std::string &directory,
   out.clear();
   WIN32_FIND_DATAA data = {};
   const std::string pattern = directory + "\\*.dll";
-  HANDLE find = FindFirstFileA(pattern.c_str(), &data);
-  if (find == INVALID_HANDLE_VALUE)
+  framework::NativeFindHandle find(FindFirstFileA(pattern.c_str(), &data));
+  if (find.get() == INVALID_HANDLE_VALUE)
     return;
   do {
     out.push_back(data.cFileName);
-  } while (FindNextFileA(find, &data));
-  FindClose(find);
+  } while (FindNextFileA(find.get(), &data));
+  find.reset();
   std::sort(out.begin(), out.end());
 }
 
@@ -522,9 +523,10 @@ void boot() {
   const AbcUiRenderBackendHost host = makeHost();
   for (const std::string &file : files) {
     const std::string path = directory + "\\" + file;
-    HMODULE module = LoadLibraryExA(path.c_str(), nullptr,
-                                    LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
-                                        LOAD_LIBRARY_SEARCH_SYSTEM32);
+    framework::NativeLibrary library(LoadLibraryExA(
+        path.c_str(), nullptr,
+        LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32));
+    const auto module = library.get();
     if (!module) {
       ConsoleWarn("[AbcUi] render backend DLL not loaded: %s (GetLastError "
                   "%lu)\n",
@@ -537,7 +539,6 @@ void boot() {
       ConsoleWarn("[AbcUi] render backend DLL rejected (outside the backend "
                   "directory): %s\n",
                   file.c_str());
-      FreeLibrary(module);
       continue;
     }
     const auto entry = reinterpret_cast<BackendMainFn>(
@@ -546,7 +547,6 @@ void boot() {
       ConsoleWarn("[AbcUi] render backend DLL skipped (no "
                   "AbcRenderBackend_Main export): %s\n",
                   file.c_str());
-      FreeLibrary(module);
       continue;
     }
     BackendEntry backend;
@@ -560,7 +560,6 @@ void boot() {
     if (why) {
       ConsoleWarn("[AbcUi] render backend DLL skipped (%s): %s\n", why,
                   file.c_str());
-      FreeLibrary(module);
       continue;
     }
     // 6. Collect; a duplicate id is fatal (ambiguous selection).
@@ -572,6 +571,8 @@ void boot() {
       }
     }
     hostState.entries.push_back(std::move(backend));
+    // Accepted backends intentionally stay resident for the process lifetime.
+    static_cast<void>(library.release());
   }
 
   // 7. Match the selected id and initialize it.

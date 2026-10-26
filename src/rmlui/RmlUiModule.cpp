@@ -576,7 +576,7 @@ void onVidInit() {
   sprites::vidInit();
   if (Initialised)
     for (const auto &source : Rml::GetTextureSourceList())
-      if (source.rfind("spr://", 0) == 0)
+      if (source.starts_with("spr://"))
         Rml::ReleaseTexture(source);
   if (!Initialised)
     return;

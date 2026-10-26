@@ -62,8 +62,7 @@ bool normalizePath(std::string_view path, std::string &out) {
 } // namespace
 
 bool isModuleUri(std::string_view uri) {
-  return uri.size() > kScheme.size() &&
-         uri.compare(0, kScheme.size(), kScheme) == 0;
+  return uri.size() > kScheme.size() && uri.starts_with(kScheme);
 }
 
 bool mount(const char *moduleId, std::unique_ptr<PackageImage> image,
@@ -71,7 +70,7 @@ bool mount(const char *moduleId, std::unique_ptr<PackageImage> image,
   if (!moduleId || !*moduleId || !image)
     return false;
   auto &table = mounts();
-  if (table.find(moduleId) != table.end())
+  if (table.contains(moduleId))
     return false;
   Mount entry;
   entry.image = std::move(image);
@@ -94,7 +93,7 @@ bool isMounted(const char *moduleId) {
   if (!moduleId)
     return false;
   const auto &table = mounts();
-  return table.find(moduleId) != table.end();
+  return table.contains(moduleId);
 }
 
 std::vector<std::string> mountedIds() {

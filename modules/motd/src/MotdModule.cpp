@@ -12,6 +12,8 @@
 // auto-opening server URLs in the OS browser would be an untrusted-content
 // hole). The old character-count pagination rode vgui font metrics - one
 // scrollable page with the same keep_time/fade rhythm replaces it.
+#include "../../common/Text.h"
+#include "../../common/UiText.h"
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 
@@ -123,34 +125,17 @@ std::string htmlToText(std::string html) {
     }
     out += html[i];
   }
-  const auto replaceAll = [](std::string text, const char *from,
-                             const char *to) {
-    size_t at = 0;
-    while ((at = text.find(from, at)) != std::string::npos) {
-      text.replace(at, strlen(from), to);
-      at += strlen(to);
-    }
-    return text;
-  };
-  out = replaceAll(out, "&nbsp;", " ");
-  out = replaceAll(out, "&amp;", "&");
-  out = replaceAll(out, "&lt;", "<");
-  out = replaceAll(out, "&gt;", ">");
-  out = replaceAll(out, "&quot;", "\"");
+  moduleui::replaceAll(out, "&nbsp;", " ");
+  moduleui::replaceAll(out, "&amp;", "&");
+  moduleui::replaceAll(out, "&lt;", "<");
+  moduleui::replaceAll(out, "&gt;", ">");
+  moduleui::replaceAll(out, "&quot;", "\"");
   return out;
 }
 
 // Measure-then-copy over the bounded C API (server text is untrusted).
 std::string escapeText(const char *text) {
-  if (!text || !*text)
-    return std::string();
-  const int needed = Api->ui->escapeRml(text, nullptr, 0);
-  if (needed <= 0)
-    return std::string();
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->escapeRml(text, out.data(), static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
+  return moduleui::escapeText(Api, text);
 }
 
 void append(const char *message) {

@@ -22,7 +22,7 @@
 
 #include <abc/Parse.h>
 
-#include <cstdio>
+#include <fstream>
 #include <cstdlib>
 #include <ctime>
 #include <deque>
@@ -51,12 +51,12 @@ Bindings &bindings() {
 // Engine-guaranteed fallback: the host writes the running AppID here before
 // SteamAPI_Init (hw.dll 0x01db3910). Read-only; anything unparsable = 0.
 uint32_t readSteamAppIdFile() {
-  std::FILE *file = std::fopen("steam_appid.txt", "rb");
+  std::ifstream file("steam_appid.txt", std::ios::binary);
   if (!file)
     return 0;
   char buffer[32] = {};
-  const size_t read = std::fread(buffer, 1, sizeof(buffer) - 1, file);
-  std::fclose(file);
+  file.read(buffer, sizeof(buffer) - 1);
+  const auto read = file.gcount();
   if (read == 0)
     return 0;
   const auto value = abc::ParseInt(buffer);

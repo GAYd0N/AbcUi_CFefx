@@ -82,7 +82,7 @@ EventSubscription EventBus::subscribeVetoAggregate(const char *channel,
   const EventSubscription token = NextToken++;
   const auto handle =
       list.append([this, token, sink, userdata, owner](const void *payload) {
-        if (Records.find(token) == Records.end())
+        if (!Records.contains(token))
           return false;
         return module_resources::invoke(owner, "aggregate veto event", sink,
                                         userdata, payload) != 0;

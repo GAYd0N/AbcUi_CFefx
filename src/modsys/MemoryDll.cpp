@@ -109,6 +109,9 @@ bool bindImports(uint8_t *image, const IMAGE_NT_HEADERS32 *nt,
   if (directory.VirtualAddress == 0 || directory.Size == 0)
     return true;
 
+  // Reserve before acquiring any library reference: recording a successful
+  // LoadLibrary must not allocate and leak that reference on failure.
+  imports.reserve(kMaxImportModules);
   const IMAGE_IMPORT_DESCRIPTOR *descriptor =
       reinterpret_cast<const IMAGE_IMPORT_DESCRIPTOR *>(
           image + directory.VirtualAddress);

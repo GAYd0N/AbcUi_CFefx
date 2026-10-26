@@ -7,45 +7,52 @@
 #include "rmlui/modelpreview/Options.h"
 #include "rmlui/VGUI2ExtensionImport.h"
 #include "services/settings/KeyBindModel.h"
-#include <io.h>
+#include "framework/FileSystemHandles.h"
+#include <fstream>
 #include <filesystem>
-#include <cstdio>
 #include <cstring>
 #include <algorithm>
 #include <vector>
 #include <string>
-#include <cstdio>
 #include <string_view>
 
 namespace gameui::settings {
+namespace {
+constexpr std::size_t kMaxTextBytes = 4 * 1024 * 1024;
+
+std::string readLocalText(const std::string &path) {
+  std::ifstream file(path, std::ios::binary | std::ios::ate);
+  if (!file)
+    return {};
+  const auto size = file.tellg();
+  if (size <= 0 || size > static_cast<std::streamoff>(kMaxTextBytes))
+    return {};
+  std::string text(static_cast<std::size_t>(size), '\0');
+  file.seekg(0);
+  if (!file.read(text.data(), static_cast<std::streamsize>(text.size())))
+    return {};
+  return text;
+}
+} // namespace
+
 std::string readModFile(const char *relativePath) {
-  constexpr unsigned MaxBytes = 4 * 1024 * 1024;
   if (abc::g_pFileSystem) {
-    const auto File = abc::g_pFileSystem->Open(relativePath, "rb");
+    const auto File =
+        framework::openEngineFile(*abc::g_pFileSystem, relativePath, "rb");
     if (File) {
-      const auto Size = abc::g_pFileSystem->Size(File);
+      const auto Size = abc::g_pFileSystem->Size(File.get());
       std::string Raw;
-      if (Size > 0 && Size <= MaxBytes) {
+      if (Size > 0 && Size <= kMaxTextBytes) {
         Raw.resize(Size);
-        if (abc::g_pFileSystem->Read(Raw.data(), Size, File) !=
+        if (abc::g_pFileSystem->Read(Raw.data(), Size, File.get()) !=
             static_cast<int>(Size))
           Raw.clear();
       }
-      abc::g_pFileSystem->Close(File);
       return services::settings::KeyBindModel::decodeResourceText(Raw.data(),
                                                                   Raw.size());
     }
   }
-  FILE *file = nullptr;
-  if (fopen_s(&file, abc::ModPath(relativePath).c_str(), "rb") != 0 || !file)
-    return {};
-  std::string raw;
-  char buffer[4096];
-  size_t got = 0;
-  while (raw.size() < MaxBytes &&
-         (got = fread(buffer, 1, sizeof(buffer), file)) > 0)
-    raw.append(buffer, got);
-  fclose(file);
+  const auto raw = readLocalText(abc::ModPath(relativePath));
   return services::settings::KeyBindModel::decodeResourceText(raw.data(),
                                                               raw.size());
 }
@@ -54,7 +61,8 @@ namespace {
 std::vector<std::string> scanMounted(const char *Directory, bool Directories) {
   std::vector<std::string> Names;
   if (abc::g_pFileSystem) {
-    FileFindHandle_t Handle = FILESYSTEM_INVALID_FIND_HANDLE;
+    framework::EngineFileSearch search(*abc::g_pFileSystem);
+    auto &Handle = search.handle;
     std::string Mask = std::string(Directory) + (Directories ? "/*" : "/*.bmp");
     const char *Name = abc::g_pFileSystem->FindFirst(Mask.c_str(), &Handle);
     while (Name) {
@@ -67,8 +75,6 @@ std::vector<std::string> scanMounted(const char *Directory, bool Directories) {
       }
       Name = abc::g_pFileSystem->FindNext(Handle);
     }
-    if (Handle != FILESYSTEM_INVALID_FIND_HANDLE)
-      abc::g_pFileSystem->FindClose(Handle);
   }
   std::sort(Names.begin(), Names.end());
   Names.erase(std::unique(Names.begin(), Names.end()), Names.end());
@@ -89,7 +95,8 @@ std::vector<services::settings::StringChoice> actionModels() {
   std::vector<services::settings::StringChoice> choices;
   if (!abc::g_pFileSystem)
     return choices;
-  FileFindHandle_t handle = FILESYSTEM_INVALID_FIND_HANDLE;
+  framework::EngineFileSearch search(*abc::g_pFileSystem);
+  auto &handle = search.handle;
   const std::string mask = std::string(modelpreview::kActionModelDir) + "*.mdl";
   const char *name = abc::g_pFileSystem->FindFirst(mask.c_str(), &handle);
   while (name && choices.size() < 512) {
@@ -101,8 +108,6 @@ std::vector<services::settings::StringChoice> actionModels() {
     }
     name = abc::g_pFileSystem->FindNext(handle);
   }
-  if (handle != FILESYSTEM_INVALID_FIND_HANDLE)
-    abc::g_pFileSystem->FindClose(handle);
   return choices;
 }
 
@@ -111,13 +116,14 @@ actionSequences(const std::string &path) {
   std::vector<services::settings::StringChoice> choices;
   if (!abc::g_pFileSystem || path.empty())
     return choices;
-  const auto file = abc::g_pFileSystem->Open(path.c_str(), "rb");
+  const auto file =
+      framework::openEngineFile(*abc::g_pFileSystem, path.c_str(), "rb");
   if (!file)
     return choices;
   studiohdr_t header{};
-  const auto size = abc::g_pFileSystem->Size(file);
+  const auto size = abc::g_pFileSystem->Size(file.get());
   const bool valid =
-      abc::g_pFileSystem->Read(&header, sizeof(header), file) ==
+      abc::g_pFileSystem->Read(&header, sizeof(header), file.get()) ==
           sizeof(header) &&
       header.id == 0x54534449 && header.version == 10 &&
       header.length >= sizeof(header) &&
@@ -127,10 +133,10 @@ actionSequences(const std::string &path) {
               static_cast<size_t>(header.numseq) * sizeof(mstudioseqdesc_t) <=
           static_cast<size_t>(header.length);
   if (valid) {
-    abc::g_pFileSystem->Seek(file, header.seqindex, FILESYSTEM_SEEK_HEAD);
+    abc::g_pFileSystem->Seek(file.get(), header.seqindex, FILESYSTEM_SEEK_HEAD);
     for (int i = 0; i < header.numseq; ++i) {
       mstudioseqdesc_t sequence{};
-      if (abc::g_pFileSystem->Read(&sequence, sizeof(sequence), file) !=
+      if (abc::g_pFileSystem->Read(&sequence, sizeof(sequence), file.get()) !=
           sizeof(sequence)) {
         choices.clear();
         break;
@@ -145,7 +151,6 @@ actionSequences(const std::string &path) {
       choices.push_back({value, value + ": " + label});
     }
   }
-  abc::g_pFileSystem->Close(file);
   return choices;
 }
 } // namespace
@@ -266,10 +271,10 @@ bool writeModFile(const char *relativePath,
   // The engine filesystem first: it writes beside the mod's own files (the
   // same place the engine reads tempdecal.wad from).
   if (abc::g_pFileSystem) {
-    if (auto *file = abc::g_pFileSystem->Open(relativePath, "wb")) {
+    if (const auto file = framework::openEngineFile(*abc::g_pFileSystem,
+                                                    relativePath, "wb")) {
       const int written = abc::g_pFileSystem->Write(
-          bytes.data(), static_cast<int>(bytes.size()), file);
-      abc::g_pFileSystem->Close(file);
+          bytes.data(), static_cast<int>(bytes.size()), file.get());
       if (written == static_cast<int>(bytes.size()))
         return true;
       error = "short write";
@@ -277,14 +282,15 @@ bool writeModFile(const char *relativePath,
     }
   }
   const std::string absolute = abc::ModPath(relativePath);
-  FILE *file = nullptr;
-  if (fopen_s(&file, absolute.c_str(), "wb") != 0 || !file) {
+  std::ofstream file(absolute, std::ios::binary);
+  if (!file) {
     error = "cannot open " + absolute;
     return false;
   }
-  const std::size_t written = fwrite(bytes.data(), 1, bytes.size(), file);
-  fclose(file);
-  if (written != bytes.size()) {
+  file.write(reinterpret_cast<const char *>(bytes.data()),
+             static_cast<std::streamsize>(bytes.size()));
+  file.close();
+  if (!file) {
     error = "short write to " + absolute;
     return false;
   }
@@ -304,14 +310,7 @@ services::settings::SettingsModel::UserScrTable loadAdvancedScript() {
       Path += "_";
       Path += Language;
       Path += "/user.scr";
-      FILE *File = nullptr;
-      if (fopen_s(&File, Path.c_str(), "rb") == 0 && File) {
-        char Buffer[4096];
-        size_t Got = 0;
-        while ((Got = fread(Buffer, 1, sizeof(Buffer), File)) > 0)
-          Text.append(Buffer, Got);
-        fclose(File);
-      }
+      Text = readLocalText(Path);
     }
   }
   if (Text.empty())

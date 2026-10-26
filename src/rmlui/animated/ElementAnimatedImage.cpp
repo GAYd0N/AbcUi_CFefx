@@ -4,6 +4,7 @@
 #include <RmlUi/Core/ElementDocument.h>
 
 #include "../texture/Avatars.h"
+#include "../texture/AvatarSource.h"
 
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/Core.h>
@@ -56,23 +57,11 @@ std::unordered_map<std::string, double> &avatarClocks() {
 constexpr std::string_view kAvatarAnimPrefix = "avataranim://";
 
 bool parseAvatarAnimSource(const std::string &source, std::uint64_t &id) {
-  if (!source.starts_with(kAvatarAnimPrefix))
+  const auto value = avatars::parseSourceId(source, kAvatarAnimPrefix);
+  if (!value)
     return false;
-  const std::size_t begin = kAvatarAnimPrefix.size();
-  std::size_t end = begin;
-  while (end < source.size() && source[end] >= '0' && source[end] <= '9')
-    ++end;
-  if (end == begin || end - begin > 20)
-    return false;
-  std::uint64_t value = 0;
-  for (std::size_t i = begin; i < end; ++i) {
-    const std::uint64_t digit = static_cast<std::uint64_t>(source[i] - '0');
-    if (value > (UINT64_MAX - digit) / 10)
-      return false;
-    value = value * 10 + digit;
-  }
-  id = value;
-  return id != 0;
+  id = *value;
+  return true;
 }
 
 Rml::ElementInstancerGeneric<ElementAnimatedImage> Instancer;

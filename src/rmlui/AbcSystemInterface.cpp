@@ -9,17 +9,20 @@
 
 #include "TextInput.h"
 #include "framework/ResourceFile.h"
+#include "framework/FileSystemHandles.h"
 #include "framework/DocumentLoadGuard.h"
 #include "framework/Localization.h"
 #include "modsys/ModuleVfs.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <limits>
 #include <memory>
 #include <new>
 #include <string>
+#include <type_traits>
 
 #include <IFileSystem.h>
 #include <Windows.h>
@@ -83,16 +86,9 @@ void AbcSystemInterface::JoinPath(Rml::String &out, const Rml::String &base,
 }
 
 double AbcSystemInterface::GetElapsedTime() {
-  static LARGE_INTEGER frequency = {};
-  static bool initialized = false;
-  if (!initialized) {
-    QueryPerformanceFrequency(&frequency);
-    initialized = true;
-  }
-  LARGE_INTEGER counter{};
-  QueryPerformanceCounter(&counter);
-  return static_cast<double>(counter.QuadPart) /
-         static_cast<double>(frequency.QuadPart);
+  return std::chrono::duration<double>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
 }
 
 int AbcSystemInterface::TranslateString(Rml::String &translated,
@@ -126,6 +122,40 @@ bool AbcSystemInterface::LogMessage(Rml::Log::Type type,
   return true;
 }
 
+namespace {
+class ClipboardScope {
+public:
+  ClipboardScope() : opened_(OpenClipboard(nullptr) != FALSE) {}
+  ~ClipboardScope() {
+    if (opened_)
+      CloseClipboard();
+  }
+  ClipboardScope(const ClipboardScope &) = delete;
+  ClipboardScope &operator=(const ClipboardScope &) = delete;
+  explicit operator bool() const {
+    return opened_;
+  }
+
+private:
+  bool opened_;
+};
+
+struct GlobalMemoryCloser {
+  void operator()(HGLOBAL handle) const noexcept {
+    GlobalFree(handle);
+  }
+};
+struct GlobalMemoryUnlocker {
+  HGLOBAL handle;
+  void operator()(void *) const noexcept {
+    GlobalUnlock(handle);
+  }
+};
+using GlobalMemory =
+    std::unique_ptr<std::remove_pointer_t<HGLOBAL>, GlobalMemoryCloser>;
+using LockedGlobalMemory = std::unique_ptr<void, GlobalMemoryUnlocker>;
+} // namespace
+
 void AbcSystemInterface::SetClipboardText(const Rml::String &text) {
   const int wideLength = MultiByteToWideChar(
       CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), nullptr, 0);
@@ -135,30 +165,32 @@ void AbcSystemInterface::SetClipboardText(const Rml::String &text) {
   MultiByteToWideChar(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()),
                       wide.data(), wideLength);
 
-  if (!OpenClipboard(nullptr))
+  const ClipboardScope clipboard;
+  if (!clipboard)
     return;
   EmptyClipboard();
   const size_t bytes = (wide.size() + 1) * sizeof(wchar_t);
-  if (HGLOBAL handle = GlobalAlloc(GMEM_MOVEABLE, bytes)) {
-    if (void *data = GlobalLock(handle)) {
-      memcpy(data, wide.c_str(), bytes);
-      GlobalUnlock(handle);
-      if (!SetClipboardData(CF_UNICODETEXT, handle))
-        GlobalFree(handle);
-    } else {
-      GlobalFree(handle);
-    }
+  GlobalMemory handle(GlobalAlloc(GMEM_MOVEABLE, bytes));
+  if (!handle)
+    return;
+  {
+    LockedGlobalMemory data(GlobalLock(handle.get()), {handle.get()});
+    if (!data)
+      return;
+    std::memcpy(data.get(), wide.c_str(), bytes);
   }
-  CloseClipboard();
+  if (SetClipboardData(CF_UNICODETEXT, handle.get()))
+    static_cast<void>(handle.release()); // The clipboard owns it on success.
 }
 
 void AbcSystemInterface::GetClipboardText(Rml::String &text) {
   text.clear();
-  if (!OpenClipboard(nullptr))
+  const ClipboardScope clipboard;
+  if (!clipboard)
     return;
   if (const HANDLE handle = GetClipboardData(CF_UNICODETEXT)) {
-    if (const wchar_t *wide =
-            static_cast<const wchar_t *>(GlobalLock(handle))) {
+    LockedGlobalMemory data(GlobalLock(handle), {handle});
+    if (const auto *wide = static_cast<const wchar_t *>(data.get())) {
       const int bytes = WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0,
                                             nullptr, nullptr);
       if (bytes > 0) {
@@ -169,10 +201,8 @@ void AbcSystemInterface::GetClipboardText(Rml::String &text) {
                             nullptr);
         text.resize(static_cast<size_t>(bytes - 1));
       }
-      GlobalUnlock(handle);
     }
   }
-  CloseClipboard();
 }
 
 // IME placement delegates to TextInput (the HWND resolution and the imm32
@@ -190,8 +220,9 @@ void AbcSystemInterface::DeactivateKeyboard() {}
 namespace {
 
 struct ResourceHandle {
-  FileHandle_t EngineFile = nullptr;
-  FILE *LocalFile = nullptr;
+  framework::EngineFile EngineFile;
+  std::unique_ptr<FILE, decltype(&std::fclose)> LocalFile{nullptr,
+                                                          &std::fclose};
   // mod:// entries: a view into the mounted package. ModuleEntry keeps the
   // (possibly extracted) bytes alive for the handle's lifetime.
   const unsigned char *ModuleData = nullptr;
@@ -210,7 +241,7 @@ Rml::FileHandle AbcFileInterface::Open(const Rml::String &path) {
   // Explicit native game content is separate from package UI resources.
   const bool engineSource = path.starts_with("engine://");
   Rml::String resolved = path;
-  if (resolved.rfind("engine://", 0) == 0)
+  if (resolved.starts_with("engine://"))
     resolved = resolved.substr(9);
 
   // Module packages: "mod://<module-id>/<path>" resolves through the module
@@ -239,15 +270,14 @@ Rml::FileHandle AbcFileInterface::Open(const Rml::String &path) {
                         (!resolved.empty() &&
                          (resolved.front() == '/' || resolved.front() == '\\'));
   if (absolute) {
+    std::unique_ptr<ResourceHandle> resource(new (std::nothrow)
+                                                 ResourceHandle{});
+    if (!resource)
+      return 0;
     FILE *local = nullptr;
     if (fopen_s(&local, resolved.c_str(), "rb") != 0 || !local)
       return 0;
-    std::unique_ptr<ResourceHandle> resource(
-        new (std::nothrow) ResourceHandle{nullptr, local});
-    if (!resource) {
-      fclose(local);
-      return 0;
-    }
+    resource->LocalFile.reset(local);
     return reinterpret_cast<Rml::FileHandle>(resource.release());
   }
 
@@ -258,26 +288,19 @@ Rml::FileHandle AbcFileInterface::Open(const Rml::String &path) {
       !framework::ResourceFile::normalize(resolved, normalized) ||
       normalized.starts_with("abc/abcui/"))
     return 0;
-  FileHandle_t file = abc::g_pFileSystem->Open(normalized.c_str(), "rb");
+  auto file =
+      framework::openEngineFile(*abc::g_pFileSystem, normalized.c_str(), "rb");
   if (!file)
     return 0;
-  std::unique_ptr<ResourceHandle> resource(new (std::nothrow)
-                                               ResourceHandle{file, nullptr});
-  if (!resource) {
-    abc::g_pFileSystem->Close(file);
+  std::unique_ptr<ResourceHandle> resource(new (std::nothrow) ResourceHandle{});
+  if (!resource)
     return 0;
-  }
+  resource->EngineFile = std::move(file);
   return reinterpret_cast<Rml::FileHandle>(resource.release());
 }
 
 void AbcFileInterface::Close(Rml::FileHandle file) {
   std::unique_ptr<ResourceHandle> resource(handleFor(file));
-  if (!resource)
-    return;
-  if (resource->LocalFile)
-    fclose(resource->LocalFile);
-  else if (abc::g_pFileSystem && resource->EngineFile)
-    abc::g_pFileSystem->Close(resource->EngineFile);
 }
 
 size_t AbcFileInterface::Read(void *buffer, size_t size, Rml::FileHandle file) {
@@ -294,7 +317,7 @@ size_t AbcFileInterface::Read(void *buffer, size_t size, Rml::FileHandle file) {
     return count;
   }
   if (resource->LocalFile)
-    return fread(buffer, 1, size, resource->LocalFile);
+    return fread(buffer, 1, size, resource->LocalFile.get());
   if (!abc::g_pFileSystem || !resource->EngineFile)
     return 0;
   size_t total = 0;
@@ -305,7 +328,7 @@ size_t AbcFileInterface::Read(void *buffer, size_t size, Rml::FileHandle file) {
                    static_cast<size_t>((std::numeric_limits<int>::max)())));
     const int got =
         abc::g_pFileSystem->Read(static_cast<unsigned char *>(buffer) + total,
-                                 chunk, resource->EngineFile);
+                                 chunk, resource->EngineFile.get());
     if (got <= 0)
       break;
     total += static_cast<size_t>(got);
@@ -339,7 +362,7 @@ bool AbcFileInterface::Seek(Rml::FileHandle file, long offset, int origin) {
     return true;
   }
   if (resource->LocalFile)
-    return _fseeki64(resource->LocalFile, offset, origin) == 0;
+    return _fseeki64(resource->LocalFile.get(), offset, origin) == 0;
   if (!abc::g_pFileSystem || !resource->EngineFile)
     return false;
   if (offset < (std::numeric_limits<int>::min)() ||
@@ -359,7 +382,7 @@ bool AbcFileInterface::Seek(Rml::FileHandle file, long offset, int origin) {
   default:
     return false;
   }
-  abc::g_pFileSystem->Seek(resource->EngineFile, static_cast<int>(offset),
+  abc::g_pFileSystem->Seek(resource->EngineFile.get(), static_cast<int>(offset),
                            seek);
   return true;
 }
@@ -371,10 +394,10 @@ size_t AbcFileInterface::Tell(Rml::FileHandle file) {
   if (resource->ModuleData)
     return resource->ModulePos;
   if (resource->LocalFile)
-    return static_cast<size_t>(_ftelli64(resource->LocalFile));
+    return static_cast<size_t>(_ftelli64(resource->LocalFile.get()));
   if (!abc::g_pFileSystem || !resource->EngineFile)
     return 0;
-  return abc::g_pFileSystem->Tell(resource->EngineFile);
+  return abc::g_pFileSystem->Tell(resource->EngineFile.get());
 }
 
 } // namespace rmlui

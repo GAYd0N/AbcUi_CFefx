@@ -5,10 +5,13 @@
 
 #include <abc/Config.h>
 #include <abc/Console.h>
+#include <abc/Parse.h>
 
 #include <algorithm>
 #include <format>
+#include <optional>
 #include <string>
+#include <string_view>
 
 namespace services {
 namespace voice {
@@ -30,21 +33,15 @@ struct VoiceBanJson {
 // Canonical decimal SteamID64: digits only, no leading zeros (except "0"
 // itself, refused below - the zero id is the "no identity" sentinel),
 // representable in uint64.
-bool idTextValid(const std::string &text) {
+std::optional<std::uint64_t> idFromText(std::string_view text) {
   if (text.empty() || text.size() > 20)
-    return false;
+    return std::nullopt;
   if (text.size() > 1 && text[0] == '0')
-    return false;
-  for (const char c : text) {
-    if (c < '0' || c > '9')
-      return false;
-  }
-  const std::uint64_t value = std::strtoull(text.c_str(), nullptr, 10);
-  return value != 0;
-}
-
-std::uint64_t idFromText(const std::string &text) {
-  return std::strtoull(text.c_str(), nullptr, 10);
+    return std::nullopt;
+  if (!std::ranges::all_of(text, [](char c) { return c >= '0' && c <= '9'; }))
+    return std::nullopt;
+  const auto value = abc::ParseNumber<std::uint64_t>(text);
+  return value && *value != 0 ? value : std::nullopt;
 }
 
 std::string textFromId(std::uint64_t id) {
@@ -68,12 +65,12 @@ VoiceBanStore::LoadStatus VoiceBanStore::load(std::vector<std::uint64_t> &out) {
   out.clear();
   out.reserve(json.Bans.size());
   for (const auto &text : json.Bans) {
-    if (!idTextValid(text))
+    const auto id = idFromText(text);
+    if (!id)
       continue;
-    const std::uint64_t id = idFromText(text);
-    if (std::find(out.begin(), out.end(), id) != out.end())
+    if (std::ranges::find(out, *id) != out.end())
       continue;
-    out.push_back(id);
+    out.push_back(*id);
     if (out.size() >= kMaxBans)
       break;
   }

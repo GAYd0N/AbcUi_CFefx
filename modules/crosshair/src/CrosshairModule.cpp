@@ -15,6 +15,7 @@
 // hook, AbcUi has no client sig infrastructure); the port always uses the old
 // code's own fallback (clientdata punchangle).
 #include <abcui/events.h>
+#include "../../common/Text.h"
 #include <abcui/module_api.h>
 
 #include <cmath>
@@ -230,7 +231,7 @@ void drawDefaultCrosshair() {
       if (sprite.status == ABCUI_OK)
         return;
       sprite.status = ABCUI_OK;
-      std::snprintf(sprite.atlas, sizeof(sprite.atlas), "%s", "crosshairs.spr");
+      moduleui::copyCString(sprite.atlas, "crosshairs.spr");
       sprite.rect[0] = target ? 72 : 0;
       sprite.rect[1] = target ? 72 : 48;
       sprite.rect[2] = sprite.rect[0] + 24;

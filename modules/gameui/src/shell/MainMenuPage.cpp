@@ -458,9 +458,9 @@ int32_t onClick(void *, AbcUiElement *target, const AbcUiElementEvent *event) {
     closeFriendMenu();
   } else if (const char *id = Api->ui->elementId(target);
              id && std::string_view(id) == "friend-menu-join") {
-    if (!MenuFriendId.empty())
-      Api->social->join(std::strtoull(MenuFriendId.c_str(), nullptr, 10),
-                        MenuFriendAddress.c_str());
+    if (const auto id = moduleui::parseNumber<uint64_t>(MenuFriendId);
+        id && *id != 0)
+      Api->social->join(*id, MenuFriendAddress.c_str());
     closeFriendMenu();
     return 1;
   }

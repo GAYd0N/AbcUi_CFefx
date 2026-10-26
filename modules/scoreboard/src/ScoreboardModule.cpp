@@ -16,6 +16,7 @@
 // - sorting drops the "frags+deaths+ping == 0" pre-filter.
 // - avatars resolve through the framework avatar service ("avatar://<id>",
 //   the bundled default until steam delivers).
+#include "../../common/UiText.h"
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 #include "../../common/Avatars.h"
@@ -133,16 +134,7 @@ void setVisible(bool visible) {
 }
 
 std::string escapeText(const std::string &text) {
-  if (text.empty())
-    return text;
-  const int needed = Api->ui->escapeRml(text.c_str(), nullptr, 0);
-  if (needed <= 0)
-    return std::string();
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->escapeRml(text.c_str(), out.data(),
-                     static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
+  return moduleui::escapeText(Api, text);
 }
 
 std::string localized(const char *token, const char *fallback) {

@@ -11,6 +11,7 @@
 // silently fell back to the raw string anyway. The port shows the server text
 // directly (the server owns its localization) and keeps the localized
 // default captions next to the bound key names.
+#include "../../common/UiText.h"
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 
@@ -51,23 +52,11 @@ void setInnerRml(const char *id, const char *rml) {
 
 // Measure-then-copy over the bounded C API (server text is untrusted).
 std::string escapeText(const char *text) {
-  const int needed = Api->ui->escapeRml(text ? text : "", nullptr, 0);
-  if (needed <= 0)
-    return std::string();
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->escapeRml(text, out.data(), static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
+  return moduleui::escapeText(Api, text);
 }
 
 std::string keyName(int keynum) {
-  const int needed = Api->ui->keyNameForKey(keynum, nullptr, 0);
-  if (needed <= 0)
-    return std::string();
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->keyNameForKey(keynum, out.data(), static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
+  return moduleui::readString(Api->ui->keyNameForKey, keynum);
 }
 
 std::string defaultCaption(const char *token, const char *fallback) {

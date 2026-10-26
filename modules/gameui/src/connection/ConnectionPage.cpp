@@ -79,13 +79,7 @@ std::string inputValue(AbcUiDocument *page, const char *id) {
   AbcUiElement *control = nodeOf(page, id);
   if (!control)
     return {};
-  const int needed = Api->ui->elementValue(control, nullptr, 0);
-  if (needed <= 0)
-    return {};
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->elementValue(control, out.data(), static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
+  return moduleui::readString(Api->ui->elementValue, control);
 }
 
 void setInputValue(AbcUiDocument *page, const char *id, const std::string &v) {

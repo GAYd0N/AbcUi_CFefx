@@ -1,8 +1,7 @@
 #include "ItemList.h"
 
 #include <algorithm>
-#include <charconv>
-#include <system_error>
+#include "../../../common/Parse.h"
 #include <utility>
 
 namespace itemlist {
@@ -26,12 +25,7 @@ std::vector<std::string> tokenize(const std::string &content) {
 }
 
 int parseChannel(const std::string &text) {
-  int value = 0;
-  const char *const end = text.data() + text.size();
-  const auto result = std::from_chars(text.data(), end, value);
-  if (result.ec != std::errc{} || result.ptr != end)
-    return 0;
-  return value;
+  return moduleui::parseNumber<int>(text).value_or(0);
 }
 
 } // namespace

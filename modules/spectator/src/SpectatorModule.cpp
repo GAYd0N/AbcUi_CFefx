@@ -8,6 +8,7 @@
 // The framework exposes the same pair through AbcUiHudState.spectateMode /
 // spectateTarget; the module claims ABCUI_NATIVE_HUD_SPECTATOR so the VGUI
 // paint gate skips the native subtree while this document is on screen.
+#include "../../common/UiText.h"
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 
@@ -64,14 +65,7 @@ void setInner(const char *id, const std::string &rml) {
 }
 
 std::string escape(const std::string &text) {
-  const int needed = Api->ui->escapeRml(text.c_str(), nullptr, 0);
-  if (needed <= 0)
-    return {};
-  std::string out(static_cast<std::size_t>(needed) + 1, '\0');
-  Api->ui->escapeRml(text.c_str(), out.data(),
-                     static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<std::size_t>(needed));
-  return out;
+  return moduleui::escapeText(Api, text);
 }
 
 std::string translateOr(const char *token, const char *fallback) {

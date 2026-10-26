@@ -23,6 +23,8 @@
 // - entity-index reuse re-assigns the tracked item.
 #include "items/ItemList.h"
 
+#include "../../common/Text.h"
+#include "../../common/UiText.h"
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 
@@ -197,15 +199,7 @@ std::string translate(const char *token, const char *fallback) {
 
 // Measure-then-copy over the bounded C API (server text is untrusted).
 std::string escapeText(const char *text) {
-  if (!text || !*text)
-    return std::string();
-  const int needed = Api->ui->escapeRml(text, nullptr, 0);
-  if (needed <= 0)
-    return std::string();
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->escapeRml(text, out.data(), static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
+  return moduleui::escapeText(Api, text);
 }
 
 std::string spriteUri(const char *file) {
@@ -406,18 +400,9 @@ void updatePromptText(const char *nameToken) {
   else
     name = nameToken ? nameToken : "";
 
-  const auto replaceAll = [](std::string &target, const char *from,
-                             const std::string &to) {
-    const size_t fromLen = strlen(from);
-    size_t at = 0;
-    while ((at = target.find(from, at)) != std::string::npos) {
-      target.replace(at, fromLen, to);
-      at += to.size();
-    }
-  };
   std::string result = templ;
-  replaceAll(result, "%%USE_BINDKEY%%", key);
-  replaceAll(result, "%%PICKUP_ITEM%%", name);
+  moduleui::replaceAll(result, "%%USE_BINDKEY%%", key);
+  moduleui::replaceAll(result, "%%PICKUP_ITEM%%", name);
   setElementText(text, escapeText(result.c_str()));
 }
 

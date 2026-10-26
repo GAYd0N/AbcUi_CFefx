@@ -17,6 +17,7 @@
 // hud_fastswitch never shows the bar (the command already went out); the
 // hud_rainbow_menu cycle rides the rebuild (old PerformLayout counter).
 #include <abcui/events.h>
+#include "../../common/Text.h"
 #include <abcui/module_api.h>
 
 #include <algorithm>
@@ -285,8 +286,8 @@ void rebuild() {
       AbcUiWeaponSprite source = active ? weapon.active : weapon.inactive;
       if (source.status != ABCUI_OK) {
         source.status = ABCUI_OK;
-        std::snprintf(source.atlas, sizeof(source.atlas), "%s",
-                      "mod://abcui.weaponchoose/hud/spr/weapon_error.spr");
+        moduleui::copyCString(
+            source.atlas, "mod://abcui.weaponchoose/hud/spr/weapon_error.spr");
         source.rect[0] = 0;
         source.rect[1] = active ? 46 : 0;
         source.rect[2] = 170;

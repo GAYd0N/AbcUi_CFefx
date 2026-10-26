@@ -8,6 +8,8 @@
 // its printf with transposed Q_snprintf arguments (the victim name landed in
 // the format slot); the port prints the localized "DeathMsg_ConsolePrint"
 // template with a positional substitution, never a printf format.
+#include "../../common/Text.h"
+#include "../../common/UiText.h"
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 
@@ -68,15 +70,7 @@ void setVisible(bool visible) {
 
 // Measure-then-copy over the bounded C API (server text is untrusted).
 std::string escapeText(const char *text) {
-  if (!text || !*text)
-    return std::string();
-  const int needed = Api->ui->escapeRml(text, nullptr, 0);
-  if (needed <= 0)
-    return std::string();
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->escapeRml(text, out.data(), static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
+  return moduleui::escapeText(Api, text);
 }
 
 std::string translate(const char *token, const char *fallback) {
@@ -93,11 +87,7 @@ std::string substitute(const std::string &text, const char *a, const char *b,
   for (int i = 0; i < 3; i++) {
     const std::string key = "{" + std::to_string(i) + "}";
     const std::string value = values[i] ? values[i] : "";
-    size_t at = 0;
-    while ((at = out.find(key, at)) != std::string::npos) {
-      out.replace(at, key.size(), value);
-      at += value.size();
-    }
+    moduleui::replaceAll(out, key, value);
   }
   return out;
 }

@@ -6,6 +6,8 @@
 // The template lives in the document text; {SCORE}/{MAXSPEED}/{SPEED}
 // placeholders substitute per frame and the result is written as additive
 // glyph ink (plain text is the fallback when a character has no glyph).
+#include "../../common/Text.h"
+#include "../../common/UiText.h"
 #include <abcui/events.h>
 #include <abcui/module_api.h>
 #include "../../common/Glyphs.h"
@@ -41,24 +43,7 @@ AbcUiDocument *panelDocument() {
 }
 
 std::string elementInnerRml(AbcUiElement *element) {
-  const int needed = Api->ui->elementInnerRML(element, nullptr, 0);
-  if (needed <= 0)
-    return std::string();
-  std::string out(static_cast<size_t>(needed) + 1, '\0');
-  Api->ui->elementInnerRML(element, out.data(),
-                           static_cast<uint32_t>(out.size()));
-  out.resize(static_cast<size_t>(needed));
-  return out;
-}
-
-void replaceAll(std::string &subject, const char *key,
-                const std::string &value) {
-  const size_t keyLength = strlen(key);
-  size_t pos = 0;
-  while ((pos = subject.find(key, pos)) != std::string::npos) {
-    subject.replace(pos, keyLength, value);
-    pos += value.length();
-  }
+  return moduleui::readString(Api->ui->elementInnerRML, element);
 }
 
 void setVisible(bool visible) {
@@ -115,9 +100,11 @@ void panelOnData(void *, double) {
   MaxSpeed = std::max(MaxSpeed, player.speed);
 
   std::string text = Template;
-  replaceAll(text, "{SCORE}", std::to_string(player.frags));
-  replaceAll(text, "{MAXSPEED}", std::to_string(static_cast<int>(MaxSpeed)));
-  replaceAll(text, "{SPEED}", std::to_string(static_cast<int>(player.speed)));
+  moduleui::replaceAll(text, "{SCORE}", std::to_string(player.frags));
+  moduleui::replaceAll(text, "{MAXSPEED}",
+                       std::to_string(static_cast<int>(MaxSpeed)));
+  moduleui::replaceAll(text, "{SPEED}",
+                       std::to_string(static_cast<int>(player.speed)));
   if (text == LastText)
     return;
   LastText = text;

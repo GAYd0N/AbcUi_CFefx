@@ -1,6 +1,7 @@
 #pragma once
 
 #include <abcui/module_api.h>
+#include "UiText.h"
 
 #include <algorithm>
 #include <cstring>
@@ -92,14 +93,7 @@ private:
   AbcUiImeState Previous{};
 
   std::string escape(const char *text) const {
-    const auto size = Api->ui->escapeRml(text, nullptr, 0);
-    if (size <= 0)
-      return {};
-    std::string result(static_cast<size_t>(size) + 1, '\0');
-    Api->ui->escapeRml(text, result.data(),
-                       static_cast<uint32_t>(result.size()));
-    result.resize(size);
-    return result;
+    return moduleui::escapeText(Api, text);
   }
 };
 } // namespace moduleui

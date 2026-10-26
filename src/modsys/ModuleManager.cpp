@@ -1,5 +1,6 @@
 // framework::modmanager implementation - see ModuleManager.h.
 #include "ModuleManager.h"
+#include "framework/NativeHandles.h"
 
 #include <algorithm>
 #include <map>
@@ -184,8 +185,8 @@ size_t boot() {
   const std::string directory = abc::ModPath("abc/abcui/modules");
   const std::string pattern = directory + "\\*.zip";
   WIN32_FIND_DATAA find{};
-  HANDLE handle = FindFirstFileA(pattern.c_str(), &find);
-  if (handle == INVALID_HANDLE_VALUE)
+  NativeFindHandle handle(FindFirstFileA(pattern.c_str(), &find));
+  if (handle.get() == INVALID_HANDLE_VALUE)
     return 0; // no module directory: zero modules is a valid setup
 
   // One id may arrive in several packages: an in-place upgrade leaves the
@@ -263,8 +264,8 @@ size_t boot() {
       candidates.erase(existing);
       ambiguousIds.insert(id);
     }
-  } while (FindNextFileA(handle, &find));
-  FindClose(handle);
+  } while (FindNextFileA(handle.get(), &find));
+  handle.reset();
 
   // A conflict is symmetric even when only one manifest declares it.
   std::map<std::string, std::set<std::string>> conflicts;

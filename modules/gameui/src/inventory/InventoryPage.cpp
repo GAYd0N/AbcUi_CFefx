@@ -282,8 +282,10 @@ int32_t onClick(void *, AbcUiElement *target, const AbcUiElementEvent *event) {
     entry = Api->ui->elementParent(entry);
   }
   if (entry && !serial.empty()) {
-    Api->inventory->select(std::strtoull(serial.c_str(), nullptr, 10));
-    render();
+    if (const auto id = moduleui::parseNumber<uint64_t>(serial)) {
+      Api->inventory->select(*id);
+      render();
+    }
   }
   return 1;
 }

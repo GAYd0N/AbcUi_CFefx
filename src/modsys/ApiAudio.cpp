@@ -13,6 +13,7 @@
 #include <deque>
 #include <map>
 #include <mutex>
+#include <stop_token>
 #include <thread>
 #include <vector>
 
@@ -76,18 +77,17 @@ struct Stream {
   bool loop = false;
   float volume = 1;
   std::atomic<int32_t> result{ABCUI_ERROR_PENDING};
-  std::atomic<bool> stopping{false};
   std::mutex mutex;
-  std::condition_variable wake;
+  std::condition_variable_any wake;
   std::deque<std::vector<int16_t>> ready;
   std::vector<int16_t> pending;
   size_t pendingOffset = 0;
-  std::thread worker;
   media::MemoryInput input;
+  // Last member: cancellation/join must precede destruction of decoder input.
+  std::jthread worker;
 
   ~Stream() {
-    stopping = true;
-    wake.notify_all();
+    worker.request_stop();
     if (worker.joinable())
       worker.join();
     if (device)
@@ -110,19 +110,20 @@ struct Stream {
     return device != 0;
   }
 
-  bool push(std::vector<int16_t> chunk) {
+  bool push(std::vector<int16_t> chunk, std::stop_token stop) {
     if (chunk.empty())
       return true;
     std::unique_lock lock(mutex);
-    wake.wait(lock, [&] { return stopping || ready.size() < kMaxReadyChunks; });
-    if (stopping)
+    if (!wake.wait(lock, stop,
+                   [&] { return ready.size() < kMaxReadyChunks; }) ||
+        stop.stop_requested())
       return false;
     ready.push_back(std::move(chunk));
     result = ABCUI_OK;
     return true;
   }
 
-  void decode() {
+  void decode(std::stop_token stop) {
     const auto &api = media::ffmpeg();
     AVIOContext *io = input.create(api);
     AVFormatContext *format = api.avformat_alloc_context();
@@ -205,11 +206,11 @@ struct Stream {
         return false;
       pcm.resize(static_cast<size_t>(frames) * kChannels);
       cycleHasSamples = cycleHasSamples || frames > 0;
-      return push(std::move(pcm));
+      return push(std::move(pcm), stop);
     };
     const auto drain = [&] {
       int received = 0;
-      while (!stopping &&
+      while (!stop.stop_requested() &&
              (received = api.avcodec_receive_frame(codec, frame)) >= 0) {
         if (frame->sample_rate != codec->sample_rate ||
             frame->format != codec->sample_fmt ||
@@ -219,15 +220,16 @@ struct Stream {
           return false;
         api.av_frame_unref(frame);
       }
-      return received == AVERROR(EAGAIN) || received == AVERROR_EOF || stopping;
+      return received == AVERROR(EAGAIN) || received == AVERROR_EOF ||
+             stop.stop_requested();
     };
-    while (!stopping) {
+    while (!stop.stop_requested()) {
       code = api.av_read_frame(format, packet);
       if (code < 0) {
         if (code != AVERROR_EOF ||
             api.avcodec_send_packet(codec, nullptr) < 0 || !drain() ||
             !convert(nullptr, 0)) {
-          if (!stopping)
+          if (!stop.stop_requested())
             result = ABCUI_ERROR_DECODE;
           break;
         }
@@ -251,7 +253,7 @@ struct Stream {
         if (code == AVERROR(EAGAIN) && drain())
           code = api.avcodec_send_packet(codec, packet);
         if (code < 0 || !drain()) {
-          if (!stopping)
+          if (!stop.stop_requested())
             result = ABCUI_ERROR_DECODE;
           break;
         }
@@ -288,8 +290,7 @@ struct Stream {
       if (sdl.queue(device, pcm.data(),
                     static_cast<uint32_t>(pcm.size() * sizeof(int16_t))) != 0) {
         result = ABCUI_ERROR_UNAVAILABLE;
-        stopping = true;
-        wake.notify_all();
+        worker.request_stop();
         break;
       }
       queuedBytes = sdl.queued(device);
@@ -341,9 +342,9 @@ int32_t open(const char *uri, int32_t loop, AbcUiAudio *out) {
   streams().emplace(handle, std::move(stream));
   raw->lifetime.track([handle] { streams().erase(handle); },
                       module_resources::Lifetime::Context);
-  raw->worker = std::thread([raw] {
+  raw->worker = std::jthread([raw](std::stop_token stop) {
     try {
-      raw->decode();
+      raw->decode(stop);
     } catch (...) {
       raw->result = ABCUI_ERROR_UNAVAILABLE;
     }
