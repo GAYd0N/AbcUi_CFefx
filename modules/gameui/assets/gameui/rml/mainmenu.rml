@@ -31,9 +31,12 @@
 
 	<!-- The character card is the screen's subject: this box is exactly what
 	     the preview camera frames. The default pose faces the screen turned
-	     8 degrees toward the player's left (angle yaw -8: the camera looks
-	     down 15 degrees from +X, so screen right is +Y and a negative yaw turns the
-	     model's front to the player's left). The source is the player's own
+	     8 degrees toward the player's left (angle yaw -8). The camera is
+	     turned 30 degrees toward that front (yaw 150), raised further
+	     (pitch 16) and pulled back by the auto-framing margin, so the
+	     character's chest faces the viewer. A small camera roll keeps the
+	     stance vertical; auto-framing recomputes the
+	     camera position. The source is the player's own
 	     model; the abc_ui_menu_model_path cvar overrides it while non-empty
 	     (read by gameui::engine::playerCardFacts). src / action-src / weapon /
 	     sequence are all projected from those engine facts every beat: the
@@ -54,8 +57,8 @@
 		<model id="player-model" src="models/player.mdl" sequence="0" animate="true" angles="0 -8 0"
 			action-src="abc/abcui/models/menu_action/display_male.mdl" weapon="models/p_m16.mdl"
 			controllers="127 127 127 127" blending="127 127"
-			auto-frame="true" frame-margin="1.02"
-			camera-origin="120 0 32" camera-angles="15 180 0" fov="40"
+			auto-frame="true" frame-margin="1.15"
+			camera-origin="121 -70 55" camera-angles="16 150 -3" fov="40"
 			ambient="96" shade="110" light-color="1 0.96 0.9" light-direction="-0.990268 0.139173 0"/>
 	</div>
 

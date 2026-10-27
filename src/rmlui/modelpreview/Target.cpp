@@ -352,7 +352,7 @@ struct Target::State : IStandaloneView {
 
   void OnBeforeRenderView() override {}
 
-  void drawPass(IStandaloneViewDrawfuncsV003 &studio) {
+  void drawPass(IStandaloneViewDrawfuncs &studio) {
     // The background clear must land inside the pass, on the framebuffer the
     // engine bound for this view - R_RenderView clears only depth (and color
     // just with gl_clear), so the region is cleared here, exactly over this
@@ -378,19 +378,19 @@ struct Target::State : IStandaloneView {
     }
     // Each follower consumes a fresh source pose, never a previous preview's
     // saved bones (or the saved bones of the displayed player's extra bones).
-    studio.DrawStudioModelEx(&Entity, HasAction ? &Action : nullptr, &Lighting);
+    studio.DrawStudioModel(&Entity, HasAction ? &Action : nullptr, &Lighting);
     if (HasWeapon)
-      studio.DrawStudioModelEx(&Weapon, &Action, &Lighting);
+      studio.DrawStudioModel(&Weapon, &Action, &Lighting);
   }
 
   // Registration only happens after an API_003 factory query succeeds.
   void DrawNormalTriangles(IStandaloneViewDrawfuncs *drawfuncs) override {
     if (!TransparentPass)
-      drawPass(*static_cast<IStandaloneViewDrawfuncsV003 *>(drawfuncs));
+      drawPass(*drawfuncs);
   }
   void DrawTransparentTriangles(IStandaloneViewDrawfuncs *drawfuncs) override {
     if (TransparentPass)
-      drawPass(*static_cast<IStandaloneViewDrawfuncsV003 *>(drawfuncs));
+      drawPass(*drawfuncs);
   }
 
   void OnAfterRenderView() override {

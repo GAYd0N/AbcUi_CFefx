@@ -21,10 +21,10 @@ IStandaloneViewManager *manager() {
     }
     const auto factory =
         Sys_GetFactory(static_cast<HINTERFACEMODULE>(info.PluginModuleBase));
-    auto *result =
-        factory ? static_cast<IStandaloneViewManager *>(factory(
-                      STANDALONEVIEW_MANAGER_INTERFACE_VERSION_V003, nullptr))
-                : nullptr;
+    IStandaloneViewManager *result = nullptr;
+    if (factory)
+      result = static_cast<IStandaloneViewManager *>(
+          factory(STANDALONEVIEW_MANAGER_INTERFACE_VERSION, nullptr));
     if (!result)
       abc::ConsoleWarn("[AbcUi model] StandaloneView API_003 unavailable; "
                        "update StandaloneView and restart the game\n");

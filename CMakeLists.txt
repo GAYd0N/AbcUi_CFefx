@@ -37,7 +37,7 @@ if(NOT EXISTS "${ABCUI_STANDALONEVIEW_DIR}/include/Interface/IStandaloneView.h")
     message(FATAL_ERROR "AbcUi requires thirdparty/StandaloneView; initialize the submodule with git submodule update --init")
 endif()
 file(STRINGS "${ABCUI_STANDALONEVIEW_DIR}/include/Interface/IStandaloneView.h"
-    ABCUI_STANDALONEVIEW_API003 REGEX "define STANDALONEVIEW_MANAGER_INTERFACE_VERSION_V003 ")
+    ABCUI_STANDALONEVIEW_API003 REGEX "define STANDALONEVIEW_MANAGER_INTERFACE_VERSION \"StandaloneViewManager_API_003\"")
 if(NOT ABCUI_STANDALONEVIEW_API003)
     message(FATAL_ERROR "StandaloneView API_003 headers required; update thirdparty/StandaloneView")
 endif()
