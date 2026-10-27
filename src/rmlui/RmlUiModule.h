@@ -14,8 +14,8 @@
 // and immediately before the final buffer is blitted to screen. This is the
 // "implementation micro-adjustment" the plan anticipated vs OnPostRenderView:
 // the latter fires per view render (water portals/mirrors would double-draw
-// the UI). A RedrawBeat backend (the future GL backend) pumps the same sink
-// from HUD_Redraw instead.
+// the UI). A RedrawBeat backend pumps the same sink from BaseUI's post-paint
+// callback, including the main menu and loading frames without HUD_Redraw.
 
 #include <functional>
 

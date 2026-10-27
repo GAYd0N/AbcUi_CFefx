@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 5,
+  "source": {
+    "snapshotSchemaVersion": 8,
+    "analysisOutputContractVersion": 3
+  },
+  "binaries": {
+    "client": {
+      "windows": {
+        "alias": [
+          "client_orig.dll",
+          "client_original.dll",
+          "client_org.dll"
+        ],
+        "crc32": "5d6c9a27",
+        "crc64": "f4d0ae7dac38c443",
+        "isBlob": false,
+        "md5": "b1ad68bdc1bc08e5ace7cd08f2d8f009",
+        "sha256": "5e3bd90c24e829c43344f0fe18368a71cad3c9b3405695e2489b469cf694624c",
+        "size": 1551360
+      }
+    },
+    "vgui2": {
+      "windows": {
+        "crc32": "9858ed83",
+        "crc64": "f0da18da98f09e4c",
+        "isBlob": false,
+        "md5": "e181b2bd463afbac3db05ff49ad59761",
+        "sha256": "814d05642da7e4fe3d066ae78b598d49993b8e0eea4036f1ea321821b4506dcf",
+        "size": 610304
+      }
+    }
+  },
+  "records": [
+    {
+      "platform": "windows",
+      "module": "client",
+      "symbolName": "AbcUi_PlayerExtraInfo_stride",
+      "kind": "scalar",
+      "payload": {
+        "scalar_name": "AbcUi_PlayerExtraInfo_stride",
+        "scalar_value": 88
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "client",
+      "symbolName": "AbcUiPlayerExtraInfoView.donor",
+      "kind": "structMember",
+      "payload": {
+        "struct_name": "AbcUiPlayerExtraInfoView",
+        "member_name": "donor",
+        "offset": "0x54"
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "client",
+      "symbolName": "AbcUiHudBaseView.flags",
+      "kind": "structMember",
+      "payload": {
+        "struct_name": "AbcUiHudBaseView",
+        "member_name": "flags",
+        "offset": "0x10"
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "vgui2",
+      "symbolName": "AbcUi_IPanel_IsWithinTraverse_index",
+      "kind": "scalar",
+      "payload": {
+        "scalar_name": "AbcUi_IPanel_IsWithinTraverse_index",
+        "scalar_value": 43
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "vgui2",
+      "symbolName": "AbcUi_IPanel_PaintTraverse_index",
+      "kind": "scalar",
+      "payload": {
+        "scalar_name": "AbcUi_IPanel_PaintTraverse_index",
+        "scalar_value": 41
+      }
+    }
+  ]
+}

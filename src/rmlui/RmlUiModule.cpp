@@ -184,6 +184,7 @@ public:
 #endif
     RenderInterface->endFrame();
     backend->endFrame();
+    vgui2ext::resetTextureBinding();
   }
 
   void invalidateTargets() override {
@@ -456,6 +457,10 @@ void shutdown() {
   // Text/IME state next (T07): the handler's cached TextInputContext
   // pointers die with the DOM below; drop them while it is alive.
   textInputShutdown();
+  // The shared backdrop is not owned by a document. Join its decode worker
+  // while Rml, textures and the backend are alive; a CRT thread retains the
+  // plugin DLL, so waiting for the singleton destructor prevents unloading.
+  menubackdrop::menuBackdrop().shutdown();
   if (!Initialised) {
     // HUD_Init can arm modules before the first HUD_Frame creates a context.
     if (Sink.shutdown)
@@ -545,6 +550,9 @@ void onFrame(double frameTime) {
 
 void onDisconnected() {
   framework::PanelManager::setSessionActive(false);
+  // The native engine releases mounted model data on disconnect. Never
+  // carry a preview's cached studio pointers into the next menu frame.
+  modelpreview::invalidateAll();
   // Match the map-init data reset without destroying the menu context or
   // resetting the entire input router (the menu may already own it).
   hudstate::reset();

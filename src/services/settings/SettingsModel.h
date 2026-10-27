@@ -211,9 +211,10 @@ public:
   // The labelled form (file scans): values are stored, labels are shown.
   // Both vectors are sorted together by value.
   void setStringChoices(const char *cvar, std::vector<StringChoice> choices);
-  // Composition-owned dependent option providers. Runs after draft/snapshot
-  // changes and before apply; re-entrant draft corrections do not recurse.
-  void setChoiceRefresh(std::function<void(SettingsModel &)> refresh);
+  // Composition-owned dependent options. Single-row edits notify only the
+  // named source; bulk transactions reconcile once. Corrections do not recurse.
+  void setChoiceRefresh(const char *sourceCvar,
+                        std::function<void(SettingsModel &)> refresh);
 
   // Re-reads engine truth. Untouched rows adopt the new value silently;
   // rows with a pending user edit keep the draft and flip to kConflict
@@ -331,8 +332,9 @@ private:
   Seams Seams_;
   std::vector<RowRuntime> Rows_;
   std::function<void(SettingsModel &)> ChoiceRefresh_;
+  std::string ChoiceSource_;
   bool RefreshingChoices_ = false;
-  void refreshChoices();
+  void refreshChoices(const char *changedCvar = nullptr);
 };
 
 // kText byte budget: the shipped OptionsSubMultiplayer.res NameEntry

@@ -3,10 +3,8 @@
 // services::voice::VoiceBanStore - persistence adapter for the per-player
 // voice mute list (issue 17: the legacy CVoiceBanMgr, new store).
 //
-// The list is OUR schema (no migration, the legacy binary voice_ban.dt is
-// never read): a small JSON document at "<mod>/abc/abcui/voice_ban.dt",
-// written through abc::Config's atomic sibling replacement (abc::JsonSave;
-// never truncates the previous file).
+// The voice_bans section in abc/abcui/config.json is written through the
+// shared user-config owner and atomic sibling replacement.
 //
 // JSON keys and semantics - NEVER rename (persisted contract):
 //   bans: array of SteamID64 values as DECIMAL STRINGS. The text form is

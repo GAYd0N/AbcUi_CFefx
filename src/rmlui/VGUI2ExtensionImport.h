@@ -36,6 +36,8 @@ int createTexture();
 void uploadTexture(int textureId, const unsigned char *rgba, int width,
                    int height);
 void deleteTextureById(int textureId);
+// Reconcile the engine's cached texture binding after a backend frame.
+void resetTextureBinding();
 
 // Cursor state for InputBridge (window/pixel coords, y-down). Returns false
 // when unavailable.

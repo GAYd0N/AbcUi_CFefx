@@ -26,8 +26,8 @@ void snapshot(AbcUiImeState &out);
 // the last IMM32 read size (0 = the context carried no list); eventCount is
 // the last event payload size (-1 = the payload was not usable).
 void imeDebug(unsigned &feeds, unsigned &lastBytes, unsigned &eventFeeds,
-             int &lastEventCount, int &count, int &selected, bool &anchorValid,
-             int &compositionBytes);
+              int &lastEventCount, int &count, int &selected, bool &anchorValid,
+              int &compositionBytes);
 // Raw candidates-event dump (abc_ui_input_events): the first words of the
 // last payload seen, so the live layout is identified on-machine instead of
 // guessed. `words` receives 8 entries.

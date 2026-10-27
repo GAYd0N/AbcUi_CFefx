@@ -14,9 +14,9 @@
 //                         AbcUiRenderBackendDesc *outDesc);
 //
 // Backends live as loose DLLs in <mod>/abc/abcui/render_backend/ and are
-// selected with the abc_ui_render_backend cvar (full restart to apply). A
-// missing or unusable selected backend is fatal at startup - there is no
-// built-in fallback. A backend DLL:
+// selected with render_backend in abc/abcui/config.json (full restart to
+// apply). The host falls back from renderer to gl when Renderer or its
+// backend DLL is absent. Initialization failures remain fatal. A backend DLL:
 //   - must not include framework headers or link the framework's static
 //     libraries; everything arrives through the host table and the
 //     descriptor it fills;
@@ -51,10 +51,10 @@ extern "C" {
 #define ABCUI_RENDER_BACKEND_CALL ABCUI_CALL
 
 // Capability bits (AbcUiRenderBackendDesc::capabilities).
-#define ABCUI_RB_CAP_RENDER_CALLBACKS 0x1u   // backend drives the frame beat
-#define ABCUI_RB_CAP_REDRAW_BEAT 0x2u        // framework pumps HUD_Redraw
-#define ABCUI_RB_CAP_WORLD_PASS 0x4u         // top-down world render (radar)
-#define ABCUI_RB_CAP_BLUR_PASS 0x8u          // menu backdrop blur
+#define ABCUI_RB_CAP_RENDER_CALLBACKS 0x1u // backend drives the frame beat
+#define ABCUI_RB_CAP_REDRAW_BEAT 0x2u      // framework pumps after BaseUI paint
+#define ABCUI_RB_CAP_WORLD_PASS 0x4u       // top-down world render (radar)
+#define ABCUI_RB_CAP_BLUR_PASS 0x8u        // menu backdrop blur
 #define ABCUI_RB_CAP_OFFSCREEN_TARGETS 0x10u // viewport capture textures
 
 // AbcUiRenderDraw::blend - semantic blend modes replace Renderer-private
@@ -124,7 +124,7 @@ typedef struct AbcUiBlurPassRequest {
 } AbcUiBlurPassRequest;
 
 // Host -> backend frame beats. The backend calls these from its own frame
-// source (Renderer callbacks, HUD_Redraw pump, ...). All entries except
+// source (Renderer callbacks, BaseUI post-paint pump, ...). All entries except
 // structSize/userdata may be null; the backend then skips that beat.
 typedef struct AbcUiRenderFrameSink {
   uint32_t structSize;
@@ -155,7 +155,7 @@ typedef struct AbcUiRenderBackendHost {
 // matching ABCUI_RB_CAP_* bit is clear; the loader validates exactly that.
 typedef struct AbcUiRenderBackendDesc {
   uint32_t structSize;
-  const char *id;          // cvar value, e.g. "renderer"; [a-z0-9_]+
+  const char *id;          // config value, e.g. "renderer"; [a-z0-9_]+
   const char *displayName; // human-readable, ASCII
   uint32_t capabilities;   // ABCUI_RB_CAP_* bits
   void *userdata;          // passed to every callback below

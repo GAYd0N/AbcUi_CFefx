@@ -29,7 +29,6 @@
 #include "modsys/ModuleManager.h"
 #include "modules/Module.h"
 #include "render/BackendHost.h"
-#include "render/StandaloneView.h"
 #include "rmlui/InputBridge.h"
 #include "rmlui/RmlUiModule.h"
 #include "services/steam/SteamAPI.h"
@@ -118,7 +117,6 @@ private:
 
 static void H_HUD_Init() {
   gExportfuncs.HUD_Init();
-  framework::standaloneview::installClientHooks();
   // HUD_Init/HUD_Shutdown can repeat within one engine process (the client
   // is reloaded on some map-change/reconnect paths). Everything that
   // HUD_Shutdown tears down must be re-armed here.
@@ -146,8 +144,7 @@ static void H_HUD_Init() {
     playerres::init();
     textfeed::init();
     rmlui::registerCommands();
-    // The render-backend cvar registers here (not at LoadClient): the boot
-    // id is already resolved, and an engine-created archived value keeps it.
+    // Backend diagnostics are process-scoped, like the module commands.
     abc::render::registerCommands();
     modules::registry().initAll();
   }
@@ -194,11 +191,14 @@ static int H_HUD_Redraw(float time, int intermission) {
   // +/-showscores commands stay dead while it lasts.
   framework::scoreseat::setIntermission(intermission != 0);
   rmlui::onRedraw(delta);
-  // RedrawBeat render backends (the GL backend) render their frame sink
-  // here; callback-driven backends (Renderer) ignore the pump.
-  abc::render::pumpRedraw(delta);
-  const NativeHudDrawScope nativeDraw;
-  return gExportfuncs.HUD_Redraw(time, intermission);
+  int result = 0;
+  {
+    const NativeHudDrawScope nativeDraw;
+    result = gExportfuncs.HUD_Redraw(time, intermission);
+  }
+  // The redraw-driven render beat belongs to BaseUI::Paint's post callback,
+  // after native VGUI painting and including frames with no loaded map.
+  return result;
 }
 
 static int H_HUD_UpdateClientData(struct client_data_s *cdata, float time) {
@@ -303,20 +303,12 @@ H_HUD_GetStudioModelInterface(int version,
   // Old exportfuncs: mirror the engine studio API once (player info reads
   // in data::playerres; AbcEssential holds its own copy - D-01 no sharing).
   EngineStudioApi = pstudio;
-  const int result =
-      gExportfuncs.HUD_GetStudioModelInterface(version, ppinterface, pstudio);
-  // The standalone-view route draws preview entities through the interface
-  // the engine ended up with (the client's, or the engine's own default
-  // when the client provided none).
-  framework::standaloneview::captureStudioInterfaces(ppinterface, pstudio);
-  return result;
+  return gExportfuncs.HUD_GetStudioModelInterface(version, ppinterface,
+                                                  pstudio);
 }
 
 static void H_HUD_Shutdown() {
   VanillaHudPanelCount = 0;
-  // Remove hooks before a possible client unload. Ordinary HUD cycles keep
-  // the studio slot and re-arm portal hooks from H_HUD_Init.
-  framework::standaloneview::uninstallClientHooks();
   services::voice::status().shutdown();
   rmlui::onHudShutdown();
   gExportfuncs.HUD_Shutdown();
@@ -364,31 +356,9 @@ static void H_CL_CreateMove(float time, usercmd_s *cmd, int active) {
   }
 }
 
-// Standalone-view routing (issue #24 comment): while a preview view is
-// current, the calc-refdef / triangle exports belong to it (onlyClientDraw
-// pass); otherwise they chain into the client originals as always.
-static void H_V_CalcRefdef(struct ref_params_s *pparams) {
-  if (framework::standaloneview::hookCalcRefdef(pparams))
-    return;
-  gExportfuncs.V_CalcRefdef(pparams);
-}
-
-static void H_HUD_DrawNormalTriangles() {
-  if (framework::standaloneview::hookDrawNormalTriangles())
-    return;
-  gExportfuncs.HUD_DrawNormalTriangles();
-}
-
-static void H_HUD_DrawTransparentTriangles() {
-  if (framework::standaloneview::hookDrawTransparentTriangles())
-    return;
-  gExportfuncs.HUD_DrawTransparentTriangles();
-}
-
 void attachExports(cl_exportfuncs_t *pExportFuncs) {
   // LoadClient, unlike HUD_Init, identifies a new client-export lifetime.
   EngineStudioApi = nullptr;
-  framework::standaloneview::captureStudioInterfaces(nullptr, nullptr);
   pExportFuncs->IN_ActivateMouse = rmlui::activateGameMouse;
   pExportFuncs->IN_Accumulate = H_IN_Accumulate;
   pExportFuncs->IN_MouseEvent = H_IN_MouseEvent;
@@ -399,12 +369,6 @@ void attachExports(cl_exportfuncs_t *pExportFuncs) {
   pExportFuncs->HUD_Frame = H_HUD_Frame;
   pExportFuncs->HUD_Key_Event = H_HUD_Key_Event;
   pExportFuncs->HUD_GetStudioModelInterface = H_HUD_GetStudioModelInterface;
-  // These wrappers pass through while no standalone view owns the call.
-  // Install even when startup resolution failed, so a HUD_Init retry can
-  // recover without replacing the engine's export chain mid-process.
-  pExportFuncs->V_CalcRefdef = H_V_CalcRefdef;
-  pExportFuncs->HUD_DrawNormalTriangles = H_HUD_DrawNormalTriangles;
-  pExportFuncs->HUD_DrawTransparentTriangles = H_HUD_DrawTransparentTriangles;
   pExportFuncs->HUD_UpdateClientData = H_HUD_UpdateClientData;
   pExportFuncs->HUD_TxferPredictionData = H_HUD_TxferPredictionData;
   pExportFuncs->HUD_TxferLocalOverrides = H_HUD_TxferLocalOverrides;

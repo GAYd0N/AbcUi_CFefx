@@ -133,8 +133,7 @@ void setText(const char *id, const std::string &text) {
 
 void setDisplay(const char *id, bool visible) {
   if (AbcUiElement *element = node(id))
-    Api->ui->elementSetProperty(element, "display",
-                                visible ? "block" : "none");
+    Api->ui->elementSetProperty(element, "display", visible ? "block" : "none");
 }
 
 bool addInputFocused() {
@@ -174,14 +173,13 @@ bool validMediaPath(std::string_view path) {
 bool readEngineText(const std::string &path, uint32_t maxBytes,
                     std::string &out) {
   out.clear();
-  const int size =
-      Api->vfs->readEngineFile(path.c_str(), nullptr, 0, maxBytes);
+  const int size = Api->vfs->readEngineFile(path.c_str(), nullptr, 0, maxBytes);
   if (size <= 0 || static_cast<uint32_t>(size) > maxBytes)
     return size == 0;
   std::string buffer(static_cast<std::size_t>(size), '\0');
-  const int read = Api->vfs->readEngineFile(
-      path.c_str(), buffer.data(), static_cast<uint32_t>(buffer.size()),
-      maxBytes);
+  const int read =
+      Api->vfs->readEngineFile(path.c_str(), buffer.data(),
+                               static_cast<uint32_t>(buffer.size()), maxBytes);
   if (read != size)
     return false;
   out = std::move(buffer);
@@ -285,8 +283,7 @@ void parsePlaylistText(std::string_view text, std::string_view directory,
     while (!line.empty() &&
            (line.back() == '\r' || line.back() == ' ' || line.back() == '\t'))
       line.remove_suffix(1);
-    while (!line.empty() &&
-           (line.front() == ' ' || line.front() == '\t'))
+    while (!line.empty() && (line.front() == ' ' || line.front() == '\t'))
       line.remove_prefix(1);
     if (!line.empty() && line.front() != '#' && line.front() != '*') {
       if (endsWithCaseInsensitive(line, ".m3u"))
@@ -340,20 +337,19 @@ void loadPlaylist() {
   if (Tracks.empty()) {
     Hint = translated("abcui.mediaplayer/MediaPlayer_EmptyPlaylist",
                       "The playlist is empty. Add a media path below.");
-    PlaylistSource = translated("abcui.mediaplayer/MediaPlayer_EmptySource",
-                                "empty");
+    PlaylistSource =
+        translated("abcui.mediaplayer/MediaPlayer_EmptySource", "empty");
   }
   if (!playingPath.empty()) {
     for (std::size_t i = 0; i < Tracks.size(); ++i) {
-      if (Tracks[i].path == playingPath &&
-          static_cast<int>(i) != Current) {
+      if (Tracks[i].path == playingPath && static_cast<int>(i) != Current) {
         Current = static_cast<int>(i);
         break;
       }
     }
   }
-  Selected = Current >= 0 && Current < static_cast<int>(Tracks.size()) ? Current
-                                                                      : -1;
+  Selected =
+      Current >= 0 && Current < static_cast<int>(Tracks.size()) ? Current : -1;
 }
 
 // ---- engine transport ----------------------------------------------------
@@ -648,8 +644,8 @@ void renderPlaylist() {
         "title=\"{}\"><span class=\"mp-row-num\">{}</span>"
         "<span class=\"mp-row-name\">{}</span>"
         "<span class=\"mp-row-mark\">{}</span></div>",
-        selected ? " mp-row-selected" : "", playing ? " mp-row-playing" : "",
-        i, escapeAttribute(track.path), i + 1, escapeText(track.label),
+        selected ? " mp-row-selected" : "", playing ? " mp-row-playing" : "", i,
+        escapeAttribute(track.path), i + 1, escapeText(track.label),
         playing ? "&#9654;" : "");
   }
   if (rows.empty()) {
@@ -662,8 +658,8 @@ void renderPlaylist() {
   setInnerRml("mp-list", rows);
   setText("mp-playlist-source", PlaylistSource);
   if (AbcUiElement *count = node("mp-playlist-count"))
-    Api->ui->elementSetInnerRML(
-        count, std::format("{}", Tracks.size()).c_str());
+    Api->ui->elementSetInnerRML(count,
+                                std::format("{}", Tracks.size()).c_str());
   setText("mp-hint", Hint);
   setDisplay("mp-hint", !Hint.empty());
 }
@@ -673,11 +669,10 @@ void renderTransport() {
     return;
   const bool hasTrack =
       Current >= 0 && Current < static_cast<int>(Tracks.size());
-  setText("mp-track",
-          hasTrack
-              ? Tracks[static_cast<std::size_t>(Current)].label
-              : translated("abcui.mediaplayer/MediaPlayer_NoTrack",
-                           "No track selected"));
+  setText("mp-track", hasTrack
+                          ? Tracks[static_cast<std::size_t>(Current)].label
+                          : translated("abcui.mediaplayer/MediaPlayer_NoTrack",
+                                       "No track selected"));
   const char *stateToken = "abcui.mediaplayer/MediaPlayer_Stopped";
   const char *stateFallback = "Stopped";
   const char *toggleToken = "abcui.mediaplayer/MediaPlayer_Play";
@@ -710,14 +705,13 @@ void updateProgress() {
   LastElapsedSecond = second;
   LastProgressPercent = percent;
   setText("mp-elapsed", formatTime(Elapsed));
-  setText("mp-total", Duration > 0.0
-                          ? formatTime(Duration)
-                          : translated("abcui.mediaplayer/MediaPlayer_Unknown",
-                                       "--:--"));
+  setText("mp-total",
+          Duration > 0.0
+              ? formatTime(Duration)
+              : translated("abcui.mediaplayer/MediaPlayer_Unknown", "--:--"));
   if (AbcUiElement *progress = node("mp-progress"))
     Api->ui->elementProgressValue(
-        progress,
-        Duration > 0.0 ? static_cast<float>(percent) / 100.0f : 0.0f);
+        progress, Duration > 0.0 ? static_cast<float>(percent) / 100.0f : 0.0f);
 }
 
 void updateVolumeRow() {
@@ -814,8 +808,7 @@ void ABCUI_CALL onDocumentReady(void *) {
   if (AbcUiElement *input = Api->ui->querySelector(Page, "mp-add-path"))
     Api->ui->elementSetAttribute(
         input, "placeholder",
-        translated("abcui.mediaplayer/MediaPlayer_AddPlaceholder", "")
-            .c_str());
+        translated("abcui.mediaplayer/MediaPlayer_AddPlaceholder", "").c_str());
   updateVolumeRow();
   renderPlaylist();
   renderTransport();
@@ -883,9 +876,8 @@ bool CommandHooked = false;
 void tryHookCommand() {
   if (CommandHooked)
     return;
-  CommandHooked = Api->commands->subscribeCommand("MediaPlayer", 0,
-                                                  &onMediaPlayerCommand,
-                                                  nullptr) != 0;
+  CommandHooked = Api->commands->subscribeCommand(
+                      "MediaPlayer", 0, &onMediaPlayerCommand, nullptr) != 0;
 }
 
 void ABCUI_CALL onModuleLoad() {

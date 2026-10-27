@@ -97,6 +97,11 @@ void onChange(AbcUiElement *target) {
   AbcUiSettingRow row{};
   if (!rowFound(rowKey.c_str(), row))
     return;
+  // Select initialization can deliver a deferred change after projection.
+  // An unchanged value is not a new edit and must not schedule another pass.
+  if (value == row.draftText)
+    return;
+  const bool projectionCurrent = Api->settings->revision() == RenderedRevision;
   // Select rows (kEnum/kStringEnum) commit through their value string and
   // text rows (kText) through the validated string door; the model
   // re-validates against the option set / charset either way.
@@ -110,7 +115,9 @@ void onChange(AbcUiElement *target) {
   } else {
     Api->settings->setDraftText(rowKey.c_str(), value.c_str());
   }
-  if (!InRender)
+  if (projectionCurrent)
+    renderEditedRow(rowKey.c_str(), true);
+  else
     render(rowKey.c_str());
 }
 
@@ -176,6 +183,8 @@ void onClick(AbcUiElement *target) {
     hideLayers();
     refocusDefault();
   } else if (action == kActionToggle && !rowKey.empty()) {
+    const bool projectionCurrent =
+        Api->settings->revision() == RenderedRevision;
     AbcUiSettingRow row{};
     if (rowFound(rowKey.c_str(), row) && !(row.flags & ABCUI_SET_ROW_MISSING)) {
       // Toggle kinds: kBool threshold, kNegate sign view, kCommandToggle
@@ -187,7 +196,10 @@ void onClick(AbcUiElement *target) {
               : toggleDraftOn(row);
       Api->settings->setDraftBool(rowKey.c_str(), current ? 0 : 1);
     }
-    render();
+    if (projectionCurrent)
+      renderEditedRow(rowKey.c_str(), false);
+    else
+      render();
   } else if (action == kActionVoiceTest) {
     // Start/stop the microphone test. The engine refusing the start (no
     // device) leaves the state untouched - the status keeps the idle text.

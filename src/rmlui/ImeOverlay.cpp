@@ -50,8 +50,8 @@ void imePayloadDebug(unsigned &seen, unsigned *words) {
 }
 
 void imeDebug(unsigned &feeds, unsigned &lastBytes, unsigned &eventFeeds,
-             int &lastEventCount, int &count, int &selected, bool &anchorValid,
-             int &compositionBytes) {
+              int &lastEventCount, int &count, int &selected, bool &anchorValid,
+              int &compositionBytes) {
   const auto &s = state();
   feeds = DebugFeeds;
   lastBytes = DebugLastBytes;

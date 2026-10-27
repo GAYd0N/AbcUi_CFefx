@@ -7,6 +7,7 @@
 #include "data/PlayerResource.h"
 #include "rmlui/modelpreview/Options.h"
 #include "services/playerlist/MuteBackend.h"
+#include "framework/FileSystemHandles.h"
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -35,7 +36,10 @@ PlayerCardFacts playerCardFacts() {
   // cannot load (a model folder that is not installed) shows the stock
   // generic model instead of an empty card.
   const auto Exists = [](const std::string &Path) {
-    return !abc::g_pFileSystem || abc::g_pFileSystem->FileExists(Path.c_str());
+    // FileExists is a local-disk compatibility shim in the engine SDK.
+    // Open uses the mounted mod/download/addon search paths instead.
+    return !abc::g_pFileSystem || static_cast<bool>(framework::openEngineFile(
+                                      *abc::g_pFileSystem, Path.c_str(), "rb"));
   };
   Facts.ModelPath = modelpreview::resolveCardModelPath(
       readCvarString("abc_ui_menu_model_path"), Facts.ModelName, Exists);

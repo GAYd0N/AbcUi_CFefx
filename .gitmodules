@@ -19,3 +19,6 @@
 [submodule "thirdparty/miniz"]
 	path = thirdparty/miniz
 	url = https://github.com/richgel999/miniz
+[submodule "thirdparty/StandaloneView"]
+	path = thirdparty/StandaloneView
+	url = https://github.com/DrAbcOfficial/StandaloneView

@@ -17,7 +17,8 @@
 #include "services/loading/ConnectionService.h"
 #include "services/friends/FriendsService.h"
 #include "services/inventory/InventoryService.h"
-#include "services/serverbrowser/BlacklistFileStore.h"
+#include "services/serverbrowser/BlacklistJson.h"
+#include "services/UserConfig.h"
 #include "services/playerlist/PlayerListService.h"
 #include "services/settings/SettingsPageService.h"
 #include "services/uiconfig/MenuShellService.h"
@@ -546,20 +547,26 @@ void GameUiModule::onInit() {
       gEngfuncs.pfnServerCmd(weapon->name.c_str());
   });
   ServerBrowser.setProvider(services::serverbrowser::steamQueryProvider());
-  const auto BlacklistPath = abc::ModPath("abc/abcui/server_blacklist.json");
+  std::string BlacklistJson;
   std::string BlacklistError;
+  const auto BlacklistStatus =
+      services::userconfig::readSection("server_blacklist", BlacklistJson);
   const bool BlacklistLoaded =
-      services::serverbrowser::BlacklistFileStore::load(
-          BlacklistPath, Blacklist, BlacklistError);
+      BlacklistStatus == services::userconfig::LoadStatus::Missing ||
+      (BlacklistStatus == services::userconfig::LoadStatus::Loaded &&
+       services::serverbrowser::BlacklistJson::parse(BlacklistJson, Blacklist,
+                                                     BlacklistError));
   if (!BlacklistLoaded)
-    abc::ConsoleWarn("[AbcUi] %s: %s\n", BlacklistPath.c_str(),
+    abc::ConsoleWarn("[AbcUi] config.json server_blacklist unreadable: %s\n",
                      BlacklistError.c_str());
-  Blacklist.setSaveSink([BlacklistPath, BlacklistLoaded](const auto &Rules) {
+  Blacklist.setSaveSink([BlacklistLoaded](const auto &Rules) {
     if (!BlacklistLoaded)
       return false; // Never overwrite a damaged user's file.
     std::string Error;
-    const bool Saved = services::serverbrowser::BlacklistFileStore::save(
-        BlacklistPath, Rules, Error);
+    std::string Json;
+    const bool Saved =
+        services::serverbrowser::BlacklistJson::serialize(Rules, Json, Error) &&
+        services::userconfig::writeSection("server_blacklist", Json);
     if (!Saved)
       abc::ConsoleWarn("[AbcUi] blacklist save: %s\n", Error.c_str());
     return Saved;

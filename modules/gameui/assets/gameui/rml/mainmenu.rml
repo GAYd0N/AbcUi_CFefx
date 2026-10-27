@@ -31,7 +31,7 @@
 
 	<!-- The character card is the screen's subject: this box is exactly what
 	     the preview camera frames. The default pose faces the screen turned
-	     15 degrees toward the player's left (angle yaw -15: the camera looks
+	     8 degrees toward the player's left (angle yaw -8: the camera looks
 	     down 15 degrees from +X, so screen right is +Y and a negative yaw turns the
 	     model's front to the player's left). The source is the player's own
 	     model; the abc_ui_menu_model_path cvar overrides it while non-empty
@@ -50,13 +50,13 @@
 		     tight framing make the character prominent without scaling away
 		     the automatic fit or changing other model previews. The light
 		     shines directly onto the model's front: its ray is opposite the
-		     forward vector at the entity's -15 degree yaw. -->
-		<model id="player-model" src="models/player.mdl" sequence="0" animate="true" angles="0 -15 0"
+		     forward vector at the entity's -8 degree yaw. -->
+		<model id="player-model" src="models/player.mdl" sequence="0" animate="true" angles="0 -8 0"
 			action-src="abc/abcui/models/menu_action/display_male.mdl" weapon="models/p_m16.mdl"
 			controllers="127 127 127 127" blending="127 127"
 			auto-frame="true" frame-margin="1.02"
 			camera-origin="120 0 32" camera-angles="15 180 0" fov="40"
-			ambient="96" shade="110" light-color="1 0.96 0.9" light-direction="-0.965926 0.258819 0"/>
+			ambient="96" shade="110" light-color="1 0.96 0.9" light-direction="-0.990268 0.139173 0"/>
 	</div>
 
 	<div id="friends-panel" class="abc-panel">

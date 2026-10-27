@@ -130,6 +130,18 @@ void CloseCard(std::string &markup, const std::string &cardId,
 void buildRows() {
   if (!Page || !Api->settings)
     return;
+  clearProjectionCache();
+  // A rebuild must not destroy singleton widgets already moved into cards.
+  if (AbcUiElement *host = node("settings-widget-host")) {
+    for (const auto &widget : kWidgetBlocks) {
+      if (AbcUiElement *block = node(widget.Element)) {
+        if (Api->ui->elementParent(block) != host)
+          Api->ui->elementAppendChild(host, block);
+      }
+    }
+  }
+  SelectShown.clear();
+  HueShown.clear();
   AbcUiElement *rows = node("rows");
   if (!rows)
     return;
@@ -475,7 +487,8 @@ void renderRow(AbcUiSettingRow &row, bool skipInput) {
     // The committed text is the projection; a programmatic value write does
     // not dispatch change (no feedback loop). The origin field of a change
     // commit is skipped entirely so its caret and IME state survive.
-    Api->ui->elementSetValue(control, row.draftText);
+    if (attributeOf(control, "value") != row.draftText)
+      Api->ui->elementSetValue(control, row.draftText);
   }
 
   // Row status: domain facts plus the pending-state suffix.

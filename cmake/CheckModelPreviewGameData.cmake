@@ -1,4 +1,4 @@
-# Validate the offline catalog consumed by the Win32 standalone-view route.
+# Validate AbcUi's offline Windows UI layouts, not StandaloneView's engine symbols.
 cmake_minimum_required(VERSION 4.2)
 
 if(NOT DEFINED ABCUI_REPO_DIR)
@@ -12,17 +12,11 @@ if(version_count LESS 1)
 endif()
 math(EXPR version_last "${version_count} - 1")
 set(required
-    "engine|V_RenderView|function"
-    "engine|VGui_ViewportPaintBackground|function"
-    "engine|cls.state|global"
-    "engine|cls.signon|global"
-    "engine|cl_worldmodel|global"
-    "engine|r_worldentity|global"
-    "engine|CL_FxBlend|function"
-    "engine|currententity|global"
-    "engine|r_blend|global"
-    "client|ClientPortalManager_RenderPortals|function"
-    "client|ClientPortalManager_ResetAll|function")
+    "client|AbcUi_PlayerExtraInfo_stride|scalar"
+    "client|AbcUiPlayerExtraInfoView.donor|structMember"
+    "client|AbcUiHudBaseView.flags|structMember"
+    "vgui2|AbcUi_IPanel_IsWithinTraverse_index|scalar"
+    "vgui2|AbcUi_IPanel_PaintTraverse_index|scalar")
 foreach(version RANGE ${version_last})
     string(JSON name GET "${index}" versions ${version} gameVersion)
     string(JSON url GET "${index}" versions ${version} url)
@@ -38,7 +32,7 @@ foreach(version RANGE ${version_last})
         message(FATAL_ERROR "${name}: gamedata snapshot hash/size mismatch")
     endif()
     file(READ "${catalog}/${url}" snapshot)
-    foreach(module engine client)
+    foreach(module client vgui2)
         string(JSON identity GET "${snapshot}" binaries ${module} windows sha256)
         if(NOT identity)
             message(FATAL_ERROR "${name}: missing ${module} Windows identity")
@@ -63,22 +57,24 @@ foreach(version RANGE ${version_last})
             if(key IN_LIST found)
                 message(FATAL_ERROR "${name}: duplicate Windows symbol ${symbol}")
             endif()
-            if(kind STREQUAL "function")
-                set(rva_field func_rva)
+            if(kind STREQUAL "scalar")
+                string(JSON value GET "${snapshot}" records ${record} payload scalar_value)
+                if(NOT value MATCHES "^[0-9]+$" OR value LESS 1)
+                    message(FATAL_ERROR "${name}: invalid scalar for ${symbol}")
+                endif()
             else()
-                set(rva_field gv_rva)
-            endif()
-            string(JSON rva GET "${snapshot}" records ${record} payload ${rva_field})
-            if(NOT rva MATCHES "^0x[0-9a-fA-F]+$" OR rva MATCHES "^0x0+$")
-                message(FATAL_ERROR "${name}: invalid RVA for ${symbol}")
+                string(JSON offset GET "${snapshot}" records ${record} payload offset)
+                if(NOT offset MATCHES "^0x[0-9a-fA-F]+$")
+                    message(FATAL_ERROR "${name}: invalid offset for ${symbol}")
+                endif()
             endif()
             list(APPEND found "${key}")
         endif()
     endforeach()
     foreach(key IN LISTS required)
         if(NOT key IN_LIST found)
-            message(FATAL_ERROR "${name}: missing Windows model preview symbol ${key}")
+            message(FATAL_ERROR "${name}: missing Windows UI layout ${key}")
         endif()
     endforeach()
 endforeach()
-message(STATUS "Model preview gamedata: Windows symbols and snapshot hashes OK")
+message(STATUS "AbcUi gamedata: Windows UI layouts and snapshot hashes OK")

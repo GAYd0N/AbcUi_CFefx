@@ -45,6 +45,7 @@ std::string bindActionLabel(const AbcUiBindAction &row) {
 void buildBindRows() {
   if (!Page || !Api->settings)
     return;
+  clearProjectionCache();
   AbcUiElement *rows = node("bindrows");
   if (!rows)
     return;

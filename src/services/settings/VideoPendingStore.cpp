@@ -1,14 +1,14 @@
 // services::settings::VideoPendingStore implementation - see the header.
 #include "VideoPendingStore.h"
+#include "../UserConfig.h"
 
-#include <abc/Config.h>
 #include <abc/Console.h>
 
 namespace services {
 namespace settings {
 
 namespace {
-constexpr const char *kRecordPath = "abc/abcui/video_pending.json";
+constexpr const char *kSection = "video_pending";
 }
 
 bool VideoPendingStore::save(const VideoPendingRecord &record) {
@@ -22,7 +22,7 @@ bool VideoPendingStore::save(const VideoPendingRecord &record) {
   json.OldWindowed = record.OldWindowed;
   json.AppliedUnixMs = record.AppliedUnixMs;
   json.Generation = record.Generation;
-  if (!abc::JsonSave(json, kRecordPath)) {
+  if (!userconfig::save(json, kSection)) {
     abc::ConsoleWarn("[AbcUi] could not persist the video pending record\n");
     return false;
   }
@@ -31,10 +31,10 @@ bool VideoPendingStore::save(const VideoPendingRecord &record) {
 
 bool VideoPendingStore::load(VideoPendingRecord &out) {
   VideoPendingJson json;
-  const auto status = abc::JsonLoadWithStatus(json, kRecordPath);
-  if (status == abc::JsonLoadStatus::Missing)
+  const auto status = userconfig::load(json, kSection);
+  if (status == userconfig::LoadStatus::Missing)
     return false;
-  if (status != abc::JsonLoadStatus::Success) {
+  if (status != userconfig::LoadStatus::Loaded) {
     // Unreadable record: fail closed into "no record" (the model then
     // keeps the engine's own registry state untouched).
     abc::ConsoleWarn("[AbcUi] video pending record unreadable (%d)\n",

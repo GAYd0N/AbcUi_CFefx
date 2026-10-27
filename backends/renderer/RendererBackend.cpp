@@ -683,7 +683,7 @@ int32_t ABCUI_CALL cbInitialize(void *, const AbcUiRenderBackendHost *host) {
   if (!module) {
     hostError("backend \"renderer\": the Renderer plugin is not loaded - "
               "AbcUi needs Renderer.dll in metahook/plugins, or select "
-              "another backend with abc_ui_render_backend");
+              "another backend with render_backend in abc/abcui/config.json");
     return 0;
   }
   const auto factory =

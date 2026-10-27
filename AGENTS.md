@@ -7,6 +7,11 @@ Guidance for AI/automation collaborators working in this repository. Read `READM
 - Nothing committed (code, comments, docs, commit messages, tags) may contain local machine paths, personal directories, session logs or any credentials; the deployment destination is provided through the `ABC_GAME_DIR` environment variable (optional; unset means no deploy).
 - Do not commit test scaffolding, acceptance scripts, evidence screenshots, plans or progress logs; those are session artifacts that do not belong in the release.
 - The README is the single public document; UI, config-format or cvar behaviour changes must update it in the same commit.
+- AbcUi user preferences belong in `abc/abcui/config.json` through
+  `services::userconfig`. Section updates preserve other settings and unknown
+  fields; do not restore independent preference-file writers or the render
+  backend selection cvar. Renderer availability falls back to `gl` without
+  rewriting the configured preference.
 - AbcCore is managed by the aggregate `ABCEnchance` repository and consumed
   through `ABC_CORE_DIR`; do not add a `thirdparty/AbcCore` submodule back. The
   plugin-facing contract is the versioned C ABI `AbcCore_CreateInterface`
@@ -18,12 +23,16 @@ Guidance for AI/automation collaborators working in this repository. Read `READM
   `backends/renderer/` (the `renderer` backend DLL behind
   `sdk/abcui/render_backend.h`), which also owns the two fixed-pipeline GL
   capture niches with no IMetaRenderer equivalent (scissor viewport clear +
-  copy-out); any further GL (a future `gl` backend) is allowed only inside a
-  backend DLL. VGUI2 `ISurface2` stays confined to the texture upload channel
+  copy-out). The independent `backends/gl/` backend uses OpenGL without
+  Renderer headers, include directories or interfaces. All GL stays inside
+  backend DLLs. VGUI2 `ISurface2` stays confined to the texture upload channel
   (`DrawSetTextureRGBA`), cursor handling and engine UI seams, never to draw a
-  panel. Model preview renders through the in-house engine `V_RenderView`
-  route (`src/render/StandaloneView.*`, copied from MetaHookSv/StandaloneView,
-  MIT): gamedata-symbol misses degrade the preview, never fatal.
+  panel. Model previews use the independent `StandaloneView.dll` plugin through
+  API_003. `thirdparty/StandaloneView` supplies public headers only; do not
+  compile its manager or engine hooks into AbcUi or duplicate its studio,
+  lighting or empty-world logic. A missing plugin or API_003 disables previews,
+  never the rest of the UI. List StandaloneView first so its callbacks are
+  outermost and its manager outlives the consumers.
 - AbcCore must stay renderer-free. AbcUi owns `thirdparty/Renderer` and the renderer-facing bridge in `src/render/`; do not move either back into AbcCore.
 
 ## README

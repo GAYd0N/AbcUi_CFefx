@@ -3,19 +3,17 @@
 // services::settings::ModelFavorites - the player-model favorite list
 // (issue 16: legacy ABCEnchance favmodels parity, new store).
 //
-// The list is OUR schema (no migration, no legacy file is ever read): a
-// small JSON document at "<mod>/abc/abcui/model_favorites.json", written
-// through abc::Config's atomic sibling replacement (abc::JsonSave ->
-// WriteJsonFile; never truncates the previous file). Entries are model
-// directory names under models/player - the same tokens the `model` cvar
+// The model_favorites section in abc/abcui/config.json is persisted through
+// the shared user-config owner and atomic sibling replacement. Entries are
+// model directory names under models/player - the same tokens the `model` cvar
 // stores.
 //
 // JSON keys and semantics - NEVER rename (persisted contract):
 //   favorites: array of model names (empty array = no favorites).
 //
-// Mutations persist immediately (the file is tiny and the favorite toggle
-// is the only writer). A failed write keeps the in-memory state and the
-// caller surfaces the outcome; the next mutation retries the write.
+// Mutations persist immediately through the shared owner.
+// A failed write keeps the in-memory state and the caller surfaces the
+// outcome; the next mutation retries the write.
 
 #include <string>
 #include <vector>

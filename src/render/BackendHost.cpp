@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "BackendHost.h"
@@ -24,6 +25,7 @@
 
 #include "../framework/FatalExit.h"
 #include "../framework/NativeHandles.h"
+#include "../services/UserConfig.h"
 
 namespace abc::render {
 
@@ -33,7 +35,7 @@ namespace {
 
 struct BackendEntry {
   std::string fileName; // inside the backend directory
-  HMODULE module = nullptr;
+  framework::NativeLibrary module;
   AbcUiRenderBackendDesc desc{};
   bool initialized = false;
 };
@@ -41,6 +43,8 @@ struct BackendEntry {
 struct HostState {
   bool booted = false;
   std::string bootId = "renderer";
+  std::string configuredId = "renderer";
+  std::string initializationError;
   std::vector<BackendEntry> entries;
   std::unique_ptr<struct TableBackend> active;
 };
@@ -49,9 +53,6 @@ HostState &state() {
   static HostState instance;
   return instance;
 }
-
-constexpr const char *kCvarName = "abc_ui_render_backend";
-constexpr const char *kDefaultId = "renderer";
 
 // --------------------------------------------------------------- host API --
 
@@ -79,6 +80,7 @@ void ABCUI_CALL hostError(const char *format, ...) {
   va_start(args, format);
   vsnprintf(text, sizeof(text), format, args);
   va_end(args);
+  state().initializationError = text;
   ConsoleError("[AbcUi][render-backend] %s\n", text);
 }
 
@@ -490,13 +492,13 @@ void boot() {
     return;
   hostState.booted = true;
 
-  // 1. Selection: read-only lookup - an archived value loaded from
-  // config.cfg is visible this early; registering happens at HUD_Init.
-  std::string selected = kDefaultId;
-  if (cvar_t *cvar = CVAR_GET_POINTER(kCvarName))
-    if (cvar->string && *cvar->string)
-      selected = cvar->string;
-  hostState.bootId = selected;
+  std::string selected;
+  if (!services::userconfig::renderBackend(selected)) {
+    fatal("cannot read render_backend from abc/abcui/config.json; "
+          "expected a backend id such as \"renderer\" or \"gl\"");
+    return;
+  }
+  hostState.configuredId = selected;
 
   // 2. Scan the backend directory (deterministic: sorted by file name).
   std::error_code pathError;
@@ -514,7 +516,8 @@ void boot() {
   scanDirectory(directory, files);
   if (files.empty()) {
     fatal("render backend \"" + selected + "\" is not installed: " + directory +
-          " is empty. Install abcui_render_renderer.dll into "
+          " is empty. Install abcui_render_renderer.dll or "
+          "abcui_render_gl.dll into "
           "abc/abcui/render_backend/");
     return;
   }
@@ -551,7 +554,6 @@ void boot() {
     }
     BackendEntry backend;
     backend.fileName = file;
-    backend.module = module;
     backend.desc.structSize = sizeof(backend.desc);
     const int32_t accepted =
         entry(ABCUI_RENDER_BACKEND_ABI_VERSION, &host, &backend.desc);
@@ -570,27 +572,45 @@ void boot() {
         return;
       }
     }
+    backend.module = std::move(library);
     hostState.entries.push_back(std::move(backend));
-    // Accepted backends intentionally stay resident for the process lifetime.
-    static_cast<void>(library.release());
   }
 
-  // 7. Match the selected id and initialize it.
-  BackendEntry *chosen = nullptr;
-  for (auto &entry : hostState.entries)
-    if (std::string(entry.desc.id) == selected)
-      chosen = &entry;
+  // Missing Renderer is an availability fallback, not a reason to change
+  // the user's saved preference. Installed-but-broken backends still report
+  // their initialization failure rather than silently hiding it.
+  const auto find = [&](const std::string &id) -> BackendEntry * {
+    for (auto &entry : hostState.entries)
+      if (id == entry.desc.id)
+        return &entry;
+    return nullptr;
+  };
+  BackendEntry *chosen = find(selected);
+  if (selected == "renderer" && (!hostPluginModule("Renderer") || !chosen)) {
+    ConsoleWarn("[AbcUi] renderer unavailable; falling back to gl\n");
+    selected = "gl";
+    chosen = find(selected);
+  }
   if (!chosen) {
     fatal("render backend \"" + selected +
-          "\" is not available (installed: " + installedList() + ")");
+          "\" is not available "
+          "(configured: " +
+          hostState.configuredId + ", installed: " + installedList() + ")");
     return;
   }
+  hostState.initializationError.clear();
   if (!chosen->desc.initialize(chosen->desc.userdata, &host)) {
-    // The backend printed its own reason through the host error channel.
-    fatal("render backend \"" + selected + "\" failed to initialize");
+    // Keep the backend's actionable reason visible in SysError too: the
+    // console is not necessarily usable when startup fails.
+    std::string reason =
+        "render backend \"" + selected + "\" failed to initialize";
+    if (!hostState.initializationError.empty())
+      reason += ": " + hostState.initializationError;
+    fatal(reason);
     return;
   }
   chosen->initialized = true;
+  hostState.bootId = selected;
   hostState.active = std::make_unique<TableBackend>(chosen->desc);
   ConsolePrint("[AbcUi] render backend \"%s\" (%s) active\n", chosen->desc.id,
                chosen->desc.displayName ? chosen->desc.displayName
@@ -601,14 +621,17 @@ void shutdown() {
   HostState &hostState = state();
   if (hostState.active) {
     hostState.active->removeFrameSink();
-    for (auto &entry : hostState.entries)
-      if (entry.initialized && entry.desc.shutdown)
-        entry.desc.shutdown(entry.desc.userdata);
-    // The DLLs stay loaded: teardown paths may still call backend() after
-    // this (the old MetaRendererShutdown contract), and the process owns
-    // their lifetime anyway.
-    hostState.active.reset();
   }
+  for (auto &entry : hostState.entries) {
+    if (entry.initialized && entry.desc.shutdown)
+      entry.desc.shutdown(entry.desc.userdata);
+    entry.initialized = false;
+  }
+  // Plugin teardown is the final backend consumer. Release wrappers before
+  // their function tables and discard host callbacks before a later reload.
+  hostState.active.reset();
+  hostState.entries.clear();
+  hostState.booted = false;
 }
 
 IRenderBackend *backend() {
@@ -630,50 +653,23 @@ void pumpRedraw(double seconds) {
     active->pumpRedraw(seconds);
 }
 
-// ------------------------------------------------------------ cvar face ----
+// --------------------------------------------------------- console command --
 
 namespace {
 
-bool knownId(const std::string &id) {
-  for (const auto &entry : state().entries)
-    if (id == entry.desc.id)
-      return true;
-  return false;
-}
-
-void backendCvarChanged(cvar_t *cvar) {
-  const HostState &hostState = state();
-  const std::string value = cvar->string ? cvar->string : "";
-  if (value == hostState.bootId) {
-    ConsolePrint("[AbcUi] render backend \"%s\" is already active\n",
-                 value.c_str());
-    return;
-  }
-  if (!knownId(value)) {
-    ConsoleWarn("[AbcUi] render backend \"%s\" is not available (installed: "
-                "%s)\n",
-                value.c_str(), installedList().c_str());
-    // Roll back so a typo cannot lock out the next launch.
-    CVAR_SET_STRING(kCvarName, hostState.bootId.c_str());
-    return;
-  }
-  ConsolePrint("[AbcUi] render backend \"%s\" applies after a full game "
-               "restart (not _restart)\n",
-               value.c_str());
-}
-
 void listBackendsCommand() {
   const HostState &hostState = state();
-  ConsolePrint("[AbcUi] render backends (active: %s):\n",
-               hostState.bootId.c_str());
+  ConsolePrint("[AbcUi] render backends (configured: %s, active: %s):\n",
+               hostState.configuredId.c_str(), hostState.bootId.c_str());
   for (const auto &entry : hostState.entries) {
     const uint32_t caps = entry.desc.capabilities;
-    ConsolePrint("  %-10s %s [%s%s%s%s]\n", entry.desc.id,
+    ConsolePrint("  %-10s %s [%s%s%s%s%s]\n", entry.desc.id,
                  entry.desc.displayName ? entry.desc.displayName : "",
                  caps & ABCUI_RB_CAP_RENDER_CALLBACKS ? "callbacks " : "",
                  caps & ABCUI_RB_CAP_REDRAW_BEAT ? "redraw " : "",
                  caps & ABCUI_RB_CAP_WORLD_PASS ? "world " : "",
-                 caps & ABCUI_RB_CAP_BLUR_PASS ? "blur" : "");
+                 caps & ABCUI_RB_CAP_BLUR_PASS ? "blur " : "",
+                 caps & ABCUI_RB_CAP_OFFSCREEN_TARGETS ? "targets" : "");
   }
 }
 
@@ -684,11 +680,6 @@ void registerCommands() {
   if (registered)
     return;
   registered = true;
-  // Default = the id this process booted with: when the engine already
-  // created the cvar from config.cfg its value is preserved, and the
-  // callback covers manual changes.
-  CREATE_CVAR(kCvarName, state().bootId.c_str(), FCVAR_VALUE,
-              backendCvarChanged);
   ADD_COMMAND("abc_ui_render_backend_list", listBackendsCommand);
 }
 

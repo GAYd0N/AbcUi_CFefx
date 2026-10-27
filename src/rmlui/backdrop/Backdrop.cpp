@@ -134,6 +134,12 @@ void Backdrop::shutdown() {
   Data->Media.close();
   Data->Frame.release();
   Data->Uri.clear();
+  // HUD shutdown also runs on map changes. Keep the configured source, but
+  // allow the next context to reopen it even when its spelling is unchanged.
+  Data->VideoAttempted = false;
+  Data->VideoFailed = false;
+  Data->VideoError.clear();
+  Data->Effective = Mode::kSolid;
 }
 
 const std::string &Backdrop::uri() const {

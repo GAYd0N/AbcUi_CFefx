@@ -2,9 +2,9 @@
 
 // framework::projection - the world-to-screen helper the old utility/util.cpp
 // VEC_WorldToScreen provided (ABCEnchance "sprite draw helpers stay UI domain"
-// split, render backend contract header note). Screen-space output in Rml coordinates
-// (top-left origin). Consumers: batch B Crosshair (third-person center),
-// GIndicator, PopNum.
+// split, render backend contract header note). Screen-space output in Rml
+// coordinates (top-left origin). Consumers: batch B Crosshair (third-person
+// center), GIndicator, PopNum.
 
 namespace framework {
 

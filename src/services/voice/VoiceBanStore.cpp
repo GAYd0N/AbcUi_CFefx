@@ -1,9 +1,9 @@
 // services::voice::VoiceBanStore implementation - see the header.
 #include "VoiceBanStore.h"
+#include "../UserConfig.h"
 
 #include <AIGCJson.hpp>
 
-#include <abc/Config.h>
 #include <abc/Console.h>
 #include <abc/Parse.h>
 
@@ -17,7 +17,11 @@ namespace services {
 namespace voice {
 
 namespace {
-constexpr const char *kStorePath = "abc/abcui/voice_ban.dt";
+constexpr const char *kSection = "voice_bans";
+bool &savesAllowed() {
+  static bool allowed = false;
+  return allowed;
+}
 // The scoreboard renders one row per slot; a list beyond this is a damaged
 // store rather than an achievement.
 constexpr size_t kMaxBans = 1024;
@@ -51,12 +55,13 @@ std::string textFromId(std::uint64_t id) {
 
 VoiceBanStore::LoadStatus VoiceBanStore::load(std::vector<std::uint64_t> &out) {
   VoiceBanJson json;
-  const auto status = abc::JsonLoadWithStatus(json, kStorePath);
-  if (status == abc::JsonLoadStatus::Missing) {
+  const auto status = userconfig::load(json, kSection);
+  savesAllowed() = status != userconfig::LoadStatus::Unreadable;
+  if (status == userconfig::LoadStatus::Missing) {
     out.clear();
     return LoadStatus::kMissing;
   }
-  if (status != abc::JsonLoadStatus::Success) {
+  if (status != userconfig::LoadStatus::Loaded) {
     abc::ConsoleWarn("[AbcUi] voice ban store unreadable (%d)\n",
                      static_cast<int>(status));
     out.clear();
@@ -79,11 +84,13 @@ VoiceBanStore::LoadStatus VoiceBanStore::load(std::vector<std::uint64_t> &out) {
 }
 
 bool VoiceBanStore::save(const std::vector<std::uint64_t> &bans) {
+  if (!savesAllowed())
+    return false;
   VoiceBanJson json;
   json.Bans.reserve(bans.size());
   for (const std::uint64_t id : bans)
     json.Bans.push_back(textFromId(id));
-  if (!abc::JsonSave(json, kStorePath)) {
+  if (!userconfig::save(json, kSection)) {
     abc::ConsoleWarn("[AbcUi] could not persist the voice ban store\n");
     return false;
   }

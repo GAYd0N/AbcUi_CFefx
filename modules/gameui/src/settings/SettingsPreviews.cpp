@@ -39,7 +39,7 @@ void renderPreviews() {
   // cvar's model directory to a resolvable <model> source, the same mapping
   // the main menu's character card uses. The player colors are not a preview
   // property of the renderer, so they stay out of the 3D view.
-  {
+  if (hasComponent("model-preview")) {
     const std::string model = textOf("model");
     std::string path = "models/player.mdl";
     if (model.size() >= 4 && model.compare(model.size() - 4, 4, ".mdl") == 0)
@@ -53,9 +53,10 @@ void renderPreviews() {
   }
   // The engine's stored colour token ("#abcui.gameui/Valve_Ltblue") normalizes
   // to the bare palette name the preview decoder expects.
-  setPreviewSource("spray-preview", "preview://spray/" + textOf("cl_logofile") +
-                                        "/" +
-                                        logoColorName(textOf("cl_logocolor")));
+  if (hasComponent("spray-preview"))
+    setPreviewSource("spray-preview",
+                     "preview://spray/" + textOf("cl_logofile") + "/" +
+                         logoColorName(textOf("cl_logocolor")));
 }
 
 // ----------------------------------------------------- crosshair preview ---

@@ -164,36 +164,40 @@ void configureMenuActionChoices(services::settings::SettingsModel &model) {
       std::string_view(sequence->row->StateName) != "menu-action-sequences")
     return;
   model.setStringChoices("abc_ui_menu_action_model", actionModels());
-  model.setChoiceRefresh([source = std::string(), initialized = false](
-                             services::settings::SettingsModel &rows) mutable {
-    const auto action = rows.find("abc_ui_menu_action_model");
-    const auto sequence = rows.find("abc_ui_menu_model_sequence");
-    if (!action || !sequence || action->missing || sequence->missing)
-      return;
-    const std::string spelling =
-        action->state == services::settings::RowState::kInvalid
-            ? action->engineText
-            : action->draftText;
-    const std::string path = modelpreview::resolveActionModelPath(spelling, {});
-    if (initialized && path == source)
-      return;
-    auto choices = actionSequences(path);
-    const bool known = std::any_of(choices.begin(), choices.end(),
-                                   [&sequence](const auto &choice) {
-                                     return choice.Value == sequence->draftText;
-                                   });
-    rows.setStringChoices("abc_ui_menu_model_sequence", choices);
-    // Repair only pending edits, including switching back to the live model
-    // while a sequence draft still belongs to another model. Opening/cancelling
-    // settings never silently changes the live value or creates a draft.
-    const bool pending = spelling != action->engineText ||
-                         sequence->draftText != sequence->engineText;
-    if (!known && !choices.empty() && pending)
-      rows.setDraftString("abc_ui_menu_model_sequence",
-                          choices.front().Value.c_str());
-    source = path;
-    initialized = true;
-  });
+  model.setChoiceRefresh(
+      "abc_ui_menu_action_model",
+      [source = std::string(),
+       initialized = false](services::settings::SettingsModel &rows) mutable {
+        const auto action = rows.find("abc_ui_menu_action_model");
+        const auto sequence = rows.find("abc_ui_menu_model_sequence");
+        if (!action || !sequence || action->missing || sequence->missing)
+          return;
+        const std::string spelling =
+            action->state == services::settings::RowState::kInvalid
+                ? action->engineText
+                : action->draftText;
+        const std::string path =
+            modelpreview::resolveActionModelPath(spelling, {});
+        if (initialized && path == source)
+          return;
+        auto choices = actionSequences(path);
+        const bool known = std::any_of(
+            choices.begin(), choices.end(), [&sequence](const auto &choice) {
+              return choice.Value == sequence->draftText;
+            });
+        rows.setStringChoices("abc_ui_menu_model_sequence", choices);
+        // Repair only pending edits, including switching back to the live model
+        // while a sequence draft still belongs to another model.
+        // Opening/cancelling settings never silently changes the live value or
+        // creates a draft.
+        const bool pending = spelling != action->engineText ||
+                             sequence->draftText != sequence->engineText;
+        if (!known && !choices.empty() && pending)
+          rows.setDraftString("abc_ui_menu_model_sequence",
+                              choices.front().Value.c_str());
+        source = path;
+        initialized = true;
+      });
 }
 
 namespace {

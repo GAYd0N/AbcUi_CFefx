@@ -125,12 +125,10 @@ void updatePanel() {
   const std::string name =
       targetKnown ? std::string(target.name) : std::string();
 
-  const std::string key = std::to_string(mode) + "|" +
-                          std::to_string(targetIndex) + "|" +
-                          std::to_string(targetKnown ? 1 : 0) + "|" +
-                          std::to_string(dead ? 1 : 0) + "|" +
-                          std::to_string(health) + "|" +
-                          std::to_string(armor) + "|" + name;
+  const std::string key =
+      std::to_string(mode) + "|" + std::to_string(targetIndex) + "|" +
+      std::to_string(targetKnown ? 1 : 0) + "|" + std::to_string(dead ? 1 : 0) +
+      "|" + std::to_string(health) + "|" + std::to_string(armor) + "|" + name;
   if (key == LastKey) {
     setVisible(doc, true);
     return;
@@ -144,9 +142,9 @@ void updatePanel() {
   setDisplay("spec-armor", (targetKnown && !dead) ? "flex" : "none");
   if (targetKnown) {
     setDisplay("spec-health-label", dead ? "none" : "inline");
-    setInner("spec-health-value",
-             dead ? escape(translateOr("Spec_Dead", "Dead"))
-                  : std::to_string(health));
+    setInner("spec-health-value", dead
+                                      ? escape(translateOr("Spec_Dead", "Dead"))
+                                      : std::to_string(health));
     setInner("spec-armor-value", std::to_string(armor));
   }
 
@@ -201,8 +199,8 @@ void panelReset(void *) {
 
 void onModuleLoad() {
   Api->events->subscribe(ABCUI_CHANNEL_HUD_SPECTATE, 0, &onSpectate, nullptr);
-  Api->events->subscribeVeto(ABCUI_CHANNEL_HUD_NATIVE_DRAW, 0,
-                             &onNativeHudDraw, nullptr);
+  Api->events->subscribeVeto(ABCUI_CHANNEL_HUD_NATIVE_DRAW, 0, &onNativeHudDraw,
+                             nullptr);
   Panel.structSize = sizeof(Panel);
   Panel.name = kPanelName;
   Panel.documentPath = kDocumentPath;
@@ -238,8 +236,7 @@ AbcUiModule_Main(uint32_t abiVersion, const AbcUiModuleApi *api,
       !AbcUiModule_InitDescriptor(out))
     return 0;
   if (api->structSize < sizeof(AbcUiModuleApi) || !api->core || !api->panels ||
-      !api->events || !api->ui || !api->console || !api->data ||
-      !api->players)
+      !api->events || !api->ui || !api->console || !api->data || !api->players)
     return 0;
   if (api->ui->structSize < sizeof(AbcUiUiApi) ||
       api->console->structSize < sizeof(AbcUiConsoleApi) ||

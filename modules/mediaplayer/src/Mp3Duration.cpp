@@ -25,21 +25,16 @@ struct Header {
 };
 
 int bitrateTable(int version, int layer, int index) {
-  static constexpr int kMpeg1Layer1[15] = {0,  32, 64,  96,  128, 160, 192,
-                                           224, 256, 288, 320, 352, 384,
-                                           416, 448};
-  static constexpr int kMpeg1Layer2[15] = {0,  32, 48, 56,  64,  80,  96,
-                                           112, 128, 160, 192, 224, 256,
-                                           320, 384};
-  static constexpr int kMpeg1Layer3[15] = {0,  32, 40, 48,  56,  64,  80,
-                                           96, 112, 128, 160, 192, 224,
-                                           256, 320};
-  static constexpr int kMpeg2Layer1[15] = {0,  32, 48,  56,  64,  80,  96,
-                                           112, 128, 144, 160, 176, 192,
-                                           224, 256};
-  static constexpr int kMpeg2Layer23[15] = {0,  8,  16, 24,  32,  40, 48,
-                                            56, 64, 80,  96, 112, 128,
-                                            144, 160};
+  static constexpr int kMpeg1Layer1[15] = {
+      0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448};
+  static constexpr int kMpeg1Layer2[15] = {
+      0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384};
+  static constexpr int kMpeg1Layer3[15] = {0,   32,  40,  48,  56,  64,  80, 96,
+                                           112, 128, 160, 192, 224, 256, 320};
+  static constexpr int kMpeg2Layer1[15] = {
+      0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256};
+  static constexpr int kMpeg2Layer23[15] = {0,  8,  16, 24,  32,  40,  48, 56,
+                                            64, 80, 96, 112, 128, 144, 160};
   if (index <= 0 || index >= 15)
     return 0;
   if (version == 1) {
@@ -88,9 +83,8 @@ bool parseHeader(const std::uint8_t *p, Header &out) {
   const int bitrate = out.bitrateKbps * 1000;
   if (out.layer == 1) {
     out.samplesPerFrame = 384;
-    out.frameSize =
-        static_cast<std::size_t>((12 * bitrate / out.sampleRate + out.padding) *
-                                 4);
+    out.frameSize = static_cast<std::size_t>(
+        (12 * bitrate / out.sampleRate + out.padding) * 4);
     out.sideInfo = 0;
   } else if (out.layer == 2) {
     out.samplesPerFrame = 1152;
@@ -98,15 +92,12 @@ bool parseHeader(const std::uint8_t *p, Header &out) {
         static_cast<std::size_t>(144 * bitrate / out.sampleRate + out.padding);
     out.sideInfo = 0;
   } else {
-    out.samplesPerFrame =
-        out.version == 1 ? 1152 : 576;
+    out.samplesPerFrame = out.version == 1 ? 1152 : 576;
     const int coefficient = out.version == 1 ? 144 : 72;
-    out.frameSize =
-        static_cast<std::size_t>(coefficient * bitrate / out.sampleRate +
-                                 out.padding);
-    out.sideInfo =
-        out.version == 1 ? (out.channels == 1 ? 17 : 32)
-                         : (out.channels == 1 ? 9 : 17);
+    out.frameSize = static_cast<std::size_t>(
+        coefficient * bitrate / out.sampleRate + out.padding);
+    out.sideInfo = out.version == 1 ? (out.channels == 1 ? 17 : 32)
+                                    : (out.channels == 1 ? 9 : 17);
   }
   return out.frameSize >= 4;
 }
@@ -178,8 +169,7 @@ double mp3DurationSeconds(const std::uint8_t *data, std::size_t size) {
         header.sampleRate != first.sampleRate) {
       // One bad byte (encoders leave small gaps); resync on the next frame.
       std::size_t probe = offset + 1;
-      const std::size_t probeEnd =
-          offset + 4096 < size ? offset + 4096 : size;
+      const std::size_t probeEnd = offset + 4096 < size ? offset + 4096 : size;
       while (probe + 4 <= probeEnd && !parseHeader(data + probe, header))
         ++probe;
       if (probe + 4 > probeEnd)
@@ -196,8 +186,7 @@ double mp3DurationSeconds(const std::uint8_t *data, std::size_t size) {
   }
   if (samples == 0)
     return 0;
-  const double seconds =
-      static_cast<double>(samples) / first.sampleRate;
+  const double seconds = static_cast<double>(samples) / first.sampleRate;
   return seconds > 0.1 ? seconds : 0;
 }
 

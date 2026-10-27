@@ -4,7 +4,7 @@
 // CVoiceStatus port, new store).
 //
 // The client owns its mute list (SteamID64-keyed, persisted by
-// VoiceBanStore at <mod>/abc/abcui/voice_ban.dt) and mirrors it to the
+// VoiceBanStore in abc/abcui/config.json) and mirrors it to the
 // server as a 32-slot vban bitmask (bit i-1 == entity index i): VModEnable
 // rides the reliable channel whenever voice_modenable flips, vban the
 // unreliable one on every diff against the server's ack, re-synced once

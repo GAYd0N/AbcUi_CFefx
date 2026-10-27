@@ -1,10 +1,10 @@
 // services::settings::ModelFavorites implementation - see the header.
 #include "ModelFavorites.h"
 #include "ChoiceValidation.h"
+#include "../UserConfig.h"
 
 #include <AIGCJson.hpp>
 
-#include <abc/Config.h>
 #include <abc/Console.h>
 
 #include <algorithm>
@@ -13,7 +13,7 @@ namespace services {
 namespace settings {
 
 namespace {
-constexpr const char *kStorePath = "abc/abcui/model_favorites.json";
+constexpr const char *kSection = "model_favorites";
 
 // The on-disk schema. Field order defines the written key order only; the
 // parser is key-based (a missing key keeps the default).
@@ -30,13 +30,13 @@ bool entryTextValid(const std::string &model) {
 
 ModelFavorites::LoadStatus ModelFavorites::load() {
   ModelFavoritesJson json;
-  const auto status = abc::JsonLoadWithStatus(json, kStorePath);
-  if (status == abc::JsonLoadStatus::Missing) {
+  const auto status = userconfig::load(json, kSection);
+  if (status == userconfig::LoadStatus::Missing) {
     Favorites_.clear();
     SavesAllowed_ = true;
     return LoadStatus::kMissing;
   }
-  if (status != abc::JsonLoadStatus::Success) {
+  if (status != userconfig::LoadStatus::Loaded) {
     // Unreadable store: fail closed into an empty list and refuse to save
     // (never overwrite a damaged user file - the blacklist store's rule).
     abc::ConsoleWarn("[AbcUi] model favorites unreadable (%d)\n",
@@ -56,7 +56,7 @@ bool ModelFavorites::isFavorite(const std::string &model) const {
 }
 
 bool ModelFavorites::setFavorite(const std::string &model, bool favorite) {
-  if (!entryTextValid(model))
+  if (!SavesAllowed_ || !entryTextValid(model))
     return false;
   const auto itor =
       std::lower_bound(Favorites_.begin(), Favorites_.end(), model);
@@ -73,7 +73,7 @@ bool ModelFavorites::setFavorite(const std::string &model, bool favorite) {
 bool ModelFavorites::save() const {
   ModelFavoritesJson json;
   json.Favorites = Favorites_;
-  if (!abc::JsonSave(json, kStorePath)) {
+  if (!userconfig::save(json, kSection)) {
     abc::ConsoleWarn("[AbcUi] could not persist the model favorites\n");
     return false;
   }

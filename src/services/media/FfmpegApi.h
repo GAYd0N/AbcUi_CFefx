@@ -58,7 +58,7 @@ struct FfmpegApi {
   ABCUI_FFMPEG_APIS(ABCUI_DECLARE_FFMPEG)
 #undef ABCUI_DECLARE_FFMPEG
 };
-// One process binding, verified against the pinned SDK ABI before use.
+// One plugin-lifetime binding, verified against the pinned SDK ABI before use.
 const FfmpegApi &ffmpeg();
 bool available();
 } // namespace media

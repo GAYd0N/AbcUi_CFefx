@@ -123,12 +123,14 @@ void SettingsModel::setStringChoices(const char *cvar,
 }
 
 void SettingsModel::setChoiceRefresh(
-    std::function<void(SettingsModel &)> refresh) {
+    const char *sourceCvar, std::function<void(SettingsModel &)> refresh) {
+  ChoiceSource_ = sourceCvar ? sourceCvar : "";
   ChoiceRefresh_ = std::move(refresh);
 }
 
-void SettingsModel::refreshChoices() {
-  if (!ChoiceRefresh_ || RefreshingChoices_)
+void SettingsModel::refreshChoices(const char *changedCvar) {
+  if (!ChoiceRefresh_ || RefreshingChoices_ ||
+      (changedCvar && ChoiceSource_ != changedCvar))
     return;
   RefreshingChoices_ = true;
   ChoiceRefresh_(*this);
@@ -423,13 +425,13 @@ bool SettingsModel::setDraftString(const char *cvar, const char *text) {
   // through this door.
   if (text && entry->engineText == text) {
     adoptEngineTextLocked(*entry, entry->engineText);
-    refreshChoices();
+    refreshChoices(cvar);
     return true;
   }
   if (!validateString(*entry, text)) {
     entry->draftText = text ? text : "";
     entry->state = RowState::kInvalid;
-    refreshChoices();
+    refreshChoices(cvar);
     return false;
   }
   entry->draftText = text;
@@ -438,7 +440,7 @@ bool SettingsModel::setDraftString(const char *cvar, const char *text) {
   } else if (entry->state != RowState::kConflict) {
     entry->state = RowState::kDirty;
   }
-  refreshChoices();
+  refreshChoices(cvar);
   return true;
 }
 
@@ -450,7 +452,7 @@ bool SettingsModel::adoptEngineValue(const char *cvar) {
     adoptEngineTextLocked(*entry, entry->engineText);
   else
     adoptEngineLocked(*entry, entry->engineValue);
-  refreshChoices();
+  refreshChoices(cvar);
   return true;
 }
 

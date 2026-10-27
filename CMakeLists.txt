@@ -30,6 +30,18 @@ if(NOT EXISTS "${ABCUI_RENDERER_INCLUDE_DIR}/Interface/IMetaRenderer.h")
     message(FATAL_ERROR "AbcUi requires thirdparty/Renderer; initialize the submodule with git submodule update --init --recursive")
 endif()
 
+# StandaloneView is an independent MetaHook plugin. Only its public API_003
+# header is consumed here; no engine hooks or manager implementation are linked.
+set(ABCUI_STANDALONEVIEW_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/StandaloneView")
+if(NOT EXISTS "${ABCUI_STANDALONEVIEW_DIR}/include/Interface/IStandaloneView.h")
+    message(FATAL_ERROR "AbcUi requires thirdparty/StandaloneView; initialize the submodule with git submodule update --init")
+endif()
+file(STRINGS "${ABCUI_STANDALONEVIEW_DIR}/include/Interface/IStandaloneView.h"
+    ABCUI_STANDALONEVIEW_API003 REGEX "define STANDALONEVIEW_MANAGER_INTERFACE_VERSION_V003 ")
+if(NOT ABCUI_STANDALONEVIEW_API003)
+    message(FATAL_ERROR "StandaloneView API_003 headers required; update thirdparty/StandaloneView")
+endif()
+
 # Mile.FFmpeg binary SDK (video decode). Headers only in the build: the
 # distance to Mile.FFmpeg.dll is GetProcAddress, exactly like Renderer's
 # startup video. MetaHookSV/Renderer owns the runtime DLL; AbcUi only uses the
@@ -145,13 +157,14 @@ add_library(abc_ui_config STATIC
     src/services/commandmenu/CommandMenuModel.cpp
     src/services/commandmenu/CommandMenuService.cpp
     src/services/serverbrowser/ServerBlacklist.cpp
-    src/services/serverbrowser/BlacklistFileStore.cpp)
+    src/services/serverbrowser/BlacklistJson.cpp)
 target_include_directories(abc_ui_config PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
     PRIVATE "${ABC_CORE_DIR}/thirdparty/MetaHook/thirdparty/rapidjson/include")
 target_compile_features(abc_ui_config PUBLIC cxx_std_20)
 
 add_library(AbcUi MODULE
     src/plugins.cpp
+    src/services/UserConfig.cpp
     src/CoreGlobals.cpp
     src/hooks.cpp
     src/modsys/EventBus.cpp
@@ -430,10 +443,11 @@ add_custom_target(check-rendercommon-sync
 # target never sees a Renderer include directory (that is the mechanical
 # proof the coupling is gone).
 add_subdirectory(backends/renderer)
+add_subdirectory(backends/gl)
 add_dependencies(abcui_render_renderer check-rendercommon-sync)
 
-# UI-owned layouts and standalone-view symbols are a separate, offline
-# catalog. Validate the Windows records before building or packaging.
+# UI-owned layouts are a separate, offline catalog. StandaloneView owns its
+# own engine-view symbols; validate only the UI records here.
 add_custom_target(check-modelpreview-gamedata
     COMMAND "${CMAKE_COMMAND}"
         "-DABCUI_REPO_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
@@ -458,6 +472,9 @@ target_include_directories(AbcUi PRIVATE
     "${METAHOOK_INCLUDE_DIR}/Interface/VGUI"
     "${METAHOOK_INCLUDE_DIR}/VGUI"
     "${METAHOOK_INCLUDE_DIR}/SourceSDK"
+    # Public StandaloneView interface only. Its implementation belongs to
+    # StandaloneView.dll, not this framework.
+    "${ABCUI_STANDALONEVIEW_DIR}/include/Interface"
     "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 if(ABC_GAME_DIR)
@@ -465,7 +482,7 @@ if(ABC_GAME_DIR)
         RUNTIME DESTINATION "${ABC_GAME_DIR}/svencoop/metahook/plugins"
         LIBRARY DESTINATION "${ABC_GAME_DIR}/svencoop/metahook/plugins")
     # Render backend DLLs load from abc/abcui/render_backend (issue #24).
-    install(TARGETS abcui_render_renderer
+    install(TARGETS abcui_render_renderer abcui_render_gl
         RUNTIME DESTINATION "${ABC_GAME_DIR}/svencoop/abc/abcui/render_backend"
         LIBRARY DESTINATION "${ABC_GAME_DIR}/svencoop/abc/abcui/render_backend")
     install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets/gamedata/abcui-layout/"
@@ -484,7 +501,7 @@ if(ABC_GAME_DIR)
         install(DIRECTORY assets/sound DESTINATION "${ABC_GAME_DIR}/svencoop")
     endif()
     add_custom_target(deploy
-        DEPENDS AbcUi pack_modules
+        DEPENDS AbcUi abcui_render_renderer abcui_render_gl pack_modules
         # Drop previous-version packages first: the loader resolves a
         # duplicated id by manifest version, but a stale zip on disk is still
         # dead weight and can shadow a downgrade.
@@ -528,6 +545,8 @@ add_custom_target(dist
         "${ABC_UI_STAGE_DIR}/svencoop/metahook/plugins/"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:abcui_render_renderer>"
         "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/render_backend/"
+    COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:abcui_render_gl>"
+        "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/render_backend/"
     COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/README.md" "${ABC_UI_STAGE_DIR}/"
     COMMAND "${CMAKE_COMMAND}" -E make_directory
         "${ABC_UI_STAGE_DIR}/svencoop/abc/abcui/modules"
@@ -549,5 +568,5 @@ add_custom_target(dist
         "${CMAKE_BINARY_DIR}/dist/AbcUi-${ABC_UI_VERSION}.zip"
         --format=zip -- svencoop README.md
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/dist"
-    DEPENDS AbcUi abcui_render_renderer pack_modules
+    DEPENDS AbcUi abcui_render_renderer abcui_render_gl pack_modules
     COMMENT "Packaging AbcUi-${ABC_UI_VERSION}.zip")

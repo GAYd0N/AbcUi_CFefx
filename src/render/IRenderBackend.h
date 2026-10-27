@@ -24,7 +24,7 @@ enum class Blend {
 
 enum class Capability {
   RenderCallbacks,  // backend drives the frame (Renderer: end-frame beat)
-  RedrawBeat,       // framework pumps it from HUD_Redraw (GL)
+  RedrawBeat,       // framework pumps it after BaseUI painting (GL)
   WorldPass,        // radar top-down world render
   BlurPass,         // menu backdrop blur
   OffscreenTargets, // viewport-capture textures (model preview)

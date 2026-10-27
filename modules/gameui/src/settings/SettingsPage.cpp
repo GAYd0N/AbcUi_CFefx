@@ -45,6 +45,7 @@
 #include <utility>
 #include <vector>
 #include <string_view>
+#include <unordered_map>
 
 namespace settingspage {
 
@@ -117,8 +118,36 @@ PreviewPart PreviewOutline[5];
 
 // ------------------------------------------------------------- helpers ----
 
+namespace {
+struct ProjectionCache {
+  std::unordered_map<std::string, AbcUiElement *> Nodes;
+  std::unordered_map<AbcUiElement *, std::string> Markup;
+  std::unordered_map<AbcUiElement *,
+                     std::unordered_map<std::string, std::string>>
+      Properties;
+};
+
+ProjectionCache &projectionCache() {
+  static ProjectionCache cache;
+  return cache;
+}
+} // namespace
+
+void clearProjectionCache() {
+  projectionCache() = {};
+}
+
 AbcUiElement *node(const char *id) {
-  return Page ? Api->ui->querySelector(Page, id) : nullptr;
+  if (!Page || !id)
+    return nullptr;
+  auto &nodes = projectionCache().Nodes;
+  if (const auto found = nodes.find(id); found != nodes.end())
+    return found->second;
+  AbcUiElement *element = Api->ui->querySelector(Page, id);
+  // Do not remember misses: select internals can appear on the next update.
+  if (element)
+    nodes.emplace(id, element);
+  return element;
 }
 
 AbcUiElement *node(const std::string &id) {
@@ -130,8 +159,14 @@ AbcUiElement *confirmNode(const char *id) {
 }
 
 void setInnerRml(AbcUiElement *element, const std::string &rml) {
-  if (element)
-    Api->ui->elementSetInnerRML(element, rml.c_str());
+  if (!element)
+    return;
+  auto &markup = projectionCache().Markup;
+  const auto found = markup.find(element);
+  if (found != markup.end() && found->second == rml)
+    return;
+  markup[element] = rml;
+  Api->ui->elementSetInnerRML(element, rml.c_str());
 }
 
 void setInnerRml(const char *id, const std::string &rml) {
@@ -143,8 +178,7 @@ void setText(const char *id, const std::string &text) {
 }
 
 void setDisplay(AbcUiElement *element, bool visible) {
-  if (element)
-    Api->ui->elementSetProperty(element, "display", visible ? "block" : "none");
+  setProperty(element, "display", visible ? "block" : "none");
 }
 
 void setDisplay(const char *id, bool visible) {
@@ -152,8 +186,14 @@ void setDisplay(const char *id, bool visible) {
 }
 
 void setProperty(AbcUiElement *element, const char *name, const char *value) {
-  if (element && value)
-    Api->ui->elementSetProperty(element, name, value);
+  if (!element || !name || !value)
+    return;
+  auto &properties = projectionCache().Properties[element];
+  const auto found = properties.find(name);
+  if (found != properties.end() && found->second == value)
+    return;
+  properties[name] = value;
+  Api->ui->elementSetProperty(element, name, value);
 }
 
 std::string numberText(float value) {
@@ -421,6 +461,7 @@ void projectPage() {
 void buildNavigation() {
   if (!Page || pageCount() == 0)
     return;
+  clearProjectionCache();
   AbcUiElement *navigation = node("settings-navigation");
   if (!navigation)
     return;
@@ -450,10 +491,10 @@ bool selectPage(const std::string &id) {
     return false;
   if (id != ActivePage) {
     Api->settings->voiceStopTest();
-    renderVoiceSection();
   }
   ActivePage = id;
   projectPage();
+  render();
   if (AbcUiElement *panel = node("panel"))
     Api->ui->elementSetScrollTop(panel, 0.0f);
   if (AbcUiElement *tab = node("settings-tab-" + id))
@@ -582,6 +623,56 @@ void discardAndReturn() {
 
 // -------------------------------------------------------------- render ----
 
+void renderEditedRow(const char *cvar, bool skipInput) {
+  if (!Page || !Api->settings || InRender)
+    return;
+  InRender = true;
+  AbcUiSettingRow row{};
+  if (rowFound(cvar, row))
+    renderRow(row, skipInput);
+  // Only this source changes the sequence option set. Even an equal option
+  // count can carry new labels, so project the dependent select explicitly.
+  if (std::string_view(cvar) == "abc_ui_menu_action_model") {
+    AbcUiSettingRow sequence{};
+    if (rowFound("abc_ui_menu_model_sequence", sequence))
+      renderRow(sequence, false);
+  }
+  // Enabled/disabled rows depend on a named cvar, not on the whole page.
+  const int page = pageIndexOf(ActivePage);
+  const int count = Api->settings->rowCount();
+  for (int index = 0; index < count; ++index) {
+    AbcUiSettingRow dependent{};
+    if (!rowById(index, dependent) ||
+        std::string_view(dependent.requireCvar) != cvar)
+      continue;
+    if (page >= 0) {
+      AbcUiSettingsPage definition{};
+      bool visible = false;
+      if (pageAt(page, definition)) {
+        for (int i = 0; i < definition.cvarCount; ++i)
+          visible |= pageCvar(page, i) == dependent.cvar;
+      }
+      if (!visible)
+        continue;
+    }
+    renderRow(dependent, false);
+  }
+  const std::string_view key(cvar);
+  if (key == "model" || key == "cl_logofile" || key == "cl_logocolor")
+    renderPreviews();
+  if (key == "model" && hasComponent("model-picker"))
+    renderModelPicker();
+  if (key.starts_with("cl_crosshair")) {
+    if (hasComponent("crosshair-preview"))
+      renderCrosshairPreview();
+    if (hasComponent(kColorPickerComponent))
+      renderColorRows();
+  }
+  setStatusSummary();
+  RenderedRevision = Api->settings->revision();
+  InRender = false;
+}
+
 // The bind sources and the page tree are model data: a document that became
 // ready before they were loaded rebuilds its skeleton once the counts settle
 // (otherwise the bind list stays empty forever). The counts only move on the
@@ -609,14 +700,26 @@ void render(const char *skipRow) {
   InRender = true;
   if (Api->settings) {
     ensureSkeleton();
+    const int page = pageIndexOf(ActivePage);
+    std::vector<std::string> cvars;
+    AbcUiSettingsPage definition{};
+    if (page >= 0 && pageAt(page, definition)) {
+      cvars.reserve(static_cast<std::size_t>(definition.cvarCount));
+      for (int32_t index = 0; index < definition.cvarCount; ++index)
+        cvars.push_back(pageCvar(page, index));
+    }
     const int32_t count = Api->settings->rowCount();
     for (int32_t index = 0; index < count; ++index) {
       AbcUiSettingRow row{};
       if (!rowById(index, row))
         continue;
+      if (pageCount() > 0 &&
+          std::find(cvars.begin(), cvars.end(), row.cvar) == cvars.end())
+        continue;
       renderRow(row, skipRow && std::string_view(row.cvar) == skipRow);
     }
-    const int32_t bindCount = Api->settings->bindRowCount();
+    const int32_t bindCount =
+        hasComponent("bindings") ? Api->settings->bindRowCount() : 0;
     for (int32_t index = 0; index < bindCount; ++index) {
       AbcUiBindAction row{};
       row.structSize = sizeof(row);
@@ -627,15 +730,22 @@ void render(const char *skipRow) {
   }
   // Always projected: with no model the sections render their fail-closed
   // state instead of staying silently empty.
-  renderVideoSection();
-  renderVoiceSectionImpl();
+  if (hasComponent("video"))
+    renderVideoSection();
+  if (hasComponent("voice"))
+    renderVoiceSectionImpl();
   renderPreviews();
-  renderCrosshairPreview();
-  renderSprayMaker();
-  renderModelPicker();
-  renderColorRows();
+  if (hasComponent("crosshair-preview"))
+    renderCrosshairPreview();
+  if (hasComponent("spray-maker"))
+    renderSprayMaker();
+  if (hasComponent("model-picker"))
+    renderModelPicker();
+  if (hasComponent(kColorPickerComponent))
+    renderColorRows();
   setStatusSummary();
-  setBindStatusSummary();
+  if (hasComponent("bindings"))
+    setBindStatusSummary();
   InRender = false;
   RenderedRevision = Api->settings ? Api->settings->revision() : 0;
 }
@@ -645,6 +755,7 @@ void render(const char *skipRow) {
 void onDocumentReady(void *) {
   if (!Page)
     return;
+  clearProjectionCache();
   Root = Api->documents->root(Page);
   if (Root) {
     ClickBinding =
@@ -678,6 +789,7 @@ void onDocumentHide(void *) {
 }
 
 void onDocumentClose(void *) {
+  clearProjectionCache();
   // The DOM is still alive: drop the listeners before it goes.
   if (Root) {
     if (ClickBinding)
@@ -749,6 +861,7 @@ void load() {
 }
 
 void shutdown() {
+  clearProjectionCache();
   // The documents die with the context; forget every borrowed handle.
   Page = nullptr;
   Confirm = nullptr;

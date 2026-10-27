@@ -29,6 +29,13 @@
 #include "../services/GameUiBridge.h"
 #include "../services/console/ConsoleBackend.h"
 #include "../services/console/ConsoleBuffer.h"
+#include "../render/BackendHost.h"
+#include "../framework/ImageLoader.h"
+#include "../framework/ResourceLimits.h"
+
+#include <algorithm>
+#include <bit>
+#include <cstddef>
 
 namespace vgui2ext {
 
@@ -186,8 +193,18 @@ public:
   void Paint([[maybe_unused]] int &x, [[maybe_unused]] int &y,
              [[maybe_unused]] int &right, [[maybe_unused]] int &bottom,
              VGUI2Extension_CallbackContext *CallbackContext) override {
-    if (CallbackContext->IsPost)
-      rmlui::maintainUiMouse();
+    if (!CallbackContext->IsPost)
+      return;
+    rmlui::maintainUiMouse();
+    // Unlike HUD_Redraw this beat also runs without a loaded map, after
+    // the native VGUI pass has finished painting the backbuffer.
+    // Callback-driven backends ignore it; redraw-driven backends draw once.
+    const double now =
+        gEngfuncs.GetAbsoluteTime ? gEngfuncs.GetAbsoluteTime() : 0.0;
+    const double delta =
+        LastPaintTime > 0.0 ? std::clamp(now - LastPaintTime, 0.0, 0.5) : 0.0;
+    LastPaintTime = now;
+    abc::render::pumpRedraw(delta);
   }
   void HideGameUI(VGUI2Extension_CallbackContext *CallbackContext) override {
     // The outer (engine CBaseUI) layer stays native: its engine-root
@@ -216,6 +233,9 @@ public:
     if (CallbackContext->IsPost)
       rmlui::maintainUiMouse();
   }
+
+private:
+  double LastPaintTime = 0.0;
 };
 
 UICallbacks UICallbacksInstance;
@@ -544,12 +564,34 @@ int createTexture() {
 
 void uploadTexture(int textureId, const unsigned char *rgba, int width,
                    int height) {
-  if (!Surface2 || textureId == 0)
+  std::size_t bytes = 0;
+  if (!Surface2 || textureId == 0 || !rgba ||
+      !framework::ResourceLimits::imageBytes(width, height, bytes))
     return;
   // All surface writers (font atlases, module uploads and dynamic media)
   // share this hand-off, including uploads made inside an element render.
   if (auto *renderInterface = rmlui::renderInterface())
     renderInterface->endFrame();
+  // The native engine pads non-power-of-two uploads instead of filling the
+  // whole GL texture. Our draw contract uses normalized UVs, not Surface's
+  // private subrectangle coordinates. Normalize through the upload channel
+  // for every backend, keeping both GL calls and panel drawing out of here.
+  const int uploadWidth =
+      static_cast<int>(std::bit_ceil(static_cast<unsigned int>(width)));
+  const int uploadHeight =
+      static_cast<int>(std::bit_ceil(static_cast<unsigned int>(height)));
+  if (uploadWidth != width || uploadHeight != height) {
+    framework::ImageLoader::DecodedImage input, output;
+    input.Width = width;
+    input.Height = height;
+    input.Pixels.assign(rgba, rgba + bytes);
+    if (!framework::ImageLoader::rescale(input, uploadWidth, uploadHeight,
+                                         output))
+      return;
+    Surface2->DrawSetTextureRGBA(textureId, output.Pixels.data(), uploadWidth,
+                                 uploadHeight, 1, false);
+    return;
+  }
   // hardwareFilter=1: linear filtering (UI glyphs/images), forceReload=false.
   Surface2->DrawSetTextureRGBA(textureId, rgba, width, height, 1, false);
 }
@@ -567,6 +609,12 @@ bool getCursorPos(int &x, int &y) {
     return warnUnavailableOnce(), false;
   Surface2->SurfaceGetCursorPos(x, y);
   return true;
+}
+
+void resetTextureBinding() {
+  if (Surface2) {
+    Surface2->DrawSetTexture(0);
+  }
 }
 
 bool isCursorVisible() {

@@ -480,8 +480,7 @@ void onSurfaceAppEvent(const void *sdlEvent) {
     };
     // Layout A (the VGUI2Extension proxy declares this one): array pointer,
     // count, selection.
-    const char *const *arrayA =
-        reinterpret_cast<const char *const *>(raw[3]);
+    const char *const *arrayA = reinterpret_cast<const char *const *>(raw[3]);
     const int countA = static_cast<int>(raw[4]);
     const int selectedA = static_cast<int>(raw[5]);
     if (validShape(arrayA, countA, selectedA)) {
@@ -490,8 +489,7 @@ void onSurfaceAppEvent(const void *sdlEvent) {
     }
     // Layout B (the count-first build): count, array pointer, selection.
     const int countB = static_cast<int>(raw[3]);
-    const char *const *arrayB =
-        reinterpret_cast<const char *const *>(raw[4]);
+    const char *const *arrayB = reinterpret_cast<const char *const *>(raw[4]);
     const int selectedB = static_cast<int>(raw[5]);
     if (validShape(arrayB, countB, selectedB)) {
       ime::feedCandidatesFromEvent(arrayB, countB, selectedB);

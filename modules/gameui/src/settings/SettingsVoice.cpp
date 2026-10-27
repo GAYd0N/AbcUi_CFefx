@@ -54,7 +54,8 @@ void renderVoiceSectionImpl() {
     const float shown = facts.micDirty ? facts.micVolumeDraft : facts.micVolume;
     const std::string buffer =
         std::format("{}", static_cast<int>(shown * 100.0f + 0.5f));
-    Api->ui->elementSetValue(volumeInput, buffer.c_str());
+    if (attributeOf(volumeInput, "value") != buffer)
+      Api->ui->elementSetValue(volumeInput, buffer.c_str());
     setInnerRml(node("voice-mic-value"), buffer + "%");
   }
   if (boostToggle) {

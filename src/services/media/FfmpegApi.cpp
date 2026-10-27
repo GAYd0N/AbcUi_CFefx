@@ -1,17 +1,21 @@
 #include "FfmpegApi.h"
+#include "framework/NativeHandles.h"
 
 #include <windows.h>
 
-#include <mutex>
-
 namespace media {
 const FfmpegApi &ffmpeg() {
-  static FfmpegApi api;
-  static std::once_flag once;
-  std::call_once(once, [] {
-    const auto library = LoadLibraryA("Mile.FFmpeg.dll");
+  struct Binding {
+    framework::NativeLibrary library;
+    FfmpegApi api;
+  };
+  static Binding binding = [] {
+    Binding result;
+    result.library.reset(LoadLibraryA("Mile.FFmpeg.dll"));
+    const auto library = result.library.get();
     if (!library)
-      return;
+      return result;
+    auto &api = result.api;
     bool complete = true;
 #define ABCUI_LOAD_FFMPEG(name)                                                \
   api.name =                                                                   \
@@ -25,12 +29,12 @@ const FfmpegApi &ffmpeg() {
         AV_VERSION_MAJOR(api.avutil_version()) != LIBAVUTIL_VERSION_MAJOR ||
         AV_VERSION_MAJOR(api.swresample_version()) !=
             LIBSWRESAMPLE_VERSION_MAJOR) {
-      api = {};
-      FreeLibrary(library);
+      return Binding{};
     }
-    // A successful binding stays resident until process exit.
-  });
-  return api;
+    // Workers stop during plugin shutdown, before this owner releases the DLL.
+    return result;
+  }();
+  return binding.api;
 }
 
 bool available() {

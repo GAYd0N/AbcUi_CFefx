@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 5,
+  "source": {
+    "snapshotSchemaVersion": 8,
+    "analysisOutputContractVersion": 3
+  },
+  "binaries": {
+    "client": {
+      "windows": {
+        "alias": [
+          "client_orig.dll",
+          "client_original.dll",
+          "client_org.dll"
+        ],
+        "crc32": "ed791f5b",
+        "crc64": "6ad36cd4373ebb45",
+        "isBlob": false,
+        "md5": "c72d69d461024424f9eae66bdf334656",
+        "sha256": "f40e74b7a703d193188d628066660ff0ac4be2b09613ae4b7f8d2c671991e7d6",
+        "size": 1945600
+      }
+    },
+    "vgui2": {
+      "windows": {
+        "crc32": "0b4e18a2",
+        "crc64": "3eb34a53e22eecc1",
+        "isBlob": false,
+        "md5": "74bdd3ad37b1ddaed9cca116b3e29bdb",
+        "sha256": "1eecc74e76479b6d3901bff27504d3c7809684f61d0fa2fb97449cbd6a73980f",
+        "size": 656896
+      }
+    },
+    "gameui": {
+      "windows": {
+        "crc32": "f1e19ce7",
+        "crc64": "6f447d2fe7e72fcd",
+        "isBlob": false,
+        "md5": "f852e06177fbe0e299e803f11274b8d3",
+        "sha256": "99382b87319d21139c0675d8a45669d64ef930f9e43dbd582461575383545f75",
+        "size": 738816
+      }
+    }
+  },
+  "records": [
+    {
+      "platform": "windows",
+      "module": "client",
+      "symbolName": "AbcUi_PlayerExtraInfo_stride",
+      "kind": "scalar",
+      "payload": {
+        "scalar_name": "AbcUi_PlayerExtraInfo_stride",
+        "scalar_value": 92
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "client",
+      "symbolName": "AbcUiPlayerExtraInfoView.donor",
+      "kind": "structMember",
+      "payload": {
+        "struct_name": "AbcUiPlayerExtraInfoView",
+        "member_name": "donor",
+        "offset": "0x54"
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "client",
+      "symbolName": "AbcUiHudBaseView.flags",
+      "kind": "structMember",
+      "payload": {
+        "struct_name": "AbcUiHudBaseView",
+        "member_name": "flags",
+        "offset": "0x10"
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "vgui2",
+      "symbolName": "AbcUi_IPanel_IsWithinTraverse_index",
+      "kind": "scalar",
+      "payload": {
+        "scalar_name": "AbcUi_IPanel_IsWithinTraverse_index",
+        "scalar_value": 43
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "gameui",
+      "symbolName": "AbcUi_CGameUI_ShowServerPasswordDialog_index",
+      "kind": "scalar",
+      "payload": {
+        "scalar_name": "AbcUi_CGameUI_ShowServerPasswordDialog_index",
+        "scalar_value": 22
+      }
+    },
+    {
+      "platform": "windows",
+      "module": "vgui2",
+      "symbolName": "AbcUi_IPanel_PaintTraverse_index",
+      "kind": "scalar",
+      "payload": {
+        "scalar_name": "AbcUi_IPanel_PaintTraverse_index",
+        "scalar_value": 41
+      }
+    }
+  ]
+}
