@@ -298,6 +298,18 @@ typedef struct AbcUiPopNumEvent {
   int32_t color[4];
 } AbcUiPopNumEvent;
 
+// netmsg.numdisplay - one Sven script HUD number (the NumDisplay usermsg): the
+// mapped channel byte and the value the client draws. NumDisplay is not a
+// damage message by itself; the bdsc PopNumber plugin reserves channel 7 for
+// PvE damage, so only that channel (`channel & 0x0F == 7`) is republished and
+// every other channel stays with the native handler. `value` is the plugin's
+// 0.1s-batched, truncated damage, not one hit.
+#define ABCUI_CHANNEL_NETMSG_NUM_DISPLAY "netmsg.numdisplay"
+typedef struct AbcUiNumDisplayEvent {
+  int32_t channel;
+  float value;
+} AbcUiNumDisplayEvent;
+
 // Engine modtype_t values carried by hud.addentity (com_model.h order).
 #define ABCUI_MODEL_BRUSH 0
 #define ABCUI_MODEL_SPRITE 1

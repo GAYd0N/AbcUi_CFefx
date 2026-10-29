@@ -5,6 +5,7 @@
 
 #include "NetworkMessages.h"
 #include <cmath>
+#include <cstring>
 
 #include <abc/NetMsg.h>
 #include <abc/Console.h>
@@ -86,6 +87,7 @@ pfnUserMsgHook original_TextMsg = nullptr;
 pfnUserMsgHook original_SayText = nullptr;
 pfnUserMsgHook original_Damage = nullptr;
 pfnUserMsgHook original_MetaHook = nullptr;
+pfnUserMsgHook original_NumDisplay = nullptr;
 // hud_vote gate for the VoteMenu consumer (set by the vote module through
 // the module console api at HUD_Init - before any usermsg can arrive, so the
 // null branch is unreachable in practice; null would pass the message
@@ -638,6 +640,25 @@ int __MsgFunc_MetaHook(const char *pszName, int iSize, void *pbuf) {
   }
   return original_MetaHook ? original_MetaHook(pszName, iSize, pbuf) : 0;
 }
+
+// NumDisplay (Sven script HUD): u8 mapped channel, i32 flags, f32 value, then
+// the layout parameters (digits, x/y, two RGBA pairs, sprite). The value is
+// read as a float, not a long: the server writes the float's four bytes.
+// Only channel 7 is republished - that is the bdsc PopNumber plugin's PvE
+// damage channel. The native handler always runs; it owns the drawn number and
+// this hook only mirrors the value to the event bus.
+int __MsgFunc_NumDisplay(const char *pszName, int iSize, void *pbuf) {
+  if (iSize >= 9 && pbuf) {
+    const auto *bytes = static_cast<const unsigned char *>(pbuf);
+    const int channel = bytes[0];
+    float value = 0.0f;
+    std::memcpy(&value, bytes + 5, sizeof(value));
+    if ((channel & 0x0F) == 7 && std::isfinite(value))
+      framework::eventBus().publish(ABCUI_CHANNEL_NETMSG_NUM_DISPLAY,
+                                    AbcUiNumDisplayEvent{channel, value});
+  }
+  return original_NumDisplay ? original_NumDisplay(pszName, iSize, pbuf) : 1;
+}
 #pragma endregion
 
 // HookUserMsg returns the previous handler. A refresh after a client reload
@@ -707,6 +728,17 @@ void registerUserMsgHooks() {
     abc::ConsoleWarn("[AbcUi] inventory messages (InvAdd/InvRemove) were not "
                      "registered by the client; the inventory page has no "
                      "data\n");
+  }
+  // NumDisplay is registered by the client's CHudNumDisplay::Init in the same
+  // HUD_Init pass. A null previous handler means the usermsg table does not
+  // carry the name (or this ran before the client's HUD_Init); the hook is then
+  // not installed and the value stream stays silent.
+  installHook("NumDisplay", __MsgFunc_NumDisplay, original_NumDisplay);
+  static bool warnedMissingNumDisplay = false;
+  if (!original_NumDisplay && !warnedMissingNumDisplay) {
+    warnedMissingNumDisplay = true;
+    abc::ConsoleWarn("[AbcUi] NumDisplay was not registered by the client; "
+                     "script HUD numbers stay unread\n");
   }
 }
 
