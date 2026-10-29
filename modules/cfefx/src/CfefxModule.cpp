@@ -702,18 +702,6 @@ void ABCUI_CALL onPopNum(void *, const void *payload) {
   onDamage(event->value);
 }
 
-// netmsg.numdisplay: Sven's script HUD numbers. The bdsc PopNumber plugin
-// sends PvE damage on channel 7; print it so the capture is observable in the
-// console. The accumulator above still consumes netmsg.popnum - feeding the
-// numdisplay value into onDamage is a separate decision.
-void ABCUI_CALL onNumDisplay(void *, const void *payload) {
-  if (!payload)
-    return;
-  const auto *event = static_cast<const AbcUiNumDisplayEvent *>(payload);
-  Api->core->print("[AbcUi] numdisplay: channel=%d value=%.1f\n",
-                   event->channel, event->value);
-}
-
 // -------------------------------------------------------------- cvars ------
 
 void ABCUI_CALL clampMaxDamage(void *) {
@@ -875,8 +863,6 @@ void ABCUI_CALL onModuleLoad() {
   // per process and guards on the document handle, because the panel list is
   // rebuilt every HUD_Init while the bus lives for the whole process.
   Api->events->subscribe(ABCUI_CHANNEL_NETMSG_POP_NUM, 0, &onPopNum, nullptr);
-  Api->events->subscribe(ABCUI_CHANNEL_NETMSG_NUM_DISPLAY, 0, &onNumDisplay,
-                         nullptr);
 }
 
 void ABCUI_CALL onModuleInit() {
